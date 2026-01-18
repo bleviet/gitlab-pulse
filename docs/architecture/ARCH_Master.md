@@ -115,7 +115,12 @@ To validate Layer 2 (Logic) and Layer 3 (UI Performance) without hitting GitLab 
 
 * **Tool:** tools/seeder.py  
 * **Mechanism:** Generates synthetic Parquet files directly into data/processed/.  
-* **Scale:** Capable of generating 100,000+ realistic records with injected "dirty data" (missing labels, conflicts) to verify validation rules and dashboard latency under load.
+*   **Scale:** Capable of generating 100,000+ realistic records with injected "dirty data" (missing labels, conflicts) to verify validation rules and dashboard latency under load.
+
+### **6.2. Live Integration Testing**
+
+*   **Tool:** tools/gitlab\_seeder.py
+*   **Role:** Populates a real GitLab project with known test data (including Task hierarchy via GraphQL) to verify the Layer 1 Collector against actual API behaviors.
 
 ## **7\. System Structure Summary**
 
@@ -132,7 +137,8 @@ To validate Layer 2 (Logic) and Layer 3 (UI Performance) without hitting GitLab 
 │   ├── analytics/          \# L2 Output: Trusted KPIs (Parquet)  
 │   └── state/              \# Sync timestamps  
 └── tools/  
-    └── seeder.py           \# Synthetic data generator for testing
+    ├── seeder.py           \# Synthetic data generator for testing
+    └── gitlab_seeder.py    \# Live data generator for integration testing
 ```
 
 ## **8\. Conclusion**
