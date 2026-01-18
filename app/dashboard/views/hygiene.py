@@ -196,7 +196,7 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
         column_config={
             "IID": st.column_config.LinkColumn(
                 "IID", 
-                display_text=r"/issues/(\d+)$", 
+                display_text=r"/(?:issues|work_items)/(\d+)$", 
                 width="small"
             ),
             "Title": st.column_config.TextColumn("Title", width="large"),
