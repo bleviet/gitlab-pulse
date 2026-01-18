@@ -36,6 +36,9 @@ class RawIssue(BaseModel):
     web_url: Optional[str] = Field(default=None, description="Issue URL")
     assignee: Optional[str] = Field(default=None, description="Assignee username")
     milestone: Optional[str] = Field(default=None, description="Milestone title")
+    milestone_id: Optional[int] = Field(default=None, description="Milestone ID")
+    milestone_due_date: Optional[datetime] = Field(default=None, description="Milestone due date")
+    milestone_start_date: Optional[datetime] = Field(default=None, description="Milestone start date")
 
     model_config = {"frozen": False, "extra": "ignore"}
 
@@ -75,9 +78,6 @@ class AnalyticsIssue(BaseModel):
     web_url: Optional[str] = None
     assignee: Optional[str] = None
     milestone: Optional[str] = None
-    milestone_id: Optional[int] = None
-    milestone_due_date: Optional[datetime] = None
-    milestone_start_date: Optional[datetime] = None  # Title
     milestone_id: Optional[int] = None
     milestone_due_date: Optional[datetime] = None
     milestone_start_date: Optional[datetime] = None
