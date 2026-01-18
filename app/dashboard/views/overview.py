@@ -100,66 +100,114 @@ def _render_kpi_cards(df: pd.DataFrame) -> None:
 
 
 def _render_burnup_chart(df: pd.DataFrame) -> None:
-    """Render cumulative burn-up line chart."""
-    st.subheader("📈 Cumulative Flow")
+    """Render Faceted Cumulative Flow Diagram (Small Multiples).
+
+    3 stacked panels: Features (top), Bugs (middle), Tasks (bottom).
+    All share the same X-axis (time) for vertical correlation.
+    """
+    st.subheader("📈 Cumulative Flow by Type")
 
     if df.empty:
-        st.info("No data for burn-up chart")
+        st.info("No data for cumulative flow chart")
         return
 
-    # Group by week (remove timezone before period conversion to avoid warning)
+    # Prepare weekly data (remove timezone before period conversion)
     df_copy = df.copy()
     df_copy["created_week"] = df_copy["created_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
 
-    # Calculate cumulative created
-    weekly_created = df_copy.groupby("created_week").size().cumsum().reset_index()
-    weekly_created.columns = ["week", "Created"]
+    # Panel configuration per TSD spec
+    panels = [
+        {"type": "Feature", "title": "Features (Value Flow)", "fill": "#166534", "area": "#BBF7D0"},
+        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": "#991B1B", "area": "#FCA5A5"},
+        {"type": "Task", "title": "Tasks (Maintenance)", "fill": "#374151", "area": "#D1D5DB"},
+    ]
 
-    # Calculate cumulative closed
-    closed_df = df_copy[df_copy["closed_at"].notna()].copy()
-    if not closed_df.empty:
-        closed_df["closed_week"] = closed_df["closed_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
-        weekly_closed = closed_df.groupby("closed_week").size().cumsum().reset_index()
-        weekly_closed.columns = ["week", "Closed"]
+    # Create subplots with shared X-axis
+    from plotly.subplots import make_subplots
 
-        # Merge
-        chart_df = weekly_created.merge(weekly_closed, on="week", how="left").ffill().fillna(0)
-    else:
-        chart_df = weekly_created
-        chart_df["Closed"] = 0
+    fig = make_subplots(
+        rows=3, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.08,
+        subplot_titles=[p["title"] for p in panels],
+    )
 
-    # Create Plotly chart
-    fig = go.Figure()
+    # Get all weeks for consistent x-axis
+    all_weeks = sorted(df_copy["created_week"].unique())
 
-    fig.add_trace(go.Scatter(
-        x=chart_df["week"],
-        y=chart_df["Created"],
-        mode="lines",
-        name="Created",
-        line=dict(color=COLORS["primary"], width=2),
-        fill="tozeroy",
-        fillcolor="rgba(79, 70, 229, 0.1)",
-    ))
+    for i, panel in enumerate(panels, start=1):
+        type_df = df_copy[df_copy["issue_type"] == panel["type"]].copy()
 
-    fig.add_trace(go.Scatter(
-        x=chart_df["week"],
-        y=chart_df["Closed"],
-        mode="lines",
-        name="Closed",
-        line=dict(color=COLORS["task"], width=2),
-        fill="tozeroy",
-        fillcolor="rgba(16, 185, 129, 0.1)",
-    ))
+        if type_df.empty:
+            # Add empty traces for consistency
+            fig.add_trace(go.Scatter(
+                x=all_weeks, y=[0] * len(all_weeks),
+                mode="lines", name=f'{panel["type"]} Created',
+                line=dict(color=panel["fill"], width=2),
+                showlegend=False,
+            ), row=i, col=1)
+            continue
 
+        # Calculate cumulative created
+        weekly_created = type_df.groupby("created_week").size().reindex(all_weeks, fill_value=0).cumsum()
+
+        # Calculate cumulative closed
+        closed_df = type_df[type_df["closed_at"].notna()].copy()
+        if not closed_df.empty:
+            closed_df["closed_week"] = closed_df["closed_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
+            weekly_closed = closed_df.groupby("closed_week").size().reindex(all_weeks, fill_value=0).cumsum()
+        else:
+            weekly_closed = pd.Series([0] * len(all_weeks), index=all_weeks)
+
+        # Total Created line (background - shows scope)
+        fig.add_trace(go.Scatter(
+            x=weekly_created.index,
+            y=weekly_created.values,
+            mode="lines",
+            name=f'{panel["type"]} Created',
+            line=dict(color=panel["fill"], width=2),
+            fill="tozeroy",
+            fillcolor=panel["area"],
+            showlegend=False,
+            hovertemplate="Created: %{y}<extra></extra>",
+        ), row=i, col=1)
+
+        # Total Closed filled area (foreground - shows completed work)
+        fig.add_trace(go.Scatter(
+            x=weekly_closed.index,
+            y=weekly_closed.values,
+            mode="lines",
+            name=f'{panel["type"]} Closed',
+            line=dict(color=panel["fill"], width=2),
+            fill="tozeroy",
+            fillcolor=panel["fill"],
+            showlegend=False,
+            hovertemplate="Closed: %{y}<extra></extra>",
+        ), row=i, col=1)
+
+    # Update layout per TSD spec
     fig.update_layout(
-        margin=dict(l=0, r=0, t=30, b=0),
+        height=600,
+        margin=dict(l=0, r=0, t=50, b=0),
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=False),
-        yaxis=dict(gridcolor="rgba(100,116,139,0.2)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        hovermode="x unified",
     )
+
+    # Per-panel y-axis settings (independent scaling)
+    for i in range(1, 4):
+        fig.update_yaxes(
+            showgrid=True,
+            gridcolor="rgba(100,116,139,0.2)",
+            zeroline=False,
+            row=i, col=1,
+        )
+        fig.update_xaxes(
+            showgrid=False,
+            showticklabels=(i == 3),  # Only show x-axis labels on bottom panel
+            row=i, col=1,
+        )
 
     st.plotly_chart(fig, width="stretch")
 
