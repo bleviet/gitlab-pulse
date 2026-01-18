@@ -72,9 +72,11 @@ def apply_label_mappings(
 ) -> pd.DataFrame:
     """Apply label mappings to extract issue_type, severity, etc.
 
+    Falls back to title pattern matching when labels don't provide type.
+
     Args:
         df: DataFrame with labels column
-        rule: Domain rule with label mappings
+        rule: Domain rule with label mappings and title patterns
 
     Returns:
         DataFrame with issue_type, severity, team columns
@@ -89,6 +91,14 @@ def apply_label_mappings(
         lambda labels: _find_mapped_label(labels, rule.label_mappings.type)
     )
 
+    # Fallback: infer type from title when label mapping didn't find a match
+    if rule.title_patterns.type:
+        missing_type_mask = df["issue_type"].isna()
+        if missing_type_mask.any():
+            df.loc[missing_type_mask, "issue_type"] = df.loc[missing_type_mask, "title"].apply(
+                lambda title: _infer_type_from_title(title, rule.title_patterns.type)
+            )
+
     # Extract severity from labels
     df["severity"] = df["labels"].apply(
         lambda labels: _find_mapped_label(labels, rule.label_mappings.severity)
@@ -98,6 +108,29 @@ def apply_label_mappings(
     df["team"] = rule.team
 
     return df
+
+
+def _infer_type_from_title(title: str, patterns: dict[str, str]) -> Optional[str]:
+    """Infer issue type from title using regex patterns.
+
+    Args:
+        title: Issue title
+        patterns: Dict mapping regex patterns to type names
+
+    Returns:
+        Matched type name or None
+    """
+    import re
+
+    if not title or not patterns:
+        return None
+
+    for pattern, type_name in patterns.items():
+        # Case-insensitive search
+        if re.search(pattern, title, re.IGNORECASE):
+            return type_name
+
+    return None
 
 
 def _find_mapped_label(labels: object, mapping: dict[str, str]) -> Optional[str]:

@@ -4,6 +4,8 @@
 # Project mapping (required field)
 project_ids:
   - 101  # Example project ID
+  - 102  # Additional project
+  - 103  # Additional project
 
 # Team/Domain identifier
 team: "default"
@@ -24,6 +26,13 @@ label_mappings:
     "priority::1": "P1"
     "priority::2": "P2"
     "priority::3": "P3"
+
+# Title patterns: infer type from title when labels are missing (case-insensitive regex)
+title_patterns:
+  type:
+    "\\bbug\\b|\\bfix\\b|\\berror\\b|\\bcrash\\b": "Bug"
+    "\\bfeature\\b|\\benhancement\\b|\\badd\\b": "Feature"
+    "\\btask\\b|\\brefactor\\b|\\bupdate\\b|\\bclean": "Task"
 
 # Validation rules
 validation:

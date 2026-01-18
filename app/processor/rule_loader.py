@@ -21,6 +21,15 @@ class LabelMappings(BaseModel):
     priority: dict[str, str] = Field(default_factory=dict)
 
 
+class TitlePatterns(BaseModel):
+    """Title pattern configuration for inferring type from issue title.
+
+    Maps regex patterns (case-insensitive) to issue types.
+    """
+
+    type: dict[str, str] = Field(default_factory=dict)  # pattern -> type_name
+
+
 class ValidationConfig(BaseModel):
     """Validation rules configuration."""
 
@@ -35,6 +44,7 @@ class DomainRule(BaseModel):
     project_ids: list[int] = Field(default_factory=list)
     team: str = "default"
     label_mappings: LabelMappings = Field(default_factory=LabelMappings)
+    title_patterns: TitlePatterns = Field(default_factory=TitlePatterns)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     colors: dict[str, str] = Field(default_factory=dict)
 
