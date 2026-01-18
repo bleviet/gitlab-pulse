@@ -159,14 +159,31 @@ class Orchestrator:
         # Convert to DataFrame
         new_df = pd.DataFrame([issue.model_dump() for issue in issues])
 
-        # Ensure datetime columns are properly typed in new data (avoids concat warnings)
-        for col in ["created_at", "updated_at", "closed_at", "milestone_due_date", "milestone_start_date"]:
+        # Ensure datetime columns are properly typed in new data
+        datetime_cols = ["created_at", "updated_at", "closed_at", "milestone_due_date", "milestone_start_date"]
+        for col in datetime_cols:
             if col in new_df.columns:
+                # Force to datetime, coercing errors, ensuring UTC
                 new_df[col] = pd.to_datetime(new_df[col], utc=True)
-        
+
         # Merge with existing data (upsert on id)
         if filepath.exists():
             existing_df = pd.read_parquet(filepath)
+            
+            # Align columns: Ensure new_df has all columns from existing_df to avoid concat warnings
+            # about empty/NA columns being treated differently
+            for col in existing_df.columns:
+                if col not in new_df.columns:
+                    new_df[col] = None
+            
+            # Explicitly cast all-NA columns in new_df to match existing_df types where possible
+            for col in new_df.columns:
+                if col in existing_df.columns and new_df[col].isna().all():
+                    try:
+                        new_df[col] = new_df[col].astype(existing_df[col].dtype)
+                    except Exception:
+                        pass # Keep as is if cast fails
+
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
             combined_df = combined_df.drop_duplicates(subset=["id"], keep="last")
         else:
