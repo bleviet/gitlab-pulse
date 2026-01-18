@@ -150,6 +150,18 @@ def generate_issues(
         }
         issues.append(issue)
 
+    # Post-processing: Populate child_ids
+    # Create a quick lookup map
+    issue_map = {issue["id"]: issue for issue in issues}
+
+    for issue in issues:
+        parent_id = issue.get("parent_id")
+        if parent_id and parent_id in issue_map:
+            parent = issue_map[parent_id]
+            if "child_ids" not in parent:
+                parent["child_ids"] = []
+            parent["child_ids"].append(issue["iid"])  # linking by IID as per schema
+
     return pd.DataFrame(issues)
 
 

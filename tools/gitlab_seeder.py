@@ -113,46 +113,53 @@ def setup_milestones(project) -> list[object]:
     return active_milestones
 
 
-def generate_issue_payload(milestones: list) -> dict:
+def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None) -> dict:
     """Generate a valid issue payload."""
-    # Logic similar to seeder.py but formatted for API
-    
-    # 1. Labels
     issue_labels = []
     
-    # Type
-    issue_type = random.choice(["type::bug", "type::feature", "type::task"])
-    issue_labels.append(issue_type)
+    # Decide Type: 80% Issue, 20% Task (only if parent available)
+    is_task = parent_iid is not None and random.random() < 0.2
     
-    # Severity (for bugs)
-    if issue_type == "type::bug":
-        issue_labels.append(random.choice([k for k in LABELS if "severity" in k]))
+    if is_task:
+        issue_type_param = "task"
+        title_prefix = "Task: "
+        # Labels
+        issue_labels.append("type::task")
+        issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
+        issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
         
-    # Priority
-    issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
-    
-    # Workflow
-    issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
-    
-    # 2. Milestone (80% chance)
+        description = fake.paragraph()
+        if parent_iid:
+            description += f"\n\nParent: #{parent_iid}"
+            
+    else:
+        issue_type_param = "issue"
+        # Standard Issue logic...
+        type_label = random.choice(["type::bug", "type::feature"])
+        issue_labels.append(type_label)
+        
+        if type_label == "type::bug":
+            title_prefix = "Bug: "
+            issue_labels.append(random.choice([k for k in LABELS if "severity" in k]))
+        else:
+            title_prefix = "Feat: "
+            
+        issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
+        issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
+        description = fake.paragraph()
+
+    # Milestone (Tasks can have milestones too)
     milestone_id = None
     if milestones and random.random() < 0.8:
         ms = random.choice(milestones)
         milestone_id = ms.id
         
-    # 3. Title
-    if issue_type == "type::bug":
-        title = f"Bug: {fake.sentence(nb_words=6)}"
-    elif issue_type == "type::feature":
-        title = f"Feat: {fake.sentence(nb_words=6)}"
-    else:
-        title = f"Task: {fake.sentence(nb_words=6)}"
-        
     return {
-        "title": title,
-        "description": fake.paragraph(),
+        "title": f"{title_prefix}{fake.sentence(nb_words=6)}",
+        "description": description,
         "labels": issue_labels,
         "milestone_id": milestone_id,
+        "issue_type": issue_type_param, # Support native type
         "created_at": (datetime.now() - timedelta(days=random.randint(0, 60))).isoformat()
     }
 
@@ -161,19 +168,37 @@ def seed_issues(project, count: int, milestones: list) -> None:
     """Create synthetic issues."""
     logger.info(f"Seeding {count} issues...")
     
+    potential_parents = []
+    
     for i in range(count):
-        payload = generate_issue_payload(milestones)
+        # Pick a parent if available
+        parent_iid = None
+        if potential_parents:
+            parent_iid = random.choice(potential_parents)
+            
+        payload = generate_issue_payload(milestones, parent_iid)
         
         try:
             issue = project.issues.create(payload)
-            logger.info(f"Created issue #{issue.iid}: {issue.title}")
+            logger.info(f"Created issue #{issue.iid} ({payload['issue_type']}): {issue.title}")
             
+            # If it's a standard issue, add to parents list
+            if payload["issue_type"] == "issue":
+                potential_parents.append(issue.iid)
+            
+            if parent_iid:
+                try:
+                    # Use a separate note for linking (reliable)
+                    issue.notes.create({"body": f"/parent #{parent_iid}"})
+                    logger.info(f"  -> Linked to parent #{parent_iid}")
+                except Exception as e:
+                    logger.warning(f"  -> Failed to link parent #{parent_iid}: {e}")
+
             # Simulate state (Closed/Open)
             if random.random() < 0.5:
                 issue.state_event = "close"
                 issue.save()
                 
-            # Rate limiting / kindness
             time.sleep(0.5)
             
         except Exception as e:
