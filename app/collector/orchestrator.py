@@ -87,6 +87,12 @@ class Orchestrator:
             return 0
 
         # Step 4: Enrich with GraphQL (hierarchy)
+        if not project_path:
+            try:
+                project_path = self.rest_client.get_project_path(project_id)
+            except Exception as e:
+                logger.warning(f"Could not fetch project path for {project_id}, skipping hierarchy: {e}")
+
         if project_path:
             iids = [issue.iid for issue in issues]
             hierarchy = self.gql_client.fetch_hierarchy(project_path, iids)

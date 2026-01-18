@@ -123,6 +123,12 @@ class RestClient:
             "milestone_start_date": attrs.get("milestone", {}).get("start_date") if attrs.get("milestone") else None,
         }
 
+    def get_project_path(self, project_id: int) -> str:
+        """Fetch the full project path (namespace/name)."""
+        project = self.gl.projects.get(project_id)
+        return project.path_with_namespace
+
+
     def _persist_raw(self, project_id: int, issues: list[dict[str, Any]]) -> None:
         """Persist raw JSON response to Layer 0.
 
