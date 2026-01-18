@@ -67,6 +67,14 @@ class StateManager:
             return project_state.last_updated_at
         return None
 
+    def get_tracked_projects(self) -> list[int]:
+        """Get all project IDs that have been synced before.
+
+        Returns:
+            List of project IDs from the state file
+        """
+        return list(self.state.projects.keys())
+
     def update_project(
         self,
         project_id: int,

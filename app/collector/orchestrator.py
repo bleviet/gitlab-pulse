@@ -134,9 +134,18 @@ class Orchestrator:
         """
         if project_ids is None:
             env_projects = os.environ.get("PROJECT_IDS", "")
-            if not env_projects:
-                raise ValueError("PROJECT_IDS environment variable is required")
-            project_ids = [int(p.strip()) for p in env_projects.split(",")]
+            if env_projects:
+                project_ids = [int(p.strip()) for p in env_projects.split(",")]
+            else:
+                # Fall back to previously synced projects from state file
+                project_ids = self.state_manager.get_tracked_projects()
+                if project_ids:
+                    logger.info(f"Using {len(project_ids)} projects from sync state")
+                else:
+                    raise ValueError(
+                        "No PROJECT_IDS environment variable and no previously synced projects. "
+                        "Please set PROJECT_IDS or use --project-ids flag for initial sync."
+                    )
 
         results: dict[int, int] = {}
         for project_id in project_ids:
