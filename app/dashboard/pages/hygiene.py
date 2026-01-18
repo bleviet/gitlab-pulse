@@ -109,7 +109,7 @@ def _render_scorecard(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch")
 
     # Summary metrics
     col1, col2, col3 = st.columns(3)
@@ -160,7 +160,7 @@ def _render_error_distribution(quality_df: pd.DataFrame) -> None:
         height=200,
     )
 
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_action_table(quality_df: pd.DataFrame) -> None:
@@ -187,7 +187,7 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
 
     st.dataframe(
         display_df.style.apply(style_error_code, axis=1),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "iid": st.column_config.NumberColumn("IID", width="small"),

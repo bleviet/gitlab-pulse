@@ -107,9 +107,9 @@ def _render_burnup_chart(df: pd.DataFrame) -> None:
         st.info("No data for burn-up chart")
         return
 
-    # Group by week
+    # Group by week (remove timezone before period conversion to avoid warning)
     df_copy = df.copy()
-    df_copy["created_week"] = df_copy["created_at"].dt.to_period("W").dt.start_time
+    df_copy["created_week"] = df_copy["created_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
 
     # Calculate cumulative created
     weekly_created = df_copy.groupby("created_week").size().cumsum().reset_index()
@@ -118,12 +118,12 @@ def _render_burnup_chart(df: pd.DataFrame) -> None:
     # Calculate cumulative closed
     closed_df = df_copy[df_copy["closed_at"].notna()].copy()
     if not closed_df.empty:
-        closed_df["closed_week"] = closed_df["closed_at"].dt.to_period("W").dt.start_time
+        closed_df["closed_week"] = closed_df["closed_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
         weekly_closed = closed_df.groupby("closed_week").size().cumsum().reset_index()
         weekly_closed.columns = ["week", "Closed"]
 
         # Merge
-        chart_df = weekly_created.merge(weekly_closed, on="week", how="left").fillna(method="ffill").fillna(0)
+        chart_df = weekly_created.merge(weekly_closed, on="week", how="left").ffill().fillna(0)
     else:
         chart_df = weekly_created
         chart_df["Closed"] = 0
@@ -161,7 +161,7 @@ def _render_burnup_chart(df: pd.DataFrame) -> None:
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
 
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_work_distribution(df: pd.DataFrame) -> None:
@@ -202,7 +202,7 @@ def _render_work_distribution(df: pd.DataFrame) -> None:
         yaxis=dict(showgrid=False),
     )
 
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_status_donut(df: pd.DataFrame) -> None:
@@ -234,4 +234,4 @@ def _render_status_donut(df: pd.DataFrame) -> None:
         legend=dict(orientation="h", yanchor="bottom", y=-0.1),
     )
 
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")

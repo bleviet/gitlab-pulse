@@ -136,7 +136,7 @@ def _render_age_boxplot(df: pd.DataFrame, group_col: str) -> None:
                       "Age: %{y} days<extra></extra>",
     )
 
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_stale_table(df: pd.DataFrame) -> None:
@@ -165,7 +165,7 @@ def _render_stale_table(df: pd.DataFrame) -> None:
 
     st.dataframe(
         display_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "iid": st.column_config.NumberColumn("IID", width="small"),

@@ -55,13 +55,13 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         # Quick range buttons
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("30 Days", use_container_width=True):
+            if st.button("30 Days", width="stretch"):
                 st.session_state.date_range = (
                     max_date - timedelta(days=30),
                     max_date,
                 )
         with col2:
-            if st.button("90 Days", use_container_width=True):
+            if st.button("90 Days", width="stretch"):
                 st.session_state.date_range = (
                     max_date - timedelta(days=90),
                     max_date,
@@ -69,13 +69,13 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
         col3, col4 = st.columns(2)
         with col3:
-            if st.button("1 Year", use_container_width=True):
+            if st.button("1 Year", width="stretch"):
                 st.session_state.date_range = (
                     max_date - timedelta(days=365),
                     max_date,
                 )
         with col4:
-            if st.button("All Time", use_container_width=True):
+            if st.button("All Time", width="stretch"):
                 st.session_state.date_range = (min_date, max_date)
 
         # Date range slider
