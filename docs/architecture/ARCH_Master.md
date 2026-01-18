@@ -45,6 +45,7 @@ Tracks the *effectiveness* of delivering the plan (Milestones).
 
 * **REST API (python-gitlab):** Used for high-volume metadata retrieval (titles, labels, timestamps). **Update**: Must specifically flatten the milestone object to extract milestone_title and milestone_due_date for every issue. 
 * **GraphQL API:** Used specifically for **Hierarchy Resolution**. It resolves Parent-Child links (Issues to Tasks) not natively accessible via the REST Issue API, supporting modern GitLab work items.  
+* **Milestones Collector:** Fetches all milestones independently (active and closed), enabling visibility into empty milestones and deadline tracking.
 * **Incremental Sync:** Uses a sync\_state.json to track updated\_after timestamps, reducing API load by \>90%.
 
 ### **3.2. ADR: Why Pydantic for Ingestion?**

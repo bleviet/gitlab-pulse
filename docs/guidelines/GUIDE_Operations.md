@@ -49,7 +49,55 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 
 ---
 
-## **3. Automation Example (Cron)**
+## **3. Admin Interface (UI-based Operations)**
+
+For operators who prefer a graphical interface, the Dashboard includes a password-protected **Admin Panel**.
+
+### **3.1. Accessing the Admin Panel**
+1. Open the Dashboard Sidebar.
+2. Expand **"⚡ Admin Access"**.
+3. Enter the password (default: `admin`, or set via `ADMIN_PASSWORD` env var).
+
+### **3.2. Available Actions**
+| Action | Description |
+| :--- | :--- |
+| **Run Collector (L1)** | Trigger data fetch from GitLab directly from UI |
+| **Run Processor (L2)** | Trigger data processing directly from UI |
+| **Clear Cache** | Force immediate refresh of dashboard data |
+
+---
+
+## **4. Project Auto-Discovery**
+
+After the initial setup, the Collector can automatically determine which projects to sync.
+
+### **4.1. First-Time Setup**
+You must specify `PROJECT_IDS` for the first sync:
+```bash
+export PROJECT_IDS="12345,67890"
+uv run python app/collector/orchestrator.py
+```
+
+### **4.2. Subsequent Syncs**
+Once projects are in `sync_state.json`, you can remove `PROJECT_IDS` from `.env`. The Collector will:
+1. Read `data/state/sync_state.json`.
+2. Re-sync all previously tracked projects.
+
+This means the Admin "Run Collector" button works without any manual configuration.
+
+---
+
+## **5. Milestones**
+
+The Collector also fetches **milestones** independently from issues.
+
+- **Storage:** `data/processed/milestones_{project_id}.parquet`
+- **Sync Behavior:** Always full refresh (lightweight, no incremental needed)
+- **Dashboard:** Milestones appear in the Release view with status indicators (On Track, Due Soon, Overdue)
+
+---
+
+## **6. Automation Example (Cron)**
 
 To automate this daily at 2 AM:
 
