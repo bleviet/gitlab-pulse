@@ -8,6 +8,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.utils import sort_hierarchy
+
 # Semantic color palette
 COLORS = {
     "primary": "#4F46E5",
@@ -199,8 +201,12 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     else:
         display_df = df.copy()
 
-    # 3. Sort by Age (Staleness focus)
-    display_df = display_df.sort_values("days_in_stage", ascending=False)
+    # 3. Sort by Hierarchy (Parent -> Child) or Staleness
+    # User requested hierarchical view.
+    if "parent_id" in display_df.columns:
+        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="id", title_col="title")
+    else:
+        display_df = display_df.sort_values("days_in_stage", ascending=False)
 
     # 4. Select Columns
     cols_to_show = [
