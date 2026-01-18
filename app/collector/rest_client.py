@@ -76,8 +76,11 @@ class RestClient:
         }
 
         if updated_after:
-            params["updated_after"] = updated_after.isoformat()
-            logger.info(f"Incremental sync: updated_after={updated_after}")
+            # Add 1 second to make the filter exclusive (GitLab uses >=)
+            from datetime import timedelta
+            exclusive_after = updated_after + timedelta(seconds=1)
+            params["updated_after"] = exclusive_after.isoformat()
+            logger.info(f"Incremental sync: updated_after={exclusive_after}")
 
         # Fetch all pages
         raw_issues: list[dict[str, Any]] = []
