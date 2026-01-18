@@ -24,10 +24,11 @@ class LabelMappings(BaseModel):
 class TitlePatterns(BaseModel):
     """Title pattern configuration for inferring type from issue title.
 
-    Maps regex patterns (case-insensitive) to issue types.
+    Maps type names to lists of keywords (case-insensitive matching).
+    Example: {"Bug": ["bug", "fix", "error"], "Feature": ["feature", "add"]}
     """
 
-    type: dict[str, str] = Field(default_factory=dict)  # pattern -> type_name
+    type: dict[str, list[str]] = Field(default_factory=dict)  # type_name -> keywords
 
 
 class ValidationConfig(BaseModel):

@@ -27,12 +27,24 @@ label_mappings:
     "priority::2": "P2"
     "priority::3": "P3"
 
-# Title patterns: infer type from title when labels are missing (case-insensitive regex)
+# Title patterns: infer type from title when labels are missing (case-insensitive)
+# Simple keyword matching - if title contains any keyword, assign that type
 title_patterns:
   type:
-    "\\bbug\\b|\\bfix\\b|\\berror\\b|\\bcrash\\b": "Bug"
-    "\\bfeature\\b|\\benhancement\\b|\\badd\\b": "Feature"
-    "\\btask\\b|\\brefactor\\b|\\bupdate\\b|\\bclean": "Task"
+    Bug:
+      - bug
+      - fix
+      - error
+      - crash
+    Feature:
+      - feature
+      - enhancement
+      - add
+    Task:
+      - task
+      - refactor
+      - update
+      - clean
 
 # Validation rules
 validation:

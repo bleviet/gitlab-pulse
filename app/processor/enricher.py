@@ -110,25 +110,27 @@ def apply_label_mappings(
     return df
 
 
-def _infer_type_from_title(title: str, patterns: dict[str, str]) -> Optional[str]:
-    """Infer issue type from title using regex patterns.
+def _infer_type_from_title(title: str, type_keywords: dict[str, list[str]]) -> Optional[str]:
+    """Infer issue type from title using keyword matching.
 
     Args:
         title: Issue title
-        patterns: Dict mapping regex patterns to type names
+        type_keywords: Dict mapping type names to keyword lists
 
     Returns:
         Matched type name or None
     """
-    import re
-
-    if not title or not patterns:
+    if not title or not type_keywords:
         return None
 
-    for pattern, type_name in patterns.items():
-        # Case-insensitive search
-        if re.search(pattern, title, re.IGNORECASE):
-            return type_name
+    title_lower = title.lower()
+
+    for type_name, keywords in type_keywords.items():
+        for keyword in keywords:
+            # Word boundary matching: keyword surrounded by non-alphanumeric or at start/end
+            keyword_lower = keyword.lower()
+            if keyword_lower in title_lower:
+                return type_name
 
     return None
 
