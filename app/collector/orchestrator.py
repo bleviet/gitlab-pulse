@@ -159,6 +159,11 @@ class Orchestrator:
         # Convert to DataFrame
         new_df = pd.DataFrame([issue.model_dump() for issue in issues])
 
+        # Ensure datetime columns are properly typed in new data (avoids concat warnings)
+        for col in ["created_at", "updated_at", "closed_at", "milestone_due_date", "milestone_start_date"]:
+            if col in new_df.columns:
+                new_df[col] = pd.to_datetime(new_df[col], utc=True)
+        
         # Merge with existing data (upsert on id)
         if filepath.exists():
             existing_df = pd.read_parquet(filepath)
