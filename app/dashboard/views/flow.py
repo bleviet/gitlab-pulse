@@ -204,7 +204,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # 4. Select Columns
     cols_to_show = [
-        "iid", "title", "stage", "days_in_stage", "assignee", "web_url"
+        "web_url", "title", "stage", "days_in_stage", "assignee"
     ]
     # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
@@ -215,20 +215,27 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
         "stage": "Stage",
         "title": "Title",
         "assignee": "Assignee",
-        "iid": "IID",
+        "web_url": "IID",  # Map URL to IID column for clickable link
     })
 
     # 5. Render Dataframe with Links
     st.dataframe(
         display_df,
         column_config={
-            "web_url": st.column_config.LinkColumn("GitLab Link"),
+            "IID": st.column_config.LinkColumn(
+                "IID", 
+                display_text=r"/issues/(\d+)$", 
+                width="small",
+                help="Click to open in GitLab"
+            ),
+            "Title": st.column_config.TextColumn("Title", width="large"),
             "Days in Stage": st.column_config.NumberColumn(
                 "Days in Stage",
                 help="Days since last update in this stage",
                 format="%d days",
             ),
         },
+        column_order=["IID", "Title", "Stage", "Days in Stage", "Assignee"],
         width="stretch",
         hide_index=True,
     )

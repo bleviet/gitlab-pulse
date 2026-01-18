@@ -154,7 +154,9 @@ def _render_stale_table(df: pd.DataFrame) -> None:
         return
 
     # Select display columns
-    display_cols = ["iid", "title", "issue_type", "assignee", "age_days", "updated_at", "web_url"]
+    # Select display columns (Include web_url, exclude separate iid if we merge)
+    display_cols = ["web_url", "title", "issue_type", "assignee", "age_days", "updated_at"]
+    # Wait, we need 'web_url' to be the data for 'IID' column
     available_cols = [c for c in display_cols if c in stale_df.columns]
 
     display_df = stale_df[available_cols].sort_values("age_days", ascending=False)
@@ -163,17 +165,24 @@ def _render_stale_table(df: pd.DataFrame) -> None:
     if "updated_at" in display_df.columns:
         display_df["updated_at"] = display_df["updated_at"].dt.strftime("%Y-%m-%d")
 
+    # Rename web_url to IID for the table
+    display_df = display_df.rename(columns={"web_url": "IID", "title": "Title", "issue_type": "Type", "assignee": "Assignee", "age_days": "Age (Days)", "updated_at": "Last Update"})
+
     st.dataframe(
         display_df,
         width="stretch",
         hide_index=True,
+        column_order=["IID", "Title", "Type", "Assignee", "Age (Days)", "Last Update"],
         column_config={
-            "iid": st.column_config.NumberColumn("IID", width="small"),
-            "title": st.column_config.TextColumn("Title", width="large"),
-            "issue_type": st.column_config.TextColumn("Type", width="small"),
-            "assignee": st.column_config.TextColumn("Assignee", width="medium"),
-            "age_days": st.column_config.NumberColumn("Age (Days)", width="small"),
-            "updated_at": st.column_config.TextColumn("Last Update", width="medium"),
-            "web_url": st.column_config.LinkColumn("GitLab Link", width="small"),
+            "IID": st.column_config.LinkColumn(
+                "IID",
+                display_text=r"/issues/(\d+)$",
+                width="small",
+            ),
+            "Title": st.column_config.TextColumn("Title", width="large"),
+            "Type": st.column_config.TextColumn("Type", width="small"),
+            "Assignee": st.column_config.TextColumn("Assignee", width="medium"),
+            "Age (Days)": st.column_config.NumberColumn("Age (Days)", width="small"),
+            "Last Update": st.column_config.TextColumn("Last Update", width="medium"),
         },
     )

@@ -168,14 +168,17 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
     st.subheader("🔧 Action Required")
 
     # Select display columns
-    display_cols = ["iid", "title", "error_code", "error_message", "assignee", "web_url"]
+    display_cols = ["web_url", "title", "error_code", "error_message", "assignee"]
     available_cols = [c for c in display_cols if c in quality_df.columns]
 
     display_df = quality_df[available_cols].copy()
 
-    # Style the error_code column
+    # Rename for display
+    display_df = display_df.rename(columns={"web_url": "IID", "title": "Title", "error_code": "Error", "error_message": "Details", "assignee": "Assignee"})
+
+    # Style the error_code (now 'Error') column
     def style_error_code(row: pd.Series) -> list[str]:
-        code = row.get("error_code", "")
+        code = row.get("Error", "")
         severity = ERROR_SEVERITY.get(code, "info")
         bg_colors = {
             "error": "background-color: rgba(239,68,68,0.2)",
@@ -183,18 +186,22 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
             "info": "background-color: rgba(100,116,139,0.1)",
         }
         style = bg_colors.get(severity, "")
-        return [style if c == "error_code" else "" for c in row.index]
+        return [style if c == "Error" else "" for c in row.index]
 
     st.dataframe(
         display_df.style.apply(style_error_code, axis=1),
         width="stretch",
         hide_index=True,
+        column_order=["IID", "Title", "Error", "Details", "Assignee"],
         column_config={
-            "iid": st.column_config.NumberColumn("IID", width="small"),
-            "title": st.column_config.TextColumn("Title", width="large"),
-            "error_code": st.column_config.TextColumn("Error", width="medium"),
-            "error_message": st.column_config.TextColumn("Details", width="large"),
-            "assignee": st.column_config.TextColumn("Assignee", width="medium"),
-            "web_url": st.column_config.LinkColumn("GitLab Link", width="small"),
+            "IID": st.column_config.LinkColumn(
+                "IID", 
+                display_text=r"/issues/(\d+)$", 
+                width="small"
+            ),
+            "Title": st.column_config.TextColumn("Title", width="large"),
+            "Error": st.column_config.TextColumn("Error", width="medium"),
+            "Details": st.column_config.TextColumn("Details", width="large"),
+            "Assignee": st.column_config.TextColumn("Assignee", width="medium"),
         },
     )
