@@ -94,3 +94,30 @@ The testing suite passes if the following benchmarks are met on standard hardwar
 ### **5.2. Why Bypass Layer 1?**
 
 * **determinism:** Layer 1 depends on network latency and API state. By seeding data/processed directly, we isolate Layer 2/3 performance metrics from network fluctuations.
+
+## **6. Integration Testing (Live GitLab Seeder)**
+
+While the efficient "Bypass" strategy is used for performance testing, **Layer 1 (Collector)** must be tested against a real GitLab API to verify:
+1.  **Rate Limit Handling:** Does the collector back off correctly?
+2.  **Schema Compliance:** Does the API response match our expected `RawIssue` model?
+3.  **Authentication:** Is the Token handling valid?
+
+### **6.1. Tool: `tools/gitlab_seeder.py`**
+
+A CLI tool to populate a **blank** GitLab repository with known test data.
+
+**Requirements:**
+1.  **Safety:** Must require a `--project-id` and explicit user confirmation (or `--force` flag) before writing.
+2.  **Structure Setup:**
+    *   Create standard labels (`type::bug`, `workflow::review`, etc.).
+    *   Create standard milestones (`v1.0`, `v1.1`) with Start/Due dates.
+3.  **Data Seeding:**
+    *   Push N issues (e.g., 50) via `python-gitlab`.
+    *   Assign pseudo-random labels and milestones.
+    *   Simulate "activity" (notes/comments) if possible (optional).
+
+### **6.2. Workflow**
+1.  User creates a Sandbox Project on GitLab.com or Self-Managed.
+2.  User runs: `uv run python tools/gitlab_seeder.py --project-id 12345 --count 50`.
+3.  User runs Layer 1: `uv run python app/collector/orchestrator.py --project-id 12345 --full-sync`.
+4.  Verification: `data/processed/issues_12345.parquet` exists and contains 50 rows.

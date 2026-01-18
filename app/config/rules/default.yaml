@@ -6,6 +6,7 @@ project_ids:
   - 101  # Example project ID
   - 102  # Additional project
   - 103  # Additional project
+  - 77793080 # Example GitLab project ID
 
 # Team/Domain identifier
 team: "default"
@@ -83,6 +84,8 @@ validation:
       - "severity::"  # Any severity label required for bugs
     Feature:
       - "priority::"  # Any priority label required for features
+    Task:
+      - "priority::"  # Any priority label required for tasks
 
   # Required fields (column names)
   required_fields:

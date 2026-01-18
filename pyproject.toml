@@ -20,6 +20,7 @@ dependencies = [
   # Dashboard
   "streamlit>=1.30",
   "plotly>=5.18",
+  "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

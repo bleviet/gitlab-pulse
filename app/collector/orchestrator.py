@@ -172,6 +172,10 @@ class Orchestrator:
 def main() -> None:
     """CLI entry point for the collector."""
     import argparse
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
 
     logging.basicConfig(
         level=logging.INFO,
