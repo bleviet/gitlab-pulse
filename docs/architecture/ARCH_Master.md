@@ -6,7 +6,7 @@ Scope: Universal End-to-End Data Pipeline (Ingestion to Visualization)
 
 ## **1\. Executive Summary**
 
-**GitLabInsight** is a versatile analytics platform designed to extract, validate, and visualize GitLab issue data for any user—from individual developers and open-source maintainers to large-scale organizations. It follows a **Clean Architecture** and a **Medallion Data Pattern** to ensure that raw technical data is transformed into meaningful metrics (like Aging and Throughput) without being restricted to any specific workflow or environment.
+**GitLabInsight** is a versatile analytics platform designed to extract, validate, and visualize GitLab issue data for any user—from individual developers and open-source maintainers to large-scale organizations. It follows a **Clean Architecture** and a **[Medallion Data Pattern](../glossary/GLOSSARY.md)** to ensure that raw technical data is transformed into meaningful metrics (like Aging and Throughput) without being restricted to any specific workflow or environment.
 
 ## **2\. Data Strategy & Storage Decisions**
 
