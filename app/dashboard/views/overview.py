@@ -35,19 +35,17 @@ def render_overview(df: pd.DataFrame) -> None:
     # Top Row: KPI Cards
     _render_kpi_cards(df)
 
-    st.divider()
+    # Middle Row: Burn-up Chart (Collapsible)
+    with st.expander("📈 Cumulative Flow by Type", expanded=True):
+        _render_burnup_chart(df)
 
-    # Middle Row: Burn-up Chart
-    _render_burnup_chart(df)
-
-    st.divider()
-
-    # Bottom Row: Distribution Charts
-    col1, col2 = st.columns(2)
-    with col1:
-        _render_work_distribution(df)
-    with col2:
-        _render_status_donut(df)
+    # Bottom Row: Distribution Charts (Collapsible)
+    with st.expander("📊 Distribution Charts", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            _render_work_distribution(df)
+        with col2:
+            _render_status_donut(df)
 
 
 def _render_kpi_cards(df: pd.DataFrame) -> None:

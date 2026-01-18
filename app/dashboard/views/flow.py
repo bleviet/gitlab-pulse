@@ -38,21 +38,17 @@ def render_flow_view(df: pd.DataFrame) -> None:
     # Top Row: Metrics
     _render_flow_metrics(df)
 
-    st.divider()
+    # Charts (Collapsible)
+    with st.expander("📊 Flow Charts", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            _render_funnel_chart(df)
+        with col2:
+            _render_aging_chart(df)
 
-    # Main columns
-    col1, col2 = st.columns(2)
-
-    with col1:
-        _render_funnel_chart(df)
-
-    with col2:
-        _render_aging_chart(df)
-
-    st.divider()
-
-    # Detail grid (Drill-down)
-    _render_issue_detail_grid(df)
+    # Detail grid (Collapsible)
+    with st.expander("📋 Issue Details", expanded=True):
+        _render_issue_detail_grid(df)
 
 
 def _render_flow_metrics(df: pd.DataFrame) -> None:

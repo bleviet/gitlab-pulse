@@ -38,19 +38,17 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
     st.header("🧹 Data Hygiene")
     st.caption("Quality view for metadata cleanup and validation")
 
-    # Quality Scorecard
-    _render_scorecard(valid_df, quality_df)
+    # Quality Scorecard (Collapsible)
+    with st.expander("📊 Quality Score", expanded=True):
+        _render_scorecard(valid_df, quality_df)
 
-    st.divider()
-
-    # Error Distribution
+    # Error Distribution and Action Table (Collapsible)
     if not quality_df.empty:
-        _render_error_distribution(quality_df)
+        with st.expander("📈 Error Distribution", expanded=True):
+            _render_error_distribution(quality_df)
 
-        st.divider()
-
-        # Action Table
-        _render_action_table(quality_df)
+        with st.expander("⚡ Action Items", expanded=True):
+            _render_action_table(quality_df)
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
 

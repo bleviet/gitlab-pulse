@@ -24,10 +24,10 @@ def render_release_view(df: pd.DataFrame) -> None:
     # Load milestones directly for overview
     milestones_df = load_milestones()
     
-    # Milestone Overview Section
+    # Milestone Overview Section (Collapsible, collapsed by default)
     if not milestones_df.empty:
-        _render_milestone_overview(milestones_df)
-        st.divider()
+        with st.expander("📅 All Milestones", expanded=False):
+            _render_milestone_overview(milestones_df)
     
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
@@ -90,47 +90,47 @@ def render_release_view(df: pd.DataFrame) -> None:
     col2.metric("Days Remaining", days_remaining)
     col3.metric("Scope", total_issues, help="Total issues in milestone")
     
-    # 3. Burn-up Chart
-    _render_burnup_chart(ms_data, ms_meta)
+    # 3. Burn-up Chart (Collapsible)
+    with st.expander("📈 Burn-up Chart", expanded=True):
+        _render_burnup_chart(ms_data, ms_meta)
     
-    # 4. Scope Table
-    st.subheader("Release Scope")
-    
-    # Format for display
-    display_df = ms_data.copy()
-    
-    # Sort hierarchy if available
-    if "parent_id" in display_df.columns:
-        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
-    else:
-        display_df = display_df.sort_values(["state", "updated_at"], ascending=[True, False])
-    
-    # Link
-    display_df = display_df.rename(columns={
-        "web_url": "IID", 
-        "title": "Title", 
-        "state": "State", 
-        "assignee": "Assignee",
-        "issue_type": "Type"
-    })
-    
-    st.dataframe(
-        display_df,
-        column_config={
-            "IID": st.column_config.LinkColumn(
-                "IID", 
-                display_text=r"/(?:issues|work_items)/(\d+)$", 
-                width="small"
-            ),
-            "Title": st.column_config.TextColumn("Title", width="large"),
-            "State": st.column_config.TextColumn("State", width="small"),
-            "Type": st.column_config.TextColumn("Type", width="small"),
-            "Assignee": st.column_config.TextColumn("Assignee", width="medium"),
-        },
-        column_order=["IID", "Title", "Type", "State", "Assignee"],
-        width="stretch",
-        hide_index=True,
-    )
+    # 4. Scope Table (Collapsible)
+    with st.expander("📋 Release Scope", expanded=True):
+        # Format for display
+        display_df = ms_data.copy()
+        
+        # Sort hierarchy if available
+        if "parent_id" in display_df.columns:
+            display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+        else:
+            display_df = display_df.sort_values(["state", "updated_at"], ascending=[True, False])
+        
+        # Link
+        display_df = display_df.rename(columns={
+            "web_url": "IID", 
+            "title": "Title", 
+            "state": "State", 
+            "assignee": "Assignee",
+            "issue_type": "Type"
+        })
+        
+        st.dataframe(
+            display_df,
+            column_config={
+                "IID": st.column_config.LinkColumn(
+                    "IID", 
+                    display_text=r"/(?:issues|work_items)/(\d+)$", 
+                    width="small"
+                ),
+                "Title": st.column_config.TextColumn("Title", width="large"),
+                "State": st.column_config.TextColumn("State", width="small"),
+                "Type": st.column_config.TextColumn("Type", width="small"),
+                "Assignee": st.column_config.TextColumn("Assignee", width="medium"),
+            },
+            column_order=["IID", "Title", "Type", "State", "Assignee"],
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
@@ -234,8 +234,6 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
 
 def _render_milestone_overview(milestones_df: pd.DataFrame) -> None:
     """Render milestone overview table with due dates and status indicators."""
-    st.subheader("📅 All Milestones")
-    
     # Calculate days until due
     now = pd.Timestamp.now(tz="UTC")
     display_df = milestones_df.copy()

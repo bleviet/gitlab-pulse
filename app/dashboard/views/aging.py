@@ -35,21 +35,18 @@ def render_aging(df: pd.DataFrame) -> None:
     # Alert Banner for stale issues
     _render_stale_alert(df)
 
-    # Boxplot by Issue Type
-    st.subheader("📊 Age Distribution by Type")
-    _render_age_boxplot(df, "issue_type")
+    # Boxplot by Issue Type (Collapsible)
+    with st.expander("📊 Age Distribution by Type", expanded=True):
+        _render_age_boxplot(df, "issue_type")
 
-    st.divider()
-
-    # Boxplot by Severity
+    # Boxplot by Severity (Collapsible)
     if "severity" in df.columns and not df["severity"].isna().all():
-        st.subheader("📊 Age Distribution by Severity")
-        _render_age_boxplot(df, "severity")
+        with st.expander("📊 Age Distribution by Severity", expanded=True):
+            _render_age_boxplot(df, "severity")
 
-    st.divider()
-
-    # Stale Issues Table
-    _render_stale_table(df)
+    # Stale Issues Table (Collapsible)
+    with st.expander("⚠️ Stale Issues", expanded=True):
+        _render_stale_table(df)
 
 
 def _render_stale_alert(df: pd.DataFrame) -> None:
