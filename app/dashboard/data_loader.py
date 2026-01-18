@@ -1,0 +1,153 @@
+"""Data loader with caching for Layer 3 Dashboard.
+
+Uses Streamlit's @st.cache_data for efficient data loading.
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+import pandas as pd
+import streamlit as st
+
+logger = logging.getLogger(__name__)
+
+# Default data paths
+DEFAULT_ANALYTICS_PATH = Path("data/analytics")
+
+
+@st.cache_data(ttl=900)  # 15-minute cache
+def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
+    """Load valid issues from analytics Parquet.
+
+    Args:
+        analytics_path: Path to analytics directory
+
+    Returns:
+        DataFrame with valid issues
+    """
+    path = Path(analytics_path) if analytics_path else DEFAULT_ANALYTICS_PATH
+    filepath = path / "issues_valid.parquet"
+
+    if not filepath.exists():
+        logger.warning(f"Valid issues file not found: {filepath}")
+        return pd.DataFrame()
+
+    df = pd.read_parquet(filepath)
+
+    # Ensure datetime columns are proper types
+    for col in ["created_at", "updated_at", "closed_at"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], utc=True)
+
+    # Convert category columns for memory efficiency
+    for col in ["state", "work_item_type", "issue_type", "severity", "team"]:
+        if col in df.columns:
+            df[col] = df[col].astype("category")
+
+    logger.info(f"Loaded {len(df)} valid issues")
+    return df
+
+
+@st.cache_data(ttl=900)
+def load_quality_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
+    """Load quality (failed) issues from analytics Parquet.
+
+    Args:
+        analytics_path: Path to analytics directory
+
+    Returns:
+        DataFrame with quality issues
+    """
+    path = Path(analytics_path) if analytics_path else DEFAULT_ANALYTICS_PATH
+    filepath = path / "data_quality.parquet"
+
+    if not filepath.exists():
+        logger.warning(f"Quality issues file not found: {filepath}")
+        return pd.DataFrame()
+
+    df = pd.read_parquet(filepath)
+    logger.info(f"Loaded {len(df)} quality issues")
+    return df
+
+
+def get_sync_status(state_path: Optional[str] = None) -> dict[str, str]:
+    """Get the last sync status from state file.
+
+    Args:
+        state_path: Path to sync state file
+
+    Returns:
+        Dict with sync status info
+    """
+    import json
+    from datetime import datetime
+
+    path = Path(state_path) if state_path else Path("data/state/sync_state.json")
+
+    if not path.exists():
+        return {"status": "No sync data", "last_sync": "Never"}
+
+    try:
+        with path.open("r") as f:
+            data = json.load(f)
+
+        # Find the most recent sync
+        projects = data.get("projects", {})
+        if not projects:
+            return {"status": "No projects synced", "last_sync": "Never"}
+
+        last_sync = max(
+            (p.get("last_sync_at") for p in projects.values() if p.get("last_sync_at")),
+            default=None,
+        )
+
+        if last_sync:
+            sync_dt = datetime.fromisoformat(last_sync.replace("Z", "+00:00"))
+            return {
+                "status": f"{len(projects)} projects",
+                "last_sync": sync_dt.strftime("%Y-%m-%d %H:%M"),
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to read sync state: {e}")
+
+    return {"status": "Unknown", "last_sync": "Unknown"}
+
+
+def filter_by_date_range(
+    df: pd.DataFrame,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
+) -> pd.DataFrame:
+    """Filter DataFrame by created_at date range.
+
+    Args:
+        df: DataFrame to filter
+        start_date: Start of range
+        end_date: End of range
+
+    Returns:
+        Filtered DataFrame
+    """
+    if df.empty:
+        return df
+
+    mask = (df["created_at"] >= start_date) & (df["created_at"] <= end_date)
+    return df[mask]
+
+
+def filter_by_team(df: pd.DataFrame, team: str) -> pd.DataFrame:
+    """Filter DataFrame by team.
+
+    Args:
+        df: DataFrame to filter
+        team: Team name (or "All" for no filter)
+
+    Returns:
+        Filtered DataFrame
+    """
+    if df.empty or team == "All":
+        return df
+
+    return df[df["team"] == team]

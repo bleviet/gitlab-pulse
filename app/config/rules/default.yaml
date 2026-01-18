@@ -1,0 +1,48 @@
+# Default Domain Rules Configuration
+# Place team-specific rules in separate YAML files (e.g., team_backend.yaml)
+
+# Project mapping (required field)
+project_ids:
+  - 101  # Example project ID
+
+# Team/Domain identifier
+team: "default"
+
+# Label mappings: GitLab labels → human-readable terms
+label_mappings:
+  type:
+    "type::bug": "Bug"
+    "type::feature": "Feature"
+    "type::task": "Task"
+    "type::epic": "Epic"
+  severity:
+    "severity::critical": "Critical"
+    "severity::high": "High"
+    "severity::medium": "Medium"
+    "severity::low": "Low"
+  priority:
+    "priority::1": "P1"
+    "priority::2": "P2"
+    "priority::3": "P3"
+
+# Validation rules
+validation:
+  # Required labels for specific issue types
+  required_labels:
+    Bug:
+      - "severity::"  # Any severity label required for bugs
+    Feature:
+      - "priority::"  # Any priority label required for features
+
+  # Staleness threshold (days since last update)
+  stale_threshold_days: 30
+
+  # Maximum allowed cycle time (days)
+  max_cycle_time_days: 90
+
+# Semantic color overrides (optional)
+colors:
+  Bug: "#EF4444"
+  Feature: "#3B82F6"
+  Task: "#10B981"
+  Epic: "#8B5CF6"
