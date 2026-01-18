@@ -113,10 +113,34 @@ def setup_milestones(project) -> list[object]:
     return active_milestones
 
 
-def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None) -> dict:
+def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, inject_errors: bool = False) -> dict:
     """Generate a valid issue payload."""
     issue_labels = []
     
+    # Error Injection: Missing Labels (5%)
+    if inject_errors and random.random() < 0.05:
+        # Create an issue with NO labels (invalid)
+        return {
+            "title": f"Quality: Issue with missing labels {fake.word()}",
+            "description": "This issue should be flagged by the validator.",
+            "labels": [],
+            "milestone_id": None,
+            "issue_type": "issue",
+            "created_at": datetime.now().isoformat()
+        }
+
+    # Error Injection: Conflicting Labels (1%)
+    if inject_errors and random.random() < 0.01:
+        # Create an issue with both Bug and Feature (invalid)
+        return {
+            "title": f"Quality: Conflicting labels {fake.word()}",
+            "description": "This issue has both Bug and Feature types.",
+            "labels": ["type::bug", "type::feature", "priority::1"],
+            "milestone_id": None,
+            "issue_type": "issue",
+            "created_at": datetime.now().isoformat()
+        }
+
     # Decide Type: 80% Issue, 20% Task (only if parent available)
     is_task = parent_iid is not None and random.random() < 0.2
     
@@ -138,13 +162,19 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None) -
         type_label = random.choice(["type::bug", "type::feature"])
         issue_labels.append(type_label)
         
+        # Error Injection: Missing Severity/Priority (10%)
+        skip_attributes = inject_errors and random.random() < 0.10
+
         if type_label == "type::bug":
             title_prefix = "Bug: "
-            issue_labels.append(random.choice([k for k in LABELS if "severity" in k]))
+            if not skip_attributes:
+                issue_labels.append(random.choice([k for k in LABELS if "severity" in k]))
         else:
             title_prefix = "Feat: "
             
-        issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
+        if not skip_attributes:
+            issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
+            
         issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
         description = fake.paragraph()
 
@@ -164,9 +194,9 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None) -
     }
 
 
-def seed_issues(project, count: int, milestones: list) -> None:
+def seed_issues(project, count: int, milestones: list, inject_errors: bool = False) -> None:
     """Create synthetic issues."""
-    logger.info(f"Seeding {count} issues...")
+    logger.info(f"Seeding {count} issues (Errors: {inject_errors})...")
     
     potential_parents = []
     
@@ -176,7 +206,7 @@ def seed_issues(project, count: int, milestones: list) -> None:
         if potential_parents:
             parent_iid = random.choice(potential_parents)
             
-        payload = generate_issue_payload(milestones, parent_iid)
+        payload = generate_issue_payload(milestones, parent_iid, inject_errors)
         
         try:
             issue = project.issues.create(payload)
@@ -210,6 +240,7 @@ def main():
     parser.add_argument("--project-id", type=int, required=True, help="Target GitLab Project ID")
     parser.add_argument("--count", type=int, default=10, help="Number of issues to create")
     parser.add_argument("--force", action="store_true", help="Skip confirmation")
+    parser.add_argument("--inject-errors", action="store_true", help="Inject quality errors")
     args = parser.parse_args()
     
     # Safety Check
@@ -231,7 +262,7 @@ def main():
         
     setup_labels(project)
     milestones = setup_milestones(project)
-    seed_issues(project, args.count, milestones)
+    seed_issues(project, args.count, milestones, args.inject_errors)
     
     logger.info("Seeding complete! 🚀")
 
