@@ -71,6 +71,58 @@ def load_quality_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
     return df
 
 
+# Default processed path for milestones (Layer 1 output)
+DEFAULT_PROCESSED_PATH = Path("data/processed")
+
+
+@st.cache_data(ttl=900)
+def load_milestones(processed_path: Optional[str] = None) -> pd.DataFrame:
+    """Load milestones from processed Parquet files.
+
+    Combines milestones from all project files.
+
+    Args:
+        processed_path: Path to processed directory
+
+    Returns:
+        DataFrame with all milestones
+    """
+    path = Path(processed_path) if processed_path else DEFAULT_PROCESSED_PATH
+
+    # Find all milestone files
+    milestone_files = list(path.glob("milestones_*.parquet"))
+
+    if not milestone_files:
+        logger.warning("No milestone files found")
+        return pd.DataFrame()
+
+    # Load and combine all milestone files
+    dfs = []
+    for filepath in milestone_files:
+        try:
+            df = pd.read_parquet(filepath)
+            dfs.append(df)
+        except Exception as e:
+            logger.warning(f"Failed to load {filepath}: {e}")
+
+    if not dfs:
+        return pd.DataFrame()
+
+    combined = pd.concat(dfs, ignore_index=True)
+
+    # Ensure datetime columns are proper types
+    for col in ["due_date", "start_date", "created_at", "updated_at"]:
+        if col in combined.columns:
+            combined[col] = pd.to_datetime(combined[col], utc=True)
+
+    # Convert state to category
+    if "state" in combined.columns:
+        combined["state"] = combined["state"].astype("category")
+
+    logger.info(f"Loaded {len(combined)} milestones from {len(milestone_files)} files")
+    return combined
+
+
 def get_sync_status(state_path: Optional[str] = None) -> dict[str, str]:
     """Get the last sync status from state file.
 

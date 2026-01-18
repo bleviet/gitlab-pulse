@@ -10,6 +10,7 @@ import streamlit as st
 
 from app.shared.schemas import AnalyticsIssue
 from app.dashboard.utils import sort_hierarchy
+from app.dashboard.data_loader import load_milestones
 
 
 def render_release_view(df: pd.DataFrame) -> None:
@@ -20,9 +21,17 @@ def render_release_view(df: pd.DataFrame) -> None:
     """
     st.header("Release Management")
     
+    # Load milestones directly for overview
+    milestones_df = load_milestones()
+    
+    # Milestone Overview Section
+    if not milestones_df.empty:
+        _render_milestone_overview(milestones_df)
+        st.divider()
+    
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
-        st.warning("No milestone data available.")
+        st.warning("No issues with milestones found. Assign issues to milestones to see release scope.")
         return
 
     # Filter to items with milestones
@@ -221,3 +230,68 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
     )
     
     st.plotly_chart(fig)
+
+
+def _render_milestone_overview(milestones_df: pd.DataFrame) -> None:
+    """Render milestone overview table with due dates and status indicators."""
+    st.subheader("📅 All Milestones")
+    
+    # Calculate days until due
+    now = pd.Timestamp.now(tz="UTC")
+    display_df = milestones_df.copy()
+    
+    if "due_date" in display_df.columns:
+        display_df["days_until_due"] = display_df["due_date"].apply(
+            lambda x: (x - now).days if pd.notna(x) else None
+        )
+        
+        # Add status indicator
+        def get_status(row):
+            if row["state"] == "closed":
+                return "✅ Closed"
+            days = row.get("days_until_due")
+            if days is None:
+                return "📋 Active"
+            elif days < 0:
+                return "🔴 Overdue"
+            elif days <= 7:
+                return "🟡 Due Soon"
+            else:
+                return "🟢 On Track"
+        
+        display_df["Status"] = display_df.apply(get_status, axis=1)
+    else:
+        display_df["Status"] = display_df["state"].apply(
+            lambda x: "✅ Closed" if x == "closed" else "📋 Active"
+        )
+    
+    # Format due date for display
+    if "due_date" in display_df.columns:
+        display_df["Due"] = display_df["due_date"].dt.strftime("%Y-%m-%d")
+    else:
+        display_df["Due"] = "—"
+    
+    # Sort by due date (active first, then by due date)
+    if "due_date" in display_df.columns:
+        display_df = display_df.sort_values(
+            ["state", "due_date"],
+            ascending=[True, True],
+            na_position="last"
+        )
+    
+    # Select columns for display
+    show_cols = ["title", "Status", "Due", "state"]
+    show_cols = [c for c in show_cols if c in display_df.columns]
+    
+    st.dataframe(
+        display_df[show_cols],
+        column_config={
+            "title": st.column_config.TextColumn("Milestone", width="large"),
+            "Status": st.column_config.TextColumn("Status", width="medium"),
+            "Due": st.column_config.TextColumn("Due Date", width="small"),
+            "state": None,  # Hide raw state column
+        },
+        hide_index=True,
+        height=200,
+    )
+
