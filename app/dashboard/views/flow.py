@@ -204,7 +204,8 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     # 3. Sort by Hierarchy (Parent -> Child) or Staleness
     # User requested hierarchical view.
     if "parent_id" in display_df.columns:
-        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="id", title_col="title")
+        # parent_id contains IID, so we must map to 'iid' column, not 'id'
+        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
     else:
         display_df = display_df.sort_values("days_in_stage", ascending=False)
 
