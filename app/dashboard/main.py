@@ -11,9 +11,9 @@ from app.dashboard.data_loader import (
     load_quality_issues,
     load_valid_issues,
 )
-from app.dashboard.pages.aging import render_aging
-from app.dashboard.pages.hygiene import render_hygiene
-from app.dashboard.pages.overview import render_overview
+from app.dashboard.views.aging import render_aging
+from app.dashboard.views.hygiene import render_hygiene
+from app.dashboard.views.overview import render_overview
 from app.dashboard.sidebar import render_sidebar
 
 # Page configuration
