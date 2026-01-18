@@ -49,6 +49,20 @@ class ContextConfig(BaseModel):
     require_assignment: bool = False  # If true, missing context is a validation failure
 
 
+class StageConfig(BaseModel):
+    """Configuration for a single workflow stage."""
+
+    name: str
+    labels: list[str] = Field(default_factory=list)
+    type: str = "waiting"  # "active", "waiting", "completed"
+
+
+class WorkflowConfig(BaseModel):
+    """Workflow process configuration."""
+
+    stages: list[StageConfig] = Field(default_factory=list)
+
+
 class ValidationConfig(BaseModel):
     """Validation rules configuration."""
 
@@ -65,6 +79,7 @@ class DomainRule(BaseModel):
     label_mappings: LabelMappings = Field(default_factory=LabelMappings)
     title_patterns: TitlePatterns = Field(default_factory=TitlePatterns)
     contexts: ContextConfig = Field(default_factory=ContextConfig)
+    workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     colors: dict[str, str] = Field(default_factory=dict)
 

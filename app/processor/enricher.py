@@ -248,3 +248,80 @@ def explode_contexts(
 
     logger.debug(f"Context explosion: {len(df)} -> {len(exploded_df)} rows, {len(orphan_df)} orphans")
     return exploded_df, orphan_df
+
+
+def enrich_workflow_stage(
+    df: pd.DataFrame,
+    rule: Optional[DomainRule] = None,
+    now: Optional[datetime] = None,
+) -> pd.DataFrame:
+    """Determine workflow stage for each issue based on labels.
+
+    Args:
+        df: DataFrame with labels column
+        rule: Domain rule with workflow configuration
+        now: Reference datetime for aging
+
+    Returns:
+        DataFrame with 'stage', 'stage_type', 'days_in_stage' columns
+    """
+    if now is None:
+        now = datetime.now()
+
+    # Default values
+    df["stage"] = "Backlog"
+    df["stage_type"] = "waiting"
+    df["stage_order"] = 0
+    df["days_in_stage"] = 0
+
+    if df.empty or rule is None or not rule.workflow.stages:
+        return df
+
+    # ... (omitted comment) ...
+
+    # Actually, let's just do forward iteration and only write to rows that are still 'Backlog'
+    # But 'Backlog' is just the initial value.
+    # Let's track which rows have been matched.
+    
+    matched_mask = pd.Series(False, index=df.index)
+
+    for i, stage in enumerate(rule.workflow.stages, start=1):
+        # Check for label match
+        current_mask = df["labels"].apply(
+            lambda labels: _has_any_label(labels, stage.labels)
+        )
+        
+        # Only consider rows that matched THIS stage AND haven't been matched by a previous (higher priority) stage
+        effective_mask = current_mask & (~matched_mask)
+        
+        if effective_mask.any():
+            df.loc[effective_mask, "stage"] = stage.name
+            df.loc[effective_mask, "stage_type"] = stage.type
+            df.loc[effective_mask, "stage_order"] = i
+            matched_mask = matched_mask | effective_mask
+
+    # Calculate days in stage (Proxy: now - updated_at)
+    # This assumes the issue was updated when it moved to the stage.
+    if "updated_at" in df.columns:
+        df["days_in_stage"] = (pd.Timestamp(now, tz="UTC") - df["updated_at"]).dt.days
+        df["days_in_stage"] = df["days_in_stage"].fillna(0).astype(int)
+
+    return df
+
+
+def _has_any_label(issue_labels: object, target_labels: list[str]) -> bool:
+    """Check if issue has any of the target labels."""
+    if issue_labels is None:
+        return False
+    try:
+        # Handle numpy arrays / lists
+        i_labels = list(issue_labels) if not isinstance(issue_labels, list) else issue_labels
+    except (TypeError, ValueError):
+        return False
+        
+    for label in i_labels:
+        if not isinstance(label, str):
+            continue
+        if label in target_labels:
+            return True
+    return False

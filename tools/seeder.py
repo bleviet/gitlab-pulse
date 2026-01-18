@@ -23,6 +23,13 @@ TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
 SEVERITY_LABELS = ["severity::critical", "severity::high", "severity::medium", "severity::low"]
 PRIORITY_LABELS = ["priority::1", "priority::2", "priority::3"]
 CONTEXT_LABELS = ["rnd::Alpha", "rnd::Beta", "rnd::Gamma", "cust::BMW", "cust::Audi"]
+WORKFLOW_LABELS = [
+    "workflow::architecture",
+    "workflow::implementation",
+    "workflow::review",
+    "workflow::test",
+    "workflow::done",
+]
 WORK_ITEM_TYPES = ["ISSUE", "TASK"]
 
 
@@ -86,7 +93,7 @@ def generate_issues(
             updated_at = now - timedelta(days=random.randint(35, 90))
 
         # Labels
-        labels = _generate_labels(inject_errors)
+        labels = _generate_labels(inject_errors, state)
 
         # Work item type
         work_item_type = random.choices(WORK_ITEM_TYPES, weights=[0.8, 0.2])[0]
@@ -131,7 +138,7 @@ def _random_date(start: datetime, end: datetime) -> datetime:
     return start + timedelta(seconds=random_seconds)
 
 
-def _generate_labels(inject_errors: bool = False) -> list[str]:
+def _generate_labels(inject_errors: bool = False, state: str = "opened") -> list[str]:
     """Generate a realistic label set."""
     labels: list[str] = []
 
@@ -156,17 +163,29 @@ def _generate_labels(inject_errors: bool = False) -> list[str]:
     if random.random() < 0.7:
         labels.append(random.choice(PRIORITY_LABELS))
 
-    # Context labels (80% have at least one, some have multiple for Data Explosion testing)
+    # Context labels (80% have at least one)
     if random.random() < 0.8:
-        # 30% chance of multiple contexts (Data Explosion scenario)
         if random.random() < 0.3:
-            # Pick 2-3 contexts
             num_contexts = random.randint(2, 3)
             contexts = random.sample(CONTEXT_LABELS, min(num_contexts, len(CONTEXT_LABELS)))
             labels.extend(contexts)
         else:
-            # Single context
             labels.append(random.choice(CONTEXT_LABELS))
+
+    # Workflow labels (Assigned to almost all non-error issues)
+    if state == "closed":
+        # Closed issues are mostly Done, but sometimes just "closed" at another stage
+        if random.random() < 0.9:
+            labels.append("workflow::done")
+        else:
+            # 10% closed as "won't fix" or similar (stuck in review/design)
+            labels.append(random.choice(WORKFLOW_LABELS[:-1]))
+    else:
+        # Open issues are in active/waiting stages (not Done)
+        # Check if WORKFLOW_LABELS[:-1] is empty to avoid error
+        active_stages = WORKFLOW_LABELS[:-1]
+        if active_stages:
+            labels.append(random.choice(active_stages))
 
     return labels
 

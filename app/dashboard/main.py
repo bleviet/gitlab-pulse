@@ -13,6 +13,7 @@ from app.dashboard.data_loader import (
     load_valid_issues,
 )
 from app.dashboard.views.aging import render_aging
+from app.dashboard.views.flow import render_flow_view
 from app.dashboard.views.hygiene import render_hygiene
 from app.dashboard.views.overview import render_overview
 from app.dashboard.sidebar import render_sidebar
@@ -69,6 +70,7 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
+        "🌊 Flow": "flow",
         "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
     }
@@ -80,9 +82,12 @@ def main() -> None:
         render_overview(filtered_df)
 
     with tabs[1]:
-        render_aging(filtered_df)
+        render_flow_view(filtered_df)
 
     with tabs[2]:
+        render_aging(filtered_df)
+
+    with tabs[3]:
         render_hygiene(filtered_df, quality_df)
 
 

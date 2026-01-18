@@ -58,6 +58,24 @@ contexts:
       alias: "Customer"
 
 # Validation rules
+workflow:
+  stages:
+    - name: "Architecture"
+      labels: ["workflow::architecture", "status::design"]
+      type: "active"
+    - name: "Implementation"
+      labels: ["workflow::implementation", "status::coding"]
+      type: "active"
+    - name: "Review"
+      labels: ["workflow::review", "status::mr_open"]
+      type: "waiting"
+    - name: "Testing"
+      labels: ["workflow::test", "status::validation"]
+      type: "active"
+    - name: "Done"
+      labels: ["workflow::done", "status::released"]
+      type: "completed"
+
 validation:
   # Required labels for specific issue types
   required_labels:

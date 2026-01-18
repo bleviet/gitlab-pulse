@@ -131,3 +131,10 @@ Do not edit main.py.
 ### **7.2. Atomic Operations**
 
 * **File I/O:** Always write to a temporary file (.tmp) and rename (os.replace) to the final destination. This prevents corrupt Parquet files if the process is killed mid-write.
+
+## **8. Coding Style & Consistency**
+
+### **8.1. Match Existing Style**
+* **Rule:** When modifying existing files, always mimic the coding style of the surrounding code.
+* **Why:** Consistent codebases are easier to read and maintain. If the file uses `type: ignore` comments, follow that pattern. If it uses specific variable naming conventions, adopt them.
+* **Review:** Changes that introduce inconsistent styling (e.g., using camelCase in a snake_case file) will be rejected.
