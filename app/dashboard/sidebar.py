@@ -119,6 +119,26 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         st.divider()
         st.caption("v0.1.0")
 
+        # Admin Access
+        with st.expander("⚡ Admin Access"):
+            import os
+            
+            if st.session_state.get("is_admin"):
+                st.success("Authenticated")
+                if st.button("Logout"):
+                    st.session_state["is_admin"] = False
+                    st.rerun()
+            else:
+                password = st.text_input("Password", type="password")
+                if password:
+                    # Default to 'admin' if env var not set
+                    admin_pass = os.environ.get("ADMIN_PASSWORD", "admin")
+                    if password == admin_pass:
+                        st.session_state["is_admin"] = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid password")
+
     return {
         "team": selected_team,
         "context": selected_context,

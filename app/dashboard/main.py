@@ -76,24 +76,30 @@ def main() -> None:
         "🧹 Hygiene": "hygiene",
     }
 
+    # Conditionally add Admin tab
+    if st.session_state.get("is_admin"):
+        pages["⚡ Admin"] = "admin"
+
     # Tabs for navigation
     tabs = st.tabs(list(pages.keys()))
 
-    with tabs[0]:
-        render_overview(filtered_df)
-
-    with tabs[1]:
-        render_flow_view(filtered_df)
-
-    with tabs[2]:
-        from app.dashboard.views.release import render_release_view
-        render_release_view(filtered_df)
-
-    with tabs[3]:
-        render_aging(filtered_df)
-
-    with tabs[4]:
-        render_hygiene(filtered_df, quality_df)
+    # Dynamic rendering
+    for i, (page_name, view_id) in enumerate(pages.items()):
+        with tabs[i]:
+            if view_id == "overview":
+                render_overview(filtered_df)
+            elif view_id == "flow":
+                render_flow_view(filtered_df)
+            elif view_id == "release":
+                from app.dashboard.views.release import render_release_view
+                render_release_view(filtered_df)
+            elif view_id == "aging":
+                render_aging(filtered_df)
+            elif view_id == "hygiene":
+                render_hygiene(filtered_df, quality_df)
+            elif view_id == "admin":
+                from app.dashboard.views.admin import render_admin_view
+                render_admin_view()
 
 
 if __name__ == "__main__":
