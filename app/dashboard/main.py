@@ -4,6 +4,10 @@ GitLabInsight Layer 3 Presentation Layer.
 """
 
 import streamlit as st
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from app.dashboard.data_loader import (
     filter_by_context,
