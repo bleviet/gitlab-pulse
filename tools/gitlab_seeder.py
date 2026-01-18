@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import gitlab
+import requests
 from faker import Faker
 from dotenv import load_dotenv
 
@@ -198,17 +199,104 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
     }
 
 
+
+def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_path: str, token: str) -> bool:
+    """Link two work items using GraphQL mutation."""
+    url = "https://gitlab.com/api/graphql"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Construct GIDs (assuming WorkItem GID matches Issue ID for these new items)
+    child_gid = f"gid://gitlab/WorkItem/{child_numeric_id}"
+    parent_gid = f"gid://gitlab/WorkItem/{parent_numeric_id}"
+    
+    mutation = """
+    mutation($id: WorkItemID!, $parentId: WorkItemID) {
+      workItemUpdate(input: {id: $id, hierarchyWidget: {parentId: $parentId}}) {
+        errors
+      }
+    }
+    """
+    
+    try:
+        resp = requests.post(
+            url,
+            json={
+                "query": mutation, 
+                "variables": {"id": child_gid, "parentId": parent_gid}
+            },
+            headers=headers
+        )
+        data = resp.json()
+        errors = data.get("data", {}).get("workItemUpdate", {}).get("errors", [])
+        if errors:
+            logger.error(f"  -> GraphQL Linking failed: {errors}")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"  -> GraphQL Request failed: {e}")
+        return False
+
+
+
+def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_path: str, token: str) -> bool:
+    """Link two work items using GraphQL mutation."""
+    url = "https://gitlab.com/api/graphql"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Construct GIDs (assuming WorkItem GID matches Issue ID for these new items)
+    # NOTE: This assumes issue.id matches the WorkItem ID. 
+    # Use the 'id' field from the issue object, NOT 'iid'.
+    child_gid = f"gid://gitlab/WorkItem/{child_numeric_id}"
+    parent_gid = f"gid://gitlab/WorkItem/{parent_numeric_id}"
+    
+    mutation = """
+    mutation($id: WorkItemID!, $parentId: WorkItemID) {
+      workItemUpdate(input: {id: $id, hierarchyWidget: {parentId: $parentId}}) {
+        errors
+      }
+    }
+    """
+    
+    try:
+        resp = requests.post(
+            url,
+            json={
+                "query": mutation, 
+                "variables": {"id": child_gid, "parentId": parent_gid}
+            },
+            headers=headers
+        )
+        data = resp.json()
+        errors = data.get("data", {}).get("workItemUpdate", {}).get("errors", [])
+        if errors:
+            logger.error(f"  -> GraphQL Linking failed: {errors}")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"  -> GraphQL Request failed: {e}")
+        return False
+
+
 def seed_issues(project, count: int, milestones: list, inject_errors: bool = False) -> None:
     """Create synthetic issues."""
     logger.info(f"Seeding {count} issues (Errors: {inject_errors})...")
     
+    token = os.getenv("GITLAB_TOKEN")
+    project_path = project.path_with_namespace
+    
+    # Store tuples of (id, iid) for parents
     potential_parents = []
     
     for i in range(count):
         # Pick a parent if available
+        parent_data = None
         parent_iid = None
+        parent_id = None
+        
         if potential_parents:
-            parent_iid = random.choice(potential_parents)
+            parent_data = random.choice(potential_parents)
+            parent_iid = parent_data['iid']
+            parent_id = parent_data['id']
             
         payload = generate_issue_payload(milestones, parent_iid, inject_errors)
         
@@ -218,15 +306,15 @@ def seed_issues(project, count: int, milestones: list, inject_errors: bool = Fal
             
             # If it's a standard issue, add to parents list
             if payload["issue_type"] == "issue":
-                potential_parents.append(issue.iid)
+                potential_parents.append({'id': issue.id, 'iid': issue.iid})
             
-            if parent_iid:
-                try:
-                    # Use a separate note for linking (reliable)
-                    issue.notes.create({"body": f"/parent #{parent_iid}"})
-                    logger.info(f"  -> Linked to parent #{parent_iid}")
-                except Exception as e:
-                    logger.warning(f"  -> Failed to link parent #{parent_iid}: {e}")
+            # Link to parent if applicable (Only Tasks can have parents in this schema)
+            if parent_id and payload["issue_type"] == "task":
+                success = link_work_items_gql(issue.id, parent_id, project_path, token)
+                if success:
+                    logger.info(f"  -> Linked to parent #{parent_iid} via GraphQL")
+                else:
+                    logger.warning(f"  -> Failed to link parent #{parent_iid}")
 
             # Simulate state (Closed/Open)
             if random.random() < 0.5:
