@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.shared.schemas import AnalyticsIssue
+from app.dashboard.utils import sort_hierarchy
 
 
 def render_release_view(df: pd.DataFrame) -> None:
@@ -88,7 +89,12 @@ def render_release_view(df: pd.DataFrame) -> None:
     
     # Format for display
     display_df = ms_data.copy()
-    display_df = display_df.sort_values(["state", "updated_at"], ascending=[True, False])
+    
+    # Sort hierarchy if available
+    if "parent_id" in display_df.columns:
+        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+    else:
+        display_df = display_df.sort_values(["state", "updated_at"], ascending=[True, False])
     
     # Link
     display_df = display_df.rename(columns={

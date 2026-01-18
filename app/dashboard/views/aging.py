@@ -6,6 +6,7 @@ Boxplots for age distribution and stale issue alerts.
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from app.dashboard.utils import sort_hierarchy
 
 # Semantic color palette
 COLORS = {
@@ -159,7 +160,12 @@ def _render_stale_table(df: pd.DataFrame) -> None:
     # Wait, we need 'web_url' to be the data for 'IID' column
     available_cols = [c for c in display_cols if c in stale_df.columns]
 
-    display_df = stale_df[available_cols].sort_values("age_days", ascending=False)
+    display_df = stale_df[available_cols].copy()
+    
+    if "parent_id" in display_df.columns:
+         display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+    else:
+         display_df = display_df.sort_values("age_days", ascending=False)
 
     # Format for display
     if "updated_at" in display_df.columns:

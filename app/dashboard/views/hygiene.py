@@ -6,6 +6,7 @@ Quality scorecard and action table for data quality issues.
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from app.dashboard.utils import sort_hierarchy
 
 # Semantic color palette
 COLORS = {
@@ -172,6 +173,9 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
     available_cols = [c for c in display_cols if c in quality_df.columns]
 
     display_df = quality_df[available_cols].copy()
+    
+    if "parent_id" in display_df.columns:
+         display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
 
     # Rename for display
     display_df = display_df.rename(columns={"web_url": "IID", "title": "Title", "error_code": "Error", "error_message": "Details", "assignee": "Assignee"})
