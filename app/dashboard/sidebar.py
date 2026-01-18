@@ -113,9 +113,14 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             help="Select start and end dates",
         )
 
-        # Handle single date selection
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start_date, end_date = date_range
+        # Handle single date selection (st.date_input can return single date or tuple)
+        if isinstance(date_range, tuple):
+            if len(date_range) == 2:
+                start_date, end_date = date_range
+            elif len(date_range) == 1:
+                start_date = end_date = date_range[0]
+            else:
+                start_date = end_date = min_date
         else:
             start_date = end_date = date_range
 
