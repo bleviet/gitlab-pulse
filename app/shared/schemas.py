@@ -56,6 +56,42 @@ class RawIssue(BaseModel):
         raise ValueError(f"Cannot parse datetime from {type(v)}")
 
 
+class RawMilestone(BaseModel):
+    """Raw milestone data from GitLab API.
+
+    Fetched independently to track milestones without assigned issues.
+    """
+
+    id: int = Field(description="GitLab milestone ID")
+    iid: int = Field(description="Project-scoped milestone ID")
+    project_id: int = Field(description="GitLab project ID")
+    title: str = Field(description="Milestone title")
+    description: Optional[str] = Field(default=None, description="Description")
+    state: Literal["active", "closed"] = Field(description="Milestone state")
+    due_date: Optional[datetime] = Field(default=None, description="Due date")
+    start_date: Optional[datetime] = Field(default=None, description="Start date")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+    web_url: Optional[str] = Field(default=None, description="Milestone URL")
+
+    model_config = {"frozen": False, "extra": "ignore"}
+
+    @field_validator("due_date", "start_date", "created_at", "updated_at", mode="before")
+    @classmethod
+    def parse_date(cls, v: object) -> Optional[datetime]:
+        """Parse date strings to datetime objects."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, str):
+            # Handle both date (YYYY-MM-DD) and datetime formats
+            if "T" in v:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            return datetime.fromisoformat(v + "T00:00:00+00:00")
+        raise ValueError(f"Cannot parse date from {type(v)}")
+
+
 class AnalyticsIssue(BaseModel):
     """Enriched issue with calculated metrics (Layer 2 output schema).
 

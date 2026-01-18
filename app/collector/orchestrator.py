@@ -107,6 +107,14 @@ class Orchestrator:
         # Step 5 & 6: Transform and Persist L1
         self._persist_processed(project_id, issues)
 
+        # Step 7: Fetch and persist milestones (always full sync, lightweight)
+        try:
+            milestones = self.rest_client.fetch_milestones(project_id)
+            if milestones:
+                self._persist_milestones(project_id, milestones)
+        except Exception as e:
+            logger.warning(f"Failed to fetch milestones for project {project_id}: {e}")
+
         # Update state
         max_updated = max(issue.updated_at for issue in issues)
         self.state_manager.update_project(
@@ -204,6 +212,30 @@ class Orchestrator:
         tmp_filepath.replace(filepath)
 
         logger.info(f"Persisted {len(issues)} issues to {filepath}")
+
+    def _persist_milestones(self, project_id: int, milestones: list) -> None:
+        """Persist milestones to Parquet (Layer 1 output).
+
+        Replaces entire file (milestones are lightweight, no incremental needed).
+        """
+        from app.shared.schemas import RawMilestone
+
+        filepath = self.processed_path / f"milestones_{project_id}.parquet"
+
+        # Convert to DataFrame
+        df = pd.DataFrame([ms.model_dump() for ms in milestones])
+
+        # Ensure datetime columns are properly typed
+        for col in ["due_date", "start_date", "created_at", "updated_at"]:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], utc=True)
+
+        # Atomic write (full replace)
+        tmp_filepath = filepath.with_suffix(".tmp")
+        df.to_parquet(tmp_filepath, engine="pyarrow", compression="snappy")
+        tmp_filepath.replace(filepath)
+
+        logger.info(f"Persisted {len(milestones)} milestones to {filepath}")
 
 
 def main() -> None:

@@ -13,7 +13,7 @@ from typing import Any, Optional
 import gitlab
 from gitlab.v4.objects import ProjectIssue
 
-from app.shared.schemas import RawIssue
+from app.shared.schemas import RawIssue, RawMilestone
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,49 @@ class RestClient:
         """Fetch the full project path (namespace/name)."""
         project = self.gl.projects.get(project_id)
         return project.path_with_namespace
+
+    def fetch_milestones(self, project_id: int) -> list[RawMilestone]:
+        """Fetch all milestones from a GitLab project.
+
+        Args:
+            project_id: GitLab project ID
+
+        Returns:
+            List of validated RawMilestone objects
+        """
+        project = self.gl.projects.get(project_id)
+        logger.info(f"Fetching milestones from project {project_id}")
+
+        # Fetch all milestones (both active and closed)
+        raw_milestones: list[dict[str, Any]] = []
+        for state in ["active", "closed"]:
+            milestones_list = project.milestones.list(state=state, iterator=True)
+            for ms in milestones_list:
+                raw_milestones.append({
+                    "id": ms.id,
+                    "iid": ms.iid,
+                    "project_id": project_id,
+                    "title": ms.title,
+                    "description": ms.description,
+                    "state": ms.state,
+                    "due_date": ms.due_date,
+                    "start_date": ms.start_date,
+                    "created_at": ms.created_at,
+                    "updated_at": ms.updated_at,
+                    "web_url": ms.web_url,
+                })
+
+        logger.info(f"Fetched {len(raw_milestones)} milestones from project {project_id}")
+
+        # Validate and convert to Pydantic models
+        validated: list[RawMilestone] = []
+        for raw in raw_milestones:
+            try:
+                validated.append(RawMilestone.model_validate(raw))
+            except Exception as e:
+                logger.warning(f"Validation error for milestone {raw.get('id')}: {e}")
+
+        return validated
 
 
     def _persist_raw(self, project_id: int, issues: list[dict[str, Any]]) -> None:
