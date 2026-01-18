@@ -61,6 +61,15 @@ uv run python tools/seeder.py --count 10000 --inject-errors
 uv run python -m cProfile -s time app/processor/main.py
 ```
 
+## Q&A
+
+### Data Inclusion Logic
+**Q: Are quality issues included in "Open Issues" or "Bug Ratio" metrics?**
+**A:** No. All metrics in the Overview, Flow, Release, and Aging pages are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect operational metrics.
+
+**Q: Do the issue lists include quality issues?**
+**A:** No. The lists in Flow, Release, and Aging views show only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
+
 ## License
 
 MIT
