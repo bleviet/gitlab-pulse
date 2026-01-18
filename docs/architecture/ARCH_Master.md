@@ -24,6 +24,17 @@ The system uses a tiered storage approach, moving from high-volume raw files to 
 ### **2.2. ADR: Why persistent Raw storage?**
 
 * **Reliability:** In any data-driven environment, it is critical to have a "Source of Truth." The Raw layer preserves the original API response as evidence of the state at the time of sync.  
+### 3. Development Value Stream (Flow)
+Tracks the *efficiency* of the process (Cycle Time, Lead Time).
+- **Key Metric:** Days in Stage, Flow Efficiency.
+- **View:** "Flow" Dashboard (Funnel, Aging).
+
+### 4. Release Tracking (Scope)
+Tracks the *effectiveness* of delivering the plan (Milestones).
+- **Key Metric:** Release Burn-up, Scope Completion %.
+- **View:** "Release" Dashboard (Readiness, Scope Creep).
+
+## Data Pipeline Layers
 * **Idempotency:** If the processing logic in Layer 1 changes (e.g., adding a new field), you can re-run the pipeline using the Raw files instead of re-querying GitLab. This prevents unnecessary network load and respects API rate limits.
 
 ## **3\. Layer 1: Data Acquisition (The Hybrid Collector)**
@@ -32,7 +43,7 @@ The system uses a tiered storage approach, moving from high-volume raw files to 
 
 ### **3.1. Implementation Strategy**
 
-* **REST API (python-gitlab):** Used for high-volume metadata retrieval (titles, labels, timestamps).  
+* **REST API (python-gitlab):** Used for high-volume metadata retrieval (titles, labels, timestamps). **Update**: Must specifically flatten the milestone object to extract milestone_title and milestone_due_date for every issue. 
 * **GraphQL API:** Used specifically for **Hierarchy Resolution**. It resolves Parent-Child links (Issues to Tasks) not natively accessible via the REST Issue API, supporting modern GitLab work items.  
 * **Incremental Sync:** Uses a sync\_state.json to track updated\_after timestamps, reducing API load by \>90%.
 

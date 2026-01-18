@@ -71,6 +71,7 @@ def main() -> None:
     pages = {
         "📊 Overview": "overview",
         "🌊 Flow": "flow",
+        "🚀 Release": "release",
         "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
     }
@@ -85,9 +86,13 @@ def main() -> None:
         render_flow_view(filtered_df)
 
     with tabs[2]:
-        render_aging(filtered_df)
+        from app.dashboard.views.release import render_release_view
+        render_release_view(filtered_df)
 
     with tabs[3]:
+        render_aging(filtered_df)
+
+    with tabs[4]:
         render_hygiene(filtered_df, quality_df)
 
 

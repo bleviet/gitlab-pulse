@@ -75,6 +75,12 @@ class AnalyticsIssue(BaseModel):
     web_url: Optional[str] = None
     assignee: Optional[str] = None
     milestone: Optional[str] = None
+    milestone_id: Optional[int] = None
+    milestone_due_date: Optional[datetime] = None
+    milestone_start_date: Optional[datetime] = None  # Title
+    milestone_id: Optional[int] = None
+    milestone_due_date: Optional[datetime] = None
+    milestone_start_date: Optional[datetime] = None
 
     # Enriched fields (Layer 2)
     age_days: int = Field(default=0, description="Days since creation")
@@ -125,4 +131,6 @@ PARQUET_DTYPES = {
     "severity": "category",
     "team": "category",
     "is_stale": "bool",
+    "milestone": "category",
+    "milestone_id": "float",  # Nullable int is often float in pandas < 1.0 or w/o Int64
 }

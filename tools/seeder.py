@@ -109,6 +109,25 @@ def generate_issues(
                 elif i > 0:
                     parent_id = 10000 + random.randint(0, max(0, i - 1))
 
+        # Milestone generation
+        milestone: Optional[str] = None
+        milestone_id: Optional[int] = None
+        milestone_due_date: Optional[datetime] = None
+        milestone_start_date: Optional[datetime] = None
+        
+        if random.random() < 0.6:
+            ms_ver = random.randint(1, 5)
+            milestone = f"v1.{ms_ver}"
+            milestone_id = 500 + ms_ver
+            
+            # Simulated schedule: v1.1 starts Jan 1st 2025, each lasts 30 days
+            base_date = datetime(2025, 1, 1)
+            ms_start = base_date + timedelta(days=(ms_ver - 1) * 30)
+            ms_due = ms_start + timedelta(days=28)
+            
+            milestone_start_date = ms_start
+            milestone_due_date = ms_due
+
         issue = {
             "id": issue_id,
             "iid": i + 1,
@@ -124,7 +143,10 @@ def generate_issues(
             "child_ids": [],
             "web_url": f"https://gitlab.example.com/project/-/issues/{i + 1}",
             "assignee": fake.user_name() if random.random() < 0.8 else None,
-            "milestone": f"v1.{random.randint(0, 5)}" if random.random() < 0.6 else None,
+            "milestone": milestone,
+            "milestone_id": milestone_id,
+            "milestone_due_date": milestone_due_date,
+            "milestone_start_date": milestone_start_date,
         }
         issues.append(issue)
 

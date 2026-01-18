@@ -67,6 +67,7 @@ class ValidationConfig(BaseModel):
     """Validation rules configuration."""
 
     required_labels: dict[str, list[str]] = Field(default_factory=dict)
+    required_fields: dict[str, list[str]] = Field(default_factory=dict)
     stale_threshold_days: int = 30
     max_cycle_time_days: int = 90
 

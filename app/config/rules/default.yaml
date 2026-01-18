@@ -84,6 +84,12 @@ validation:
     Feature:
       - "priority::"  # Any priority label required for features
 
+  # Required fields (column names)
+  required_fields:
+    Feature:
+      - "milestone"  # Feature issues must have a milestone (title)
+
+
   # Staleness threshold (days since last update)
   stale_threshold_days: 30
 

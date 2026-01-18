@@ -26,6 +26,7 @@ class ErrorCodes:
     """Standard error codes for quality issues."""
 
     MISSING_LABEL = "MISSING_LABEL"
+    MISSING_FIELD = "MISSING_FIELD"
     CONFLICTING_LABELS = "CONFLICTING_LABELS"
     STALE_WITHOUT_UPDATE = "STALE_WITHOUT_UPDATE"
     ORPHAN_TASK = "ORPHAN_TASK"
@@ -67,6 +68,29 @@ def validate_issues(
                         idx,
                         ErrorCodes.MISSING_LABEL,
                         f"{issue_type} missing required label: {prefix}*",
+                    ))
+
+    # Validate required fields
+    if rule and rule.validation.required_fields:
+        for issue_type, required_cols in rule.validation.required_fields.items():
+            type_mask = df["issue_type"] == issue_type
+            if not type_mask.any():
+                continue
+
+            for col in required_cols:
+                if col not in df.columns:
+                    logger.warning(f"Required field '{col}' not found in DataFrame - check enrichment")
+                    # Optionally fail all issues of this type? For now just log warning.
+                    continue
+                
+                # Check for null, NaN, or empty string
+                missing_mask = df[type_mask][col].isna() | (df[type_mask][col] == "")
+                
+                for idx in df[type_mask][missing_mask].index:
+                    errors.append((
+                        idx,
+                        ErrorCodes.MISSING_FIELD,
+                        f"{issue_type} missing required field: {col}",
                     ))
 
     # Validate conflicting labels (e.g., both type::bug and type::feature)
