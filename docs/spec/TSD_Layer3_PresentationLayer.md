@@ -1,0 +1,106 @@
+# **Technical Specification: Layer 3 \- Presentation Layer**
+
+Version: 1.1  
+Reference Architecture: Architecture/layer\_3\_specification.md v1.0  
+Scope: Detailed design for the Streamlit-based Dashboard, including UI/UX standards and Theming.
+
+## **1\. UI/UX Design System**
+
+### **1.1. Design Philosophy**
+
+The dashboard follows a **"Modern Minimalist"** aesthetic.
+
+* **Card-Based Layout:** Metrics and Charts are contained in visually distinct blocks.  
+* **High Contrast:** Critical alerts (Stale issues) use bold colors; context (grid lines) uses subtle greys.  
+* **Mode-Agnostic:** All custom visual elements must pass WCAG AA contrast standards on both dark and light backgrounds.
+
+### **1.2. Color Palette (Semantic)**
+
+We use a **Unified Semantic Palette** to ensure consistency across all charts. Hard-coding colors ensures that "Bugs" are always Red, regardless of the Streamlit theme.
+
+| Category | Hex Code | Description | Usage |
+| :---- | :---- | :---- | :---- |
+| **Primary** | \#4F46E5 | Indigo | Main Bars, Active States, "Total Issues" |
+| **Bug/Critical** | \#EF4444 | Rose/Red | Bug counts, High Severity, Error Rates |
+| **Feature** | \#3B82F6 | Blue | Feature counts, "In Progress" |
+| **Task/Done** | \#10B981 | Emerald | Completed items, Tasks |
+| **Stale/Warn** | \#F59E0B | Amber | Stale Issues, Missing Labels |
+| **Neutral** | \#64748B | Slate | Text, Grid lines, Secondary info |
+
+### **1.3. Theme Configuration (.streamlit/config.toml)**
+
+The application *must* include a config file to enforce the brand identity while respecting the user's system preference (Dark/Light).
+
+\[theme\]  
+primaryColor \= "\#4F46E5"  
+backgroundColor \= "\#FFFFFF" \# (Light Mode Default) / Detects system pref  
+secondaryBackgroundColor \= "\#F1F5F9"  
+textColor \= "\#1E293B"  
+font \= "sans serif"
+
+## **2\. UI Components & Layout**
+
+### **2.1. Global Sidebar**
+
+* **Header:** App Title (GitLabInsight) with a minimalist icon.  
+* **Domain Selector:** Populated from the team column in the Analytics parquet.  
+* **Time Range Picker:** Filters the data globally by created\_at.  
+* **Footer:** Version info and "Last Sync" timestamp.
+
+### **2.2. The Three Views**
+
+#### **View 1: Overview Page (Strategic)**
+
+* **Top Row (KPI Cards):** \* Use st.metric with delta\_color="normal".  
+  * *Total Open*, *Velocity (Closed/Week)*, *Bug Ratio*.  
+* **Middle Row (Burn-up):** \* Full-width Plotly Line Chart.  
+  * **Styling:** Minimalist mode. Remove grid lines on X-axis.  
+* **Bottom Row (Distribution):** \* Two columns: *Work Distribution (Bar)* and *Status Split (Donut)*.
+
+#### **View 2: Aging Page (Operational)**
+
+* **Alert Banner:** If stale issues \> threshold, show st.warning("⚠️ High volume of stale issues detected").  
+* **Chart:** Boxplots showing distribution of age\_days by Priority/Type.  
+  * *UX:* Hovering over outlier dots must show the specific Issue Title and Assignee.
+
+#### **View 3: Hygiene Page (Quality)**
+
+* **Scorecard:** Large Radial Gauge (0-100%) showing overall data quality.  
+* **Action Table:** A data grid (st.dataframe) showing invalid issues.  
+  * *Highlighting:* Use pandas.style to color-code the error\_code column (Red background for critical errors).
+
+## **3\. State & Performance**
+
+### **3.1. Caching Strategy**
+
+* **Function:** load\_data()  
+* **Implementation:** @st.cache\_data(ttl=900)  
+* **Logic:** The data is loaded from Parquet into memory once every 15 minutes. All filtering (by team, by date) is then performed on the in-memory DataFrame for instant UI responsiveness.
+
+## **4\. Visualization Logic**
+
+### **4.1. Plotly Configuration**
+
+All charts must use the Streamlit theme integration for backgrounds but override specific data colors.
+
+* **Config Object:** config={'displayModeBar': False} (Hides the Plotly toolbar for a cleaner look).  
+* **Layout Defaults:**  
+  * margin=dict(l=0, r=0, t=30, b=0) (Tight layout).  
+  * font=dict(family="Inter, sans-serif").  
+* **Dark/Light Adaptability:**  
+  * Do **not** set a fixed paper\_bgcolor. Use rgba(0,0,0,0) to let the Streamlit theme shine through.  
+  * Use the Semantic Palette defined in Section 1.2 for all data traces.
+
+## **5\. Architecture Decision Records (ADR)**
+
+### **5.1. Why Streamlit?**
+
+* **Python Synergy:** Since the data pipeline (L1/L2) is already in Python/Pandas, Streamlit allows us to build the UI in the same language, sharing data models and logic without needing a complex REST/JSON bridge to a JavaScript frontend.
+
+### **5.2. Why Plotly over Altair?**
+
+* **Interactivity:** Plotly provides a more robust out-of-the-box toolset for zooming and panning, which is essential when analyzing a timeline containing thousands of issue "dots."
+
+### **5.3. Why Semantic Color Mapping?**
+
+* **Cognitive Load:** By rigidly defining "Bug \= Red" and "Feature \= Blue", users instantly recognize patterns across different charts without re-reading legends. This mapping must persist regardless of whether the user is in Dark or Light mode.
