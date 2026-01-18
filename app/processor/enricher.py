@@ -161,3 +161,90 @@ def _find_mapped_label(labels: object, mapping: dict[str, str]) -> Optional[str]
                 return value
 
     return None
+
+
+def explode_contexts(
+    df: pd.DataFrame,
+    rule: Optional[DomainRule] = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Explode DataFrame by context labels (Data Explosion).
+
+    Each issue matching multiple context patterns becomes multiple rows.
+
+    Args:
+        df: DataFrame with labels column
+        rule: Domain rule with context configuration
+
+    Returns:
+        Tuple of (exploded_df, orphan_df):
+        - exploded_df: Issues with context columns added (may have more rows than input)
+        - orphan_df: Issues that matched no context (if require_assignment is True)
+    """
+    if df.empty or rule is None or not rule.contexts.patterns:
+        # No context config - add empty context columns and return
+        df = df.copy()
+        df["context"] = None
+        df["context_group"] = None
+        return df, pd.DataFrame()
+
+    patterns = rule.contexts.patterns
+    require_assignment = rule.contexts.require_assignment
+
+    exploded_rows = []
+    orphan_rows = []
+
+    for _, row in df.iterrows():
+        labels = row.get("labels", [])
+        # Handle numpy arrays
+        if labels is None:
+            labels = []
+        try:
+            label_list = list(labels) if not isinstance(labels, list) else labels
+        except (TypeError, ValueError):
+            label_list = []
+
+        # Find all matching contexts for this issue
+        matched_contexts = []
+        for pattern in patterns:
+            for label in label_list:
+                if isinstance(label, str) and label.startswith(pattern.prefix):
+                    # Extract context name (e.g., "rnd::Alpha" -> "Alpha")
+                    context_name = label[len(pattern.prefix):]
+                    matched_contexts.append({
+                        "context": context_name,
+                        "context_group": pattern.alias,
+                    })
+
+        if matched_contexts:
+            # Create one row per matched context
+            for ctx in matched_contexts:
+                new_row = row.to_dict()  # Convert to dict to avoid dtype issues
+                new_row["context"] = ctx["context"]
+                new_row["context_group"] = ctx["context_group"]
+                exploded_rows.append(new_row)
+        else:
+            # No context match
+            if require_assignment:
+                orphan_rows.append(row.to_dict())
+            else:
+                # Still include in output with None context
+                new_row = row.to_dict()
+                new_row["context"] = None
+                new_row["context_group"] = None
+                exploded_rows.append(new_row)
+
+    # Build result DataFrames
+    if exploded_rows:
+        exploded_df = pd.DataFrame(exploded_rows)
+    else:
+        exploded_df = df.copy()
+        exploded_df["context"] = None
+        exploded_df["context_group"] = None
+
+    if orphan_rows:
+        orphan_df = pd.DataFrame(orphan_rows)
+    else:
+        orphan_df = pd.DataFrame()
+
+    logger.debug(f"Context explosion: {len(df)} -> {len(exploded_df)} rows, {len(orphan_df)} orphans")
+    return exploded_df, orphan_df

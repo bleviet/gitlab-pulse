@@ -151,3 +151,22 @@ def filter_by_team(df: pd.DataFrame, team: str) -> pd.DataFrame:
         return df
 
     return df[df["team"] == team]
+
+
+def filter_by_context(df: pd.DataFrame, context: str) -> pd.DataFrame:
+    """Filter DataFrame by context (sub-project).
+
+    Args:
+        df: DataFrame to filter
+        context: Context name (or "All" for no filter)
+
+    Returns:
+        Filtered DataFrame
+    """
+    if df.empty or context == "All":
+        return df
+
+    if "context" not in df.columns:
+        return df
+
+    return df[df["context"] == context]

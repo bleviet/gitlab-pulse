@@ -57,6 +57,23 @@ To ensure flexibility across different use cases, the platform uses **Modular Ru
 * **Pandas Vectorization:** All date-based metrics (age\_days, lead\_time) are calculated using vectorized Pandas operations rather than Python loops, allowing for near-instant processing of thousands of issues.  
 * **The Gatekeeper:** Layer 2 splits data. Valid data goes to the Analytics file; invalid data goes to the Quality file, ensuring your insights are never skewed by poorly tagged issues.
 
+### **4.3. Context Slicing (Data Explosion)**
+
+Many organizations use a single GitLab repository for "Platform Development"—one codebase that serves multiple products, customers, or R&D initiatives. Since GitLab Free lacks sub-projects, teams use labels (e.g., `rnd::Alpha`, `cust::BMW`) to logically segment work.
+
+**The Problem:** An issue (e.g., "Sensor Bug") may belong to *multiple* contexts (`rnd::Alpha` AND `rnd::Beta`). Project managers for each context need to see this issue in their respective dashboards.
+
+**The Solution: Data Explosion**  
+Layer 2 "explodes" the dataset. One physical issue becomes multiple logical rows in the analytics layer:
+
+| Original Issue | Analytics Rows |
+| :------------- | :------------- |
+| Issue #100 (labels: `rnd::Alpha`, `rnd::Beta`) | Row 1: `context=Alpha`, Row 2: `context=Beta` |
+
+**Why This Matters:**
+* **Clean Architecture:** Layer 3 (Dashboard) remains "dumb"—it simply filters by the `context` column without needing to parse labels.
+* **Quality Enforcement:** A validation rule (`require_context_assignment`) flags issues that aren't assigned to any context, enforcing team discipline.
+
 ## **5\. Layer 3: Presentation (Streamlit Dashboard)**
 
 **Role:** High-speed visualization and drill-down.

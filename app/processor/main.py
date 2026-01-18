@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.processor.enricher import apply_label_mappings, enrich_metrics
+from app.processor.enricher import apply_label_mappings, enrich_metrics, explode_contexts
 from app.processor.rule_loader import RuleLoader
 from app.processor.validator import validate_issues
 
@@ -113,8 +113,18 @@ class Processor:
         df = enrich_metrics(df, rule)
         df = apply_label_mappings(df, rule)
 
+        # Context explosion (Data Explosion pattern)
+        df, orphan_df = explode_contexts(df, rule)
+
         # Validate
         result = validate_issues(df, rule)
+
+        # Add orphan issues as MISSING_CONTEXT quality failures
+        if not orphan_df.empty:
+            orphan_df = orphan_df.copy()
+            orphan_df["error_code"] = "MISSING_CONTEXT"
+            orphan_df["error_message"] = "Issue not assigned to any context/project"
+            result.quality_df = pd.concat([result.quality_df, orphan_df], ignore_index=True)
 
         return result.valid_df, result.quality_df
 

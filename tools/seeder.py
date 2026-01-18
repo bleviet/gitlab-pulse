@@ -22,6 +22,7 @@ fake = Faker()
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
 SEVERITY_LABELS = ["severity::critical", "severity::high", "severity::medium", "severity::low"]
 PRIORITY_LABELS = ["priority::1", "priority::2", "priority::3"]
+CONTEXT_LABELS = ["rnd::Alpha", "rnd::Beta", "rnd::Gamma", "cust::BMW", "cust::Audi"]
 WORK_ITEM_TYPES = ["ISSUE", "TASK"]
 
 
@@ -154,6 +155,18 @@ def _generate_labels(inject_errors: bool = False) -> list[str]:
     # Priority label (70% have one)
     if random.random() < 0.7:
         labels.append(random.choice(PRIORITY_LABELS))
+
+    # Context labels (80% have at least one, some have multiple for Data Explosion testing)
+    if random.random() < 0.8:
+        # 30% chance of multiple contexts (Data Explosion scenario)
+        if random.random() < 0.3:
+            # Pick 2-3 contexts
+            num_contexts = random.randint(2, 3)
+            contexts = random.sample(CONTEXT_LABELS, min(num_contexts, len(CONTEXT_LABELS)))
+            labels.extend(contexts)
+        else:
+            # Single context
+            labels.append(random.choice(CONTEXT_LABELS))
 
     return labels
 

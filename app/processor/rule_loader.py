@@ -31,6 +31,24 @@ class TitlePatterns(BaseModel):
     type: dict[str, list[str]] = Field(default_factory=dict)  # type_name -> keywords
 
 
+class ContextPattern(BaseModel):
+    """Single context pattern definition."""
+
+    prefix: str  # e.g., "rnd::" or "cust::"
+    alias: str   # e.g., "R&D" or "Customer"
+
+
+class ContextConfig(BaseModel):
+    """Context slicing configuration for Data Explosion.
+
+    Defines how to extract logical contexts from labels.
+    """
+
+    method: str = "label_prefix"  # Currently only supports "label_prefix"
+    patterns: list[ContextPattern] = Field(default_factory=list)
+    require_assignment: bool = False  # If true, missing context is a validation failure
+
+
 class ValidationConfig(BaseModel):
     """Validation rules configuration."""
 
@@ -46,6 +64,7 @@ class DomainRule(BaseModel):
     team: str = "default"
     label_mappings: LabelMappings = Field(default_factory=LabelMappings)
     title_patterns: TitlePatterns = Field(default_factory=TitlePatterns)
+    contexts: ContextConfig = Field(default_factory=ContextConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     colors: dict[str, str] = Field(default_factory=dict)
 

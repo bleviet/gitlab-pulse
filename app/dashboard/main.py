@@ -6,6 +6,7 @@ GitLabInsight Layer 3 Presentation Layer.
 import streamlit as st
 
 from app.dashboard.data_loader import (
+    filter_by_context,
     filter_by_date_range,
     filter_by_team,
     load_quality_issues,
@@ -58,6 +59,7 @@ def main() -> None:
     filtered_df = valid_df.copy()
     if not filtered_df.empty:
         filtered_df = filter_by_team(filtered_df, filters["team"])
+        filtered_df = filter_by_context(filtered_df, filters["context"])
         filtered_df = filter_by_date_range(
             filtered_df,
             filters["start_date"],

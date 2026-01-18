@@ -39,6 +39,19 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             help="Filter issues by team or domain",
         )
 
+        # Context selector (for Data Explosion / sub-project filtering)
+        contexts = ["All"]
+        if not df.empty and "context" in df.columns:
+            unique_contexts = df["context"].dropna().unique().tolist()
+            contexts.extend(sorted(unique_contexts))
+
+        selected_context = st.selectbox(
+            "Context / Sub-Project",
+            options=contexts,
+            index=0,
+            help="Filter by context (R&D project, Customer, etc.)",
+        )
+
         st.divider()
 
         # Time range picker
@@ -108,6 +121,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
     return {
         "team": selected_team,
+        "context": selected_context,
         "start_date": pd.Timestamp(start_date, tz="UTC"),
         "end_date": pd.Timestamp(end_date, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1),
     }

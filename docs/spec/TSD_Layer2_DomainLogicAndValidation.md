@@ -26,6 +26,16 @@ The "Gatekeeper" checks each issue against the rules defined in the correspondin
 * **Required Labels:** Check if type::bug issues have a severity:: label.  
 * **Staleness:** Tag issues as is\_stale if updated\_at \> max\_stale\_days.
 
+### **2.3. Context Slicing (Data Explosion)**
+
+To support "Platform Development" patterns where one repo serves multiple projects, the processor employs "Data Explosion":
+
+*   **Config:** Rules define contexts via label prefixes (e.g., `rnd::Alpha`, `cust::Beta`).
+*   **Expansion:** A single issue with labels `rnd::Alpha` and `cust::Beta` is expanded into two rows in the analytics dataset.
+    *   Row 1: `{id: 100, context: "Alpha", context_group: "R&D"}`
+    *   Row 2: `{id: 100, context: "Beta", context_group: "Customer"}`
+*   **Validation:** If `require_context_assignment` is true, issues without any matching context label are flagged as `MISSING_CONTEXT` quality failures.
+
 ## **3\. Data Output (Split Storage)**
 
 | File | Content |
