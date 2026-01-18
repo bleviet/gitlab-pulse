@@ -47,6 +47,11 @@ def render_flow_view(df: pd.DataFrame) -> None:
     with col2:
         _render_aging_chart(df)
 
+    st.divider()
+
+    # Detail grid (Drill-down)
+    _render_issue_detail_grid(df)
+
 
 def _render_flow_metrics(df: pd.DataFrame) -> None:
     """Render Flow key metrics."""
@@ -172,3 +177,58 @@ def _render_aging_chart(df: pd.DataFrame) -> None:
     )
 
     st.plotly_chart(fig, width="stretch")
+
+
+def _render_issue_detail_grid(df: pd.DataFrame) -> None:
+    """Render unified issue detail grid with drill-down filters."""
+    st.subheader("📋 Issue Drill-down")
+    st.caption("Inspect issues by stage.")
+
+    # 1. Multi-select Filter
+    available_stages = sorted(df["stage"].unique(), key=lambda s: df[df["stage"] == s]["stage_order"].min())
+    selected_stages = st.multiselect(
+        "Filter by Stage",
+        options=available_stages,
+        default=[],
+        help="Select stages to drill down into specifics."
+    )
+
+    # 2. Filter Data
+    if selected_stages:
+        display_df = df[df["stage"].isin(selected_stages)].copy()
+    else:
+        display_df = df.copy()
+
+    # 3. Sort by Age (Staleness focus)
+    display_df = display_df.sort_values("days_in_stage", ascending=False)
+
+    # 4. Select Columns
+    cols_to_show = [
+        "iid", "title", "stage", "days_in_stage", "assignee", "web_url"
+    ]
+    # Filter columns that exist
+    cols = [c for c in cols_to_show if c in display_df.columns]
+    
+    # Rename for display
+    display_df = display_df[cols].rename(columns={
+        "days_in_stage": "Days in Stage",
+        "stage": "Stage",
+        "title": "Title",
+        "assignee": "Assignee",
+        "iid": "IID",
+    })
+
+    # 5. Render Dataframe with Links
+    st.dataframe(
+        display_df,
+        column_config={
+            "web_url": st.column_config.LinkColumn("GitLab Link"),
+            "Days in Stage": st.column_config.NumberColumn(
+                "Days in Stage",
+                help="Days since last update in this stage",
+                format="%d days",
+            ),
+        },
+        width="stretch",
+        hide_index=True,
+    )

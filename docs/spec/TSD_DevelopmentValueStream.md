@@ -64,6 +64,14 @@ A new **"Flow"** view provides insights into process health.
 *   **Y-Axis:** `days_in_stage` (calculated as `now - updated_at` as a proxy, or `update - label_added` if history available).
 *   **Goal:** Highlight stages with high median age or extreme outliers.
 
+### **3.3. Stage Detail (Drill-down)**
+*   **Design:** Unified Data Grid (Table).
+*   **Interaction:** Users select specific stage(s) via a multi-select filter to inspect issues.
+*   **Why (UX):**
+    *   **Unified Grid:** Avoids the "Stack of Tables" vertical scroll fatigue.
+    *   **Cross-Stage Sorting:** Allows finding the "Oldest Active Item" regardless of specific stage (e.g. Architecture vs Implementation).
+*   **Columns:** `ID`, `Title`, `Stage`, `Age`, `Assignee`. Sorted by `Age` (descending) by default to highlight stuck items.
+
 ## **4. Architecture Decision Records (ADR)**
 
 ### **4.1. Snapshot-based Workflow**
