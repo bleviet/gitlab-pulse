@@ -59,10 +59,15 @@ def _run_pipeline_step(command: list[str], name: str) -> None:
         # Display logs
         with output_container.expander(f"{name} Logs", expanded=True):
             if result.stdout:
+                st.caption("Standard Output")
                 st.code(result.stdout, language="text")
             if result.stderr:
-                st.color_picker(f"{name} Error", "#FF0000", disabled=True, key=f"{name}_err_color") # Visual separator
-                st.error(result.stderr)
+                if result.returncode == 0:
+                    st.caption("Log Output")
+                    st.code(result.stderr, language="text")
+                else:
+                    st.caption("Error Output")
+                    st.error(result.stderr)
 
         if result.returncode == 0:
             status_container.success(f"{name} completed successfully!")
