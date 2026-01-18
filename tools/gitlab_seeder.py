@@ -15,6 +15,10 @@ from typing import Optional
 
 import gitlab
 from faker import Faker
+from dotenv import load_dotenv
+
+# Load env vars
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
