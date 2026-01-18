@@ -113,8 +113,12 @@ A CLI tool to populate a **blank** GitLab repository with known test data.
     *   Create standard milestones (`v1.0`, `v1.1`) with Start/Due dates.
 3.  **Data Seeding:**
     *   Push N issues (e.g., 50) via `python-gitlab`.
+    *   **Hierarchy:** Support `Task` creation and reliable parent-child linking via **GraphQL mutations** (bypassing unreliable Quick Actions).
+    *   **Error Injection:** Support `--inject-errors` flag to introduce data quality issues:
+        *   Missing Labels (e.g., no `type::*`).
+        *   Conflicting Labels (e.g., `type::bug` AND `type::feature`).
+        *   Missing Milestones.
     *   Assign pseudo-random labels and milestones.
-    *   Simulate "activity" (notes/comments) if possible (optional).
 
 ### **6.2. Workflow**
 1.  User creates a Sandbox Project on GitLab.com or Self-Managed.

@@ -8,8 +8,12 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 # Install dependencies
 uv sync --dev
 
-# Generate synthetic test data
+
+# Generate synthetic test data (Local)
 uv run python tools/seeder.py --count 1000 --inject-errors
+
+# Or seed a live GitLab project (Remote)
+uv run python tools/gitlab_seeder.py --project-id <YOUR_PROJECT_ID> --count 50 --inject-errors
 
 # Process data (Layer 2)
 uv run python app/processor/main.py
@@ -25,7 +29,7 @@ uv run streamlit run app/dashboard/main.py
 | **L0** | `data/raw/` | Raw JSON from GitLab API |
 | **L1** | `app/collector/` | Hybrid REST+GraphQL collector |
 | **L2** | `app/processor/` | Domain logic & validation |
-| **L3** | `app/dashboard/` | Streamlit visualization |
+| **L3** | `app/dashboard/` | Hierarchical Streamlit visualization |
 
 ## Configuration
 

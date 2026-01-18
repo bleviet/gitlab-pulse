@@ -69,6 +69,25 @@ font \= "sans serif"
 * **Action Table:** A data grid (st.dataframe) showing invalid issues.  
   * *Highlighting:* Use pandas.style to color-code the error\_code column (Red background for critical errors).
 
+#### **View 4: Release Management**
+
+* **KPIs:** Progress %, Days Remaining, Scope (Total Issues).
+* **Charts:** Burn-up Chart (Scope vs Completed over time).
+* **Scope Table:** List of issues in the milestone, sorted by status.
+
+#### **View 5: Value Stream (Flow)**
+
+* **Charts:** Throughput (Bar), Cycle Time Scatter.
+* **Drill-down:** Hierarchical grid showing parent-child relationships.
+
+### **2.3. Hierarchical Data Grids**
+
+Grids displaying Task/Subtask relationships (e.g., in Release or Flow views) must use **Visual Indentation** to represent topology:
+
+* **Sorting:** Parents appear immediately before their children.
+* **Indentation:** Child titles are prefixed with `↳ ` and indented.
+* **Linking:** Clicking either Parent or Child ID opens the specific Work Item URL.
+
 ## **3\. State & Performance**
 
 ### **3.1. Caching Strategy**
