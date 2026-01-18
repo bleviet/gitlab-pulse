@@ -168,7 +168,7 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
     st.subheader("🔧 Action Required")
 
     # Select display columns
-    display_cols = ["iid", "title", "error_code", "error_message", "assignee"]
+    display_cols = ["iid", "title", "error_code", "error_message", "assignee", "web_url"]
     available_cols = [c for c in display_cols if c in quality_df.columns]
 
     display_df = quality_df[available_cols].copy()
@@ -195,5 +195,6 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
             "error_code": st.column_config.TextColumn("Error", width="medium"),
             "error_message": st.column_config.TextColumn("Details", width="large"),
             "assignee": st.column_config.TextColumn("Assignee", width="medium"),
+            "web_url": st.column_config.LinkColumn("GitLab Link", width="small"),
         },
     )

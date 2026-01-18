@@ -154,7 +154,7 @@ def _render_stale_table(df: pd.DataFrame) -> None:
         return
 
     # Select display columns
-    display_cols = ["iid", "title", "issue_type", "assignee", "age_days", "updated_at"]
+    display_cols = ["iid", "title", "issue_type", "assignee", "age_days", "updated_at", "web_url"]
     available_cols = [c for c in display_cols if c in stale_df.columns]
 
     display_df = stale_df[available_cols].sort_values("age_days", ascending=False)
@@ -174,5 +174,6 @@ def _render_stale_table(df: pd.DataFrame) -> None:
             "assignee": st.column_config.TextColumn("Assignee", width="medium"),
             "age_days": st.column_config.NumberColumn("Age (Days)", width="small"),
             "updated_at": st.column_config.TextColumn("Last Update", width="medium"),
+            "web_url": st.column_config.LinkColumn("GitLab Link", width="small"),
         },
     )
