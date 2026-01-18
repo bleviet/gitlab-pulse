@@ -82,6 +82,14 @@ class Orchestrator:
             persist_raw=True,
         )
 
+        # Always fetch milestones (lightweight, independent of issue changes)
+        try:
+            milestones = self.rest_client.fetch_milestones(project_id)
+            if milestones:
+                self._persist_milestones(project_id, milestones)
+        except Exception as e:
+            logger.warning(f"Failed to fetch milestones for project {project_id}: {e}")
+
         if not issues:
             logger.info(f"No new issues found for project {project_id}")
             return 0
@@ -106,14 +114,6 @@ class Orchestrator:
 
         # Step 5 & 6: Transform and Persist L1
         self._persist_processed(project_id, issues)
-
-        # Step 7: Fetch and persist milestones (always full sync, lightweight)
-        try:
-            milestones = self.rest_client.fetch_milestones(project_id)
-            if milestones:
-                self._persist_milestones(project_id, milestones)
-        except Exception as e:
-            logger.warning(f"Failed to fetch milestones for project {project_id}: {e}")
 
         # Update state
         max_updated = max(issue.updated_at for issue in issues)
