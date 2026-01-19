@@ -306,6 +306,16 @@ def enrich_workflow_stage(
         df["days_in_stage"] = (pd.Timestamp(now, tz="UTC") - df["updated_at"]).dt.days
         df["days_in_stage"] = df["days_in_stage"].fillna(0).astype(int)
 
+    # Closed issues are always "Done" regardless of labels
+    if "state" in df.columns:
+        closed_mask = df["state"] == "closed"
+        if closed_mask.any():
+            df.loc[closed_mask, "stage"] = "Done"
+            df.loc[closed_mask, "stage_type"] = "completed"
+            # Done stage comes after all other stages
+            max_order = df["stage_order"].max()
+            df.loc[closed_mask, "stage_order"] = max_order + 1
+
     return df
 
 
