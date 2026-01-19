@@ -52,11 +52,13 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
 
     # Charts (Collapsible)
     with st.expander("📊 Flow Charts", expanded=True):
-        col1, col2 = st.columns(2)
-        with col1:
+        tab1, tab2 = st.tabs(["🔻 Project Funnel", "⏳ Stage Stickiness"])
+        
+        with tab1:
             # Use unique issues for funnel to show correct counts
             funnel_selection = _render_funnel_chart(unique_df)
-        with col2:
+            
+        with tab2:
             # Use unique issues for aging to show distinct items
             aging_selection = _render_aging_chart(unique_df)
 
