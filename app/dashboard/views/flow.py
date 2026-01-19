@@ -46,13 +46,63 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
     with st.expander("📊 Flow Charts", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
-            _render_funnel_chart(df)
+            funnel_selection = _render_funnel_chart(df)
         with col2:
-            _render_aging_chart(df)
+            aging_selection = _render_aging_chart(df)
+
+    # Apply interactive filters
+    filtered_df = df.copy()
+    
+    # Filter by Funnel Selection
+    if funnel_selection and funnel_selection.get("selection", {}).get("points"):
+        selected_points = funnel_selection["selection"]["points"]
+        # Extract filters: stage and severity
+        # We perform an OR filter for multiple selected points
+        masks = []
+        for point in selected_points:
+            # Point has customdata or y (stage) and legend group/color (severity)
+            # px.bar with orientation h: y is stage, color is severity
+            # customdata is likely needed to be robust
+            stage = point.get("y")
+            severity = point.get("customdata", [None])[0] # customdata[0] is severity if we add it
+            
+            mask = (filtered_df["stage"] == stage)
+            if severity:
+                 # Normalize severity for comparison to match the chart's logic
+                 # The chart uses Title Case for all severities, and "Unset" for NaNs
+                 
+                 if severity == "Unset":
+                     # Match "Unset", NaNs, None, empty strings
+                     mask &= (
+                         filtered_df["severity"].isna() | 
+                         (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
+                     )
+                 else:
+                     # Match severity (case-insensitive to be safe)
+                     mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
+            
+            masks.append(mask)
+            
+        if masks:
+            final_mask = pd.Series(False, index=filtered_df.index)
+            for m in masks:
+                final_mask |= m
+            filtered_df = filtered_df[final_mask]
+
+    # Filter by Aging Selection (Intersection with Funnel)
+    if aging_selection and aging_selection.get("selection", {}).get("points"):
+        selected_points = aging_selection["selection"]["points"]
+        # Aging chart: x=stage, y=days_in_stage, color=stage_type
+        # We filter by stage (x). Days is continuous, so selecting a point usually implies interest in that item or stage.
+        # But boxplots selection might be selecting outliers?
+        # Let's assume selecting points filters by Stage of those points.
+        selected_stages = {p.get("x") for p in selected_points}
+        if selected_stages:
+            filtered_df = filtered_df[filtered_df["stage"].isin(selected_stages)]
 
     # Detail grid (Collapsible)
     with st.expander("📋 Issue Details", expanded=True):
-        _render_issue_detail_grid(df)
+        _render_issue_detail_grid(filtered_df)
 
 
 def _render_flow_metrics(df: pd.DataFrame) -> None:
@@ -100,8 +150,13 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
         st.metric("Max Staleness", f"{max_days} days", help="Longest time in current stage")
 
 
-def _render_funnel_chart(df: pd.DataFrame) -> None:
-    """Render horizontal bar chart of issues per stage (The Funnel)."""
+
+def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
+    """Render horizontal bar chart of issues per stage (The Funnel).
+    
+    Returns:
+        Selection state dictionary or None
+    """
     st.subheader("🔻 Project Funnel (WIP)")
 
     # Check if severity column exists for stacked view
@@ -111,7 +166,24 @@ def _render_funnel_chart(df: pd.DataFrame) -> None:
         # Fill NaN severity with "Unset" for display
         # Convert to string first to handle Categorical dtype
         df_chart = df.copy()
-        df_chart["severity"] = df_chart["severity"].astype(str).replace("nan", "Unset").replace("<NA>", "Unset")
+        
+        # Normalize severity: handle NaNs, convert to string, strip whitespace, and title case
+        # This fixes issues where "Critical" and "critical " might be treated as different
+        df_chart["severity"] = (
+            df_chart["severity"]
+            .astype(str)
+            .replace("nan", "Unset")
+            .replace("<NA>", "Unset")
+            .replace("None", "Unset")
+            .str.strip()
+            .str.title()
+        )
+        # Ensure "Unset" remains "Unset" (title() handles it, but just to be sure if lowercased)
+        
+        # Consolidate stage_order: use the minimum order for each stage to prevent splitting
+        # This handles cases where different rules assign different orders to the same stage name
+        stage_order_map = df_chart.groupby("stage")["stage_order"].min()
+        df_chart["stage_order"] = df_chart["stage"].map(stage_order_map)
 
         # Aggregation with severity breakdown
         stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
@@ -142,6 +214,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> None:
             title="",
             color_discrete_map=priority_colors,
             category_orders={"severity": ["Critical", "High", "Medium", "Low", "Unset"]},
+            custom_data=["severity"], # Pass severity for filtering
         )
 
         fig.update_traces(textposition="inside")
@@ -152,7 +225,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> None:
 
         if stage_stats.empty:
             st.info("No stage data.")
-            return
+            return None
 
         fig = px.bar(
             stage_stats,
@@ -176,12 +249,22 @@ def _render_funnel_chart(df: pd.DataFrame) -> None:
         barmode="stack",
     )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig, 
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"] 
+    )
 
 
 
-def _render_aging_chart(df: pd.DataFrame) -> None:
-    """Render boxplot of days in stage."""
+
+def _render_aging_chart(df: pd.DataFrame) -> dict | None:
+    """Render boxplot of days in stage.
+    
+    Returns:
+        Selection state dictionary or None
+    """
     st.subheader("⏳ Stage Stickiness (Aging)")
 
     # Filter out completed if we want to focus on WIP aging? 
@@ -192,7 +275,7 @@ def _render_aging_chart(df: pd.DataFrame) -> None:
 
     if df_sorted.empty:
         st.info("No data.")
-        return
+        return None
 
     fig = px.box(
         df_sorted,
@@ -220,7 +303,12 @@ def _render_aging_chart(df: pd.DataFrame) -> None:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig, 
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"]
+    )
 
 
 def _render_issue_detail_grid(df: pd.DataFrame) -> None:

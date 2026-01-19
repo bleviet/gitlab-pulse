@@ -3,9 +3,9 @@
 
 # Project mapping (required field)
 project_ids:
-  - 101  # Example project ID
-  - 102  # Additional project
-  - 103  # Additional project
+  # - 101  # Example project ID
+  # - 102  # Additional project
+  # - 103  # Additional project
   - 77793080 # Example GitLab project ID
 
 # Team/Domain identifier
