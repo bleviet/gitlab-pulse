@@ -79,6 +79,9 @@ uv run python -m cProfile -s time app/processor/main.py
 $$ \text{Flow Efficiency} = \frac{\text{Active Items}}{\text{Active Items} + \text{Waiting Items}} \times 100 $$
 A low efficiency (e.g., < 20%) indicates that work spends most of its time waiting (e.g., for Code Review) rather than being developed.
 
+**Q: What are "Backlog" items?**
+**A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
+
 ## License
 
 MIT
