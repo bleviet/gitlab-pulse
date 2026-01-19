@@ -99,39 +99,81 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
 def _render_funnel_chart(df: pd.DataFrame) -> None:
     """Render horizontal bar chart of issues per stage (The Funnel)."""
     st.subheader("🔻 Project Funnel (WIP)")
-    
-    # Aggregation
-    stage_stats = df.groupby(["stage", "stage_order"]).size().reset_index(name="count")
-    
-    # Sort by defined order
-    stage_stats = stage_stats.sort_values("stage_order")
-    
-    if stage_stats.empty:
-        st.info("No stage data.")
-        return
 
-    fig = px.bar(
-        stage_stats,
-        x="count",
-        y="stage",
-        orientation="h",
-        text="count",
-        title="",
-    )
+    # Check if severity column exists for stacked view
+    has_severity = "severity" in df.columns
 
-    fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
-    
+    if has_severity:
+        # Fill NaN severity with "Unset" for display
+        # Convert to string first to handle Categorical dtype
+        df_chart = df.copy()
+        df_chart["severity"] = df_chart["severity"].astype(str).replace("nan", "Unset").replace("<NA>", "Unset")
+
+        # Aggregation with severity breakdown
+        stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
+
+        # Sort by defined order
+        stage_stats = stage_stats.sort_values("stage_order")
+
+        if stage_stats.empty:
+            st.info("No stage data.")
+            return
+
+        # Define priority color palette (semantic)
+        priority_colors = {
+            "Critical": "#EF4444",   # Red
+            "High": "#F97316",       # Orange
+            "Medium": "#EAB308",     # Yellow
+            "Low": "#22C55E",        # Green
+            "Unset": "#94A3B8",      # Gray
+        }
+
+        fig = px.bar(
+            stage_stats,
+            x="count",
+            y="stage",
+            color="severity",
+            orientation="h",
+            text="count",
+            title="",
+            color_discrete_map=priority_colors,
+            category_orders={"severity": ["Critical", "High", "Medium", "Low", "Unset"]},
+        )
+
+        fig.update_traces(textposition="inside")
+    else:
+        # Fallback: simple aggregation without severity
+        stage_stats = df.groupby(["stage", "stage_order"]).size().reset_index(name="count")
+        stage_stats = stage_stats.sort_values("stage_order")
+
+        if stage_stats.empty:
+            st.info("No stage data.")
+            return
+
+        fig = px.bar(
+            stage_stats,
+            x="count",
+            y="stage",
+            orientation="h",
+            text="count",
+            title="",
+        )
+        fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
+
     fig.update_layout(
         height=400,
         margin=dict(l=0, r=0, t=0, b=0),
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(autorange="reversed"), # Top to bottom flow
+        yaxis=dict(autorange="reversed"),  # Top to bottom flow
         xaxis=dict(showgrid=True, gridcolor="rgba(100,116,139,0.2)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
+        barmode="stack",
     )
 
     st.plotly_chart(fig, width="stretch")
+
 
 
 def _render_aging_chart(df: pd.DataFrame) -> None:
@@ -207,16 +249,18 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # 4. Select Columns
     cols_to_show = [
-        "web_url", "title", "stage", "days_in_stage", "assignee"
+        "web_url", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"
     ]
     # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
-    
+
     # Rename for display
     display_df = display_df[cols].rename(columns={
         "days_in_stage": "Days in Stage",
         "stage": "Stage",
         "title": "Title",
+        "severity": "Priority",
+        "milestone": "Milestone",
         "assignee": "Assignee",
         "web_url": "IID",  # Map URL to IID column for clickable link
     })
@@ -226,8 +270,8 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
         display_df,
         column_config={
             "IID": st.column_config.LinkColumn(
-                "IID", 
-                display_text=r"/(?:issues|work_items)/(\d+)$", 
+                "IID",
+                display_text=r"/(?:issues|work_items)/(\d+)$",
                 width="small",
                 help="Click to open in GitLab"
             ),
@@ -237,8 +281,10 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
                 help="Days since last update in this stage",
                 format="%d days",
             ),
+            "Priority": st.column_config.TextColumn("Priority", width="small"),
+            "Milestone": st.column_config.TextColumn("Milestone", width="medium"),
         },
-        column_order=["IID", "Title", "Stage", "Days in Stage", "Assignee"],
+        column_order=["IID", "Title", "Stage", "Days in Stage", "Priority", "Milestone", "Assignee"],
         width="stretch",
         hide_index=True,
     )
