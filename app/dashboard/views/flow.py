@@ -182,7 +182,13 @@ def _render_funnel_chart(
         Selection state dictionary or None
     """
     total_issues = len(df)
-    st.subheader(f"🔻 Project Funnel (Total: {total_issues})", help="Hover over bars to see stage descriptions.")
+    help_text = (
+        "**Interaction Guide:**\n"
+        "- **Hover** to view stage descriptions.\n"
+        "- **Click** a bar segment to filter the Issue Drill-down below.\n"
+        "- **Shift+Click** to select multiple segments for combined filtering."
+    )
+    st.subheader(f"🔻 Project Funnel (Total: {total_issues})", help=help_text)
 
     # Check if severity column exists for stacked view
     has_severity = "severity" in df.columns
