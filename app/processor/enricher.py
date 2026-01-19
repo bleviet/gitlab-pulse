@@ -320,8 +320,13 @@ def enrich_workflow_stage(
     return df
 
 
+import re
+
 def _has_any_label(issue_labels: object, target_labels: list[str]) -> bool:
-    """Check if issue has any of the target labels."""
+    """Check if issue has any of the target labels.
+    
+    Supports "regex:" prefix in target_labels for pattern matching.
+    """
     if issue_labels is None:
         return False
     try:
@@ -330,9 +335,26 @@ def _has_any_label(issue_labels: object, target_labels: list[str]) -> bool:
     except (TypeError, ValueError):
         return False
         
-    for label in i_labels:
-        if not isinstance(label, str):
-            continue
-        if label in target_labels:
-            return True
+    for target in target_labels:
+        # Check for Regex pattern
+        if target.startswith("regex:"):
+            pattern = target[6:] # Strip "regex:" prefix
+            try:
+                compiled = re.compile(pattern)
+                for label in i_labels:
+                    if not isinstance(label, str):
+                        continue
+                    if compiled.match(label):
+                        return True
+            except re.error as e:
+                # Log error or ignore invalid regex?
+                # logger.warning(f"Invalid regex pattern '{pattern}': {e}")
+                continue
+        else:
+            # Exact match
+            for label in i_labels:
+                if not isinstance(label, str):
+                    continue
+                if label == target:
+                    return True
     return False

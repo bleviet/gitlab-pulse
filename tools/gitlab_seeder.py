@@ -49,6 +49,12 @@ LABELS = {
     "rnd::Alpha": "#6610f2",  # Purple for Context Alpha
     "rnd::Beta": "#20c997",   # Teal for Context Beta
     "cust::Gamma": "#d63384", # Pink for Customer Gamma
+    "iteration-1": "#6f42c1", # Purple
+    "iteration-2": "#6f42c1",
+    "iteration-3": "#6f42c1",
+    "iteration-1::verify": "#fd7e14", # Orange
+    "iteration-2::verify": "#fd7e14",
+    "iteration-3::verify": "#fd7e14",
 }
 
 MILESTONES = [
@@ -183,11 +189,25 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
         if not skip_attributes:
             issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
             
-        issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
+        if not skip_attributes:
+            issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
+            
+        # Iteration Flow (30% chance) vs Standard Workflow
+        if random.random() < 0.3:
+             # Either just iteration (active) or iteration::verify (waiting)
+             issue_labels.append(random.choice([k for k in LABELS if "iteration" in k]))
+        else:
+             # Standard Flow
+             issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
         
         # Add Context Label (50% chance)
         if random.random() < 0.5:
-             issue_labels.append(random.choice([k for k in LABELS if "rnd::" in k or "cust::" in k]))
+             # Pick 1 or 2 context labels to simulate multi-context issues
+             start_labels = [k for k in LABELS if "rnd::" in k or "cust::" in k]
+             # Shuffle and pick 1 or 2
+             random.shuffle(start_labels)
+             num_contexts = 1 if random.random() < 0.8 else 2
+             issue_labels.extend(start_labels[:num_contexts])
              
         description = fake.paragraph()
 

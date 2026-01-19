@@ -57,6 +57,9 @@ contexts:
       alias: "R&D"
     - prefix: "cust::"
       alias: "Customer"
+    # Custom Workflow Example (Uncomment to use)
+    - prefix: "iteration-"
+      alias: "Iteration"
 
 # Validation rules
 workflow:
@@ -76,6 +79,15 @@ workflow:
     - name: "Done"
       labels: ["workflow::done", "status::released"]
       type: "completed"
+    # Custom Workflow Example (Uncomment to use)
+    - name: "In Progress"
+      # Matches iteration labels like "iteration-42", "iteration-10"
+      labels: ['regex:^iteration-\d+$']
+      type: "active"
+    - name: "Verification"
+      # Matches dynamic verification label (e.g., iteration-42::verify)
+      labels: ['regex:^iteration-\d+::verify$']
+      type: "waiting"
 
 validation:
   # Required labels for specific issue types
@@ -116,7 +128,7 @@ colors:
   # General UI
   primary: "#4F46E5"
   neutral: "#64748B"
-
+  
   # Severity
   critical: "#EF4444"
   high: "#D62728"

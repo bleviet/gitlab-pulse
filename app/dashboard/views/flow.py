@@ -39,18 +39,28 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
         st.warning("No data available.")
         return
 
-    # Top Row: Metrics
-    _render_flow_metrics(df)
+    # Deduplicate for global metrics and charts to avoid double counting
+    # Multi-context issues appear as multiple rows in 'df' (one per context)
+    # We want to count the issue only once for WIP, Efficiency, and Charts
+    if "id" in df.columns:
+        unique_df = df.drop_duplicates(subset=["id"])
+    else:
+        unique_df = df
+
+    # Top Row: Metrics (Use unique issues)
+    _render_flow_metrics(unique_df)
 
     # Charts (Collapsible)
     with st.expander("📊 Flow Charts", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
-            funnel_selection = _render_funnel_chart(df)
+            # Use unique issues for funnel to show correct counts
+            funnel_selection = _render_funnel_chart(unique_df)
         with col2:
-            aging_selection = _render_aging_chart(df)
+            # Use unique issues for aging to show distinct items
+            aging_selection = _render_aging_chart(unique_df)
 
-    # Apply interactive filters
+    # Apply interactive filters (Apply to original DF which allows exploring contexts)
     filtered_df = df.copy()
     
     # Filter by Funnel Selection
@@ -106,7 +116,11 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
 
 
 def _render_flow_metrics(df: pd.DataFrame) -> None:
-    """Render Flow key metrics."""
+    """Render Flow key metrics.
+    
+    Args:
+        df: DataFrame of issues (should be unique/deduplicated)
+    """
     col1, col2, col3, col4 = st.columns(4)
 
     # 1. Active WIP
