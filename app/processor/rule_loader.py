@@ -55,6 +55,7 @@ class StageConfig(BaseModel):
     name: str
     labels: list[str] = Field(default_factory=list)
     type: str = "waiting"  # "active", "waiting", "completed"
+    description: str = Field(default="")
 
 
 class WorkflowConfig(BaseModel):

@@ -111,7 +111,13 @@ def main() -> None:
             if view_id == "overview":
                 render_overview(filtered_df, colors=colors)
             elif view_id == "flow":
-                render_flow_view(filtered_df, colors=colors)
+                # Extract stage descriptions
+                stage_descriptions = {
+                    stage.name: stage.description 
+                    for stage in default_rule.workflow.stages 
+                    if hasattr(stage, "description")
+                }
+                render_flow_view(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
             elif view_id == "release":
                 from app.dashboard.views.release import render_release_view
                 render_release_view(filtered_df)

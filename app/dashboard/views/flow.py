@@ -20,12 +20,17 @@ COLORS = {
 }
 
 
-def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
+def render_flow_view(
+    df: pd.DataFrame, 
+    colors: dict[str, str] | None = None,
+    stage_descriptions: dict[str, str] | None = None
+) -> None:
     """Render the Flow (Value Stream) page.
 
     Args:
         df: Filtered DataFrame with valid issues
         colors: Optional dictionary of semantic colors to override defaults
+        stage_descriptions: Optional mapping of stage names to description strings
     """
     if colors:
         COLORS.update(colors)
@@ -56,7 +61,7 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
         
         with tab1:
             # Use unique issues for funnel to show correct counts
-            funnel_selection = _render_funnel_chart(unique_df)
+            funnel_selection = _render_funnel_chart(unique_df, stage_descriptions)
             
         with tab2:
             # Use unique issues for aging to show distinct items
@@ -167,14 +172,17 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
 
 
 
-def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
+def _render_funnel_chart(
+    df: pd.DataFrame, 
+    stage_descriptions: dict[str, str] | None = None
+) -> dict | None:
     """Render horizontal bar chart of issues per stage (The Funnel).
 
     Returns:
         Selection state dictionary or None
     """
     total_issues = len(df)
-    st.subheader(f"🔻 Project Funnel (Total: {total_issues})")
+    st.subheader(f"🔻 Project Funnel (Total: {total_issues})", help="Hover over bars to see stage descriptions.")
 
     # Check if severity column exists for stacked view
     has_severity = "severity" in df.columns
@@ -212,6 +220,12 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
 
         # Aggregation with severity breakdown
         stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
+        
+        # Add description to stage_stats
+        if stage_descriptions:
+            stage_stats["description"] = stage_stats["stage"].map(stage_descriptions).fillna("")
+        else:
+            stage_stats["description"] = ""
         
         # Calculate severity counts for legend labels
         severity_counts = df_chart["severity"].value_counts()
@@ -269,10 +283,14 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
                 "severity_label": ordered_severity_labels,
                 "stage": sorted_stages
             },
-            custom_data=["severity"], # Keep usage of raw severity for filtering interactions
+            custom_data=["severity", "description"], # Include description
         )
 
-        fig.update_traces(textposition="inside", textangle=0)
+        fig.update_traces(
+            textposition="inside", 
+            textangle=0,
+            hovertemplate="<b>%{y}</b><br>%{customdata[1]}<br>Severity: %{customdata[0]}<br>Count: %{x}<extra></extra>"
+        )
         
         # Update legend title
         fig.update_layout(legend_title_text="Priority")

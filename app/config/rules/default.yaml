@@ -67,18 +67,23 @@ workflow:
     - name: "Architecture"
       labels: ["workflow::architecture", "status::design"]
       type: "active"
+      description: "Initial design and architectural decisions"
     - name: "Implementation"
       labels: ["workflow::implementation", "status::coding"]
       type: "active"
+      description: "Writing code and implementing features"
     - name: "Review"
       labels: ["workflow::review", "status::mr_open"]
       type: "waiting"
+      description: "Code review and merge request feedback"
     - name: "Testing"
       labels: ["workflow::test", "status::validation"]
       type: "active"
+      description: "Quality assurance and testing"
     - name: "Done"
       labels: ["workflow::done", "status::released"]
       type: "completed"
+      description: "Work is done and released"
     # Custom Workflow Example (Uncomment to use)
     - name: "In Progress"
       # Matches iteration labels like "iteration-42", "iteration-10"
