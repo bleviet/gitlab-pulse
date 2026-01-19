@@ -77,7 +77,11 @@ def render_release_view(df: pd.DataFrame) -> None:
     status_color = "off"
     if pd.notna(ms_meta.get("milestone_due_date")):
         due_date = pd.to_datetime(ms_meta["milestone_due_date"])
-        remaining = (due_date - pd.Timestamp.now(tz="UTC")).days
+        # Normalize timezone: some GitLab instances return tz-naive, others tz-aware
+        if due_date.tz is None:
+            due_date = due_date.tz_localize("UTC")
+        now = pd.Timestamp.now(tz="UTC")
+        remaining = (due_date - now).days
         days_remaining = f"{remaining} days"
         
         if remaining < 0 and pct_complete < 100:
@@ -239,9 +243,15 @@ def _render_milestone_overview(milestones_df: pd.DataFrame) -> None:
     display_df = milestones_df.copy()
     
     if "due_date" in display_df.columns:
-        display_df["days_until_due"] = display_df["due_date"].apply(
-            lambda x: (x - now).days if pd.notna(x) else None
-        )
+        def calc_days_until_due(x):
+            if pd.isna(x):
+                return None
+            # Normalize timezone: some GitLab instances return tz-naive
+            if x.tz is None:
+                x = x.tz_localize("UTC")
+            return (x - now).days
+
+        display_df["days_until_due"] = display_df["due_date"].apply(calc_days_until_due)
         
         # Add status indicator
         def get_status(row):

@@ -41,6 +41,9 @@ def validate_issues(
 
     The Gatekeeper: splits data into valid and quality (failed) DataFrames.
 
+    Note: Only OPEN issues are validated. Closed issues are historical records
+    and hygiene checks are not actionable, so they pass through without validation.
+
     Args:
         df: Enriched DataFrame with metrics
         rule: Domain rule configuration
@@ -51,19 +54,33 @@ def validate_issues(
     if df.empty:
         return ValidationResult(valid_df=df, quality_df=pd.DataFrame())
 
-    # Track validation errors per row
+    # Separate open and closed issues - only validate open issues
+    # Closed issues are historical records; hygiene checks are not actionable
+    if "state" in df.columns:
+        open_df = df[df["state"] == "opened"].copy()
+        closed_df = df[df["state"] != "opened"].copy()
+        logger.debug(f"Validation scope: {len(open_df)} open, {len(closed_df)} closed (skipped)")
+    else:
+        open_df = df.copy()
+        closed_df = pd.DataFrame()
+
+    # If no open issues to validate, return all as valid
+    if open_df.empty:
+        return ValidationResult(valid_df=df.copy(), quality_df=pd.DataFrame())
+
+    # Track validation errors per row (only for open issues)
     errors: list[tuple[int, str, str]] = []  # (index, error_code, message)
 
     # Validate required labels
     if rule and rule.validation.required_labels:
         for issue_type, required_prefixes in rule.validation.required_labels.items():
-            type_mask = df["issue_type"] == issue_type
+            type_mask = open_df["issue_type"] == issue_type
             for prefix in required_prefixes:
-                missing = df[type_mask].apply(
+                missing = open_df[type_mask].apply(
                     lambda row: not _has_label_prefix(row["labels"], prefix),
                     axis=1,
                 )
-                for idx in df[type_mask][missing].index:
+                for idx in open_df[type_mask][missing].index:
                     errors.append((
                         idx,
                         ErrorCodes.MISSING_LABEL,
@@ -73,20 +90,20 @@ def validate_issues(
     # Validate required fields
     if rule and rule.validation.required_fields:
         for issue_type, required_cols in rule.validation.required_fields.items():
-            type_mask = df["issue_type"] == issue_type
+            type_mask = open_df["issue_type"] == issue_type
             if not type_mask.any():
                 continue
 
             for col in required_cols:
-                if col not in df.columns:
+                if col not in open_df.columns:
                     logger.warning(f"Required field '{col}' not found in DataFrame - check enrichment")
                     # Optionally fail all issues of this type? For now just log warning.
                     continue
-                
+
                 # Check for null, NaN, or empty string
-                missing_mask = df[type_mask][col].isna() | (df[type_mask][col] == "")
-                
-                for idx in df[type_mask][missing_mask].index:
+                missing_mask = open_df[type_mask][col].isna() | (open_df[type_mask][col] == "")
+
+                for idx in open_df[type_mask][missing_mask].index:
                     errors.append((
                         idx,
                         ErrorCodes.MISSING_FIELD,
@@ -108,8 +125,8 @@ def validate_issues(
             if isinstance(label, str) and any(label.startswith(t) for t in type_labels)
         )
 
-    conflict_mask = df["labels"].apply(lambda l: count_type_labels(l) > 1)
-    for idx in df[conflict_mask].index:
+    conflict_mask = open_df["labels"].apply(lambda l: count_type_labels(l) > 1)
+    for idx in open_df[conflict_mask].index:
         errors.append((
             idx,
             ErrorCodes.CONFLICTING_LABELS,
@@ -117,49 +134,56 @@ def validate_issues(
         ))
 
     # Validate orphan tasks (parent_id refers to non-existent issue)
-    if "parent_id" in df.columns:
-        task_mask = df["work_item_type"] == "TASK"
-        has_parent = df["parent_id"].notna()
-        valid_parent_ids = set(df["id"].tolist())
+    # Note: We check against ALL issues (open + closed) for valid parent IDs
+    if "parent_id" in open_df.columns:
+        task_mask = open_df["work_item_type"] == "TASK"
+        has_parent = open_df["parent_id"].notna()
+        valid_parent_ids = set(df["id"].tolist())  # Use full df for parent lookup
 
-        orphan_mask = task_mask & has_parent & ~df["parent_id"].isin(valid_parent_ids)
-        for idx in df[orphan_mask].index:
+        orphan_mask = task_mask & has_parent & ~open_df["parent_id"].isin(valid_parent_ids)
+        for idx in open_df[orphan_mask].index:
             errors.append((
                 idx,
                 ErrorCodes.ORPHAN_TASK,
-                f"Task references non-existent parent: {df.loc[idx, 'parent_id']}",
+                f"Task references non-existent parent: {open_df.loc[idx, 'parent_id']}",
             ))
 
     # Validate cycle time threshold
-    if rule and "cycle_time" in df.columns:
+    if rule and "cycle_time" in open_df.columns:
         max_cycle = rule.validation.max_cycle_time_days
-        exceeds_mask = df["cycle_time"].notna() & (df["cycle_time"] > max_cycle)
-        for idx in df[exceeds_mask].index:
+        exceeds_mask = open_df["cycle_time"].notna() & (open_df["cycle_time"] > max_cycle)
+        for idx in open_df[exceeds_mask].index:
             errors.append((
                 idx,
                 ErrorCodes.EXCEEDS_CYCLE_TIME,
-                f"Cycle time ({df.loc[idx, 'cycle_time']} days) exceeds threshold ({max_cycle})",
+                f"Cycle time ({open_df.loc[idx, 'cycle_time']} days) exceeds threshold ({max_cycle})",
             ))
 
-    # Split data based on errors
+    # Split open issues based on errors
     if errors:
         error_indices = {e[0] for e in errors}
-        valid_df = df[~df.index.isin(error_indices)].copy()
+        valid_open_df = open_df[~open_df.index.isin(error_indices)].copy()
 
         # Build quality DataFrame with error info
         quality_rows = []
         for idx, error_code, message in errors:
-            row = df.loc[idx].to_dict()
+            row = open_df.loc[idx].to_dict()
             row["error_code"] = error_code
             row["error_message"] = message
             quality_rows.append(row)
 
         quality_df = pd.DataFrame(quality_rows)
     else:
-        valid_df = df.copy()
+        valid_open_df = open_df.copy()
         quality_df = pd.DataFrame()
 
-    logger.info(f"Validation: {len(valid_df)} valid, {len(quality_df)} failed")
+    # Merge validated open issues with closed issues (which skip validation)
+    if not closed_df.empty:
+        valid_df = pd.concat([valid_open_df, closed_df], ignore_index=True)
+    else:
+        valid_df = valid_open_df
+
+    logger.info(f"Validation: {len(valid_df)} valid ({len(closed_df)} closed skipped), {len(quality_df)} failed")
     return ValidationResult(valid_df=valid_df, quality_df=quality_df)
 
 

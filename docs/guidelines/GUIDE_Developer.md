@@ -173,8 +173,19 @@ When performing date arithmetic with Pandas timestamps, ensure timezone consiste
 # BAD - Mixing tz-naive and tz-aware raises TypeError
 remaining = (due_date - pd.Timestamp.now()).days
 
-# GOOD - Both timestamps are tz-aware (UTC)
+# BETTER - But assumes due_date is always tz-aware
 remaining = (due_date - pd.Timestamp.now(tz="UTC")).days
+
+# BEST - Handle both tz-aware and tz-naive dates
+due_date = pd.to_datetime(raw_date)
+if due_date.tz is None:
+    due_date = due_date.tz_localize("UTC")
+now = pd.Timestamp.now(tz="UTC")
+remaining = (due_date - now).days
 ```
 
-**Why:** GitLab API returns ISO 8601 timestamps with timezone info (UTC). When parsed by Pandas, these become tz-aware. Subtracting a tz-naive `pd.Timestamp.now()` from a tz-aware timestamp raises `TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects`.
+**Why:** Different GitLab instances return dates in different formats:
+- **Self-hosted GitLab**: Often returns tz-aware dates (UTC)
+- **GitLab.com**: May return tz-naive dates
+
+Always normalize dates to UTC before performing arithmetic to handle both cases.
