@@ -372,6 +372,8 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # 5. Configure Columns and Render
     display_df = display_df[cols]
+    # Reset index to ensure uniqueness for styling (sort_hierarchy can cause duplicate indices with exploded contexts)
+    display_df = display_df.reset_index(drop=True)
 
     column_config = {
         "web_url": st.column_config.LinkColumn(
