@@ -16,15 +16,21 @@ COLORS = {
     "task": "#10B981",
     "stale": "#F59E0B",
     "neutral": "#64748B",
+    "epic": "#8B5CF6",
 }
 
 
-def render_aging(df: pd.DataFrame) -> None:
+
+def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
     """Render the Aging (Operational) page.
 
     Args:
         df: Filtered DataFrame with valid issues
+        colors: Optional dictionary of semantic colors to override defaults
     """
+    if colors:
+        COLORS.update(colors)
+
     st.header("⏱️ Aging Analysis")
     st.caption("Operational view for identifying bottlenecks")
 
@@ -97,11 +103,16 @@ def _render_age_boxplot(df: pd.DataFrame, group_col: str) -> None:
         "Bug": COLORS["bug"],
         "Feature": COLORS["feature"],
         "Task": COLORS["task"],
-        "Epic": "#8B5CF6",
-        "Critical": COLORS["bug"],
-        "High": COLORS["stale"],
-        "Medium": COLORS["primary"],
-        "Low": COLORS["neutral"],
+        "Task": COLORS["task"],
+        "Epic": COLORS["epic"],
+        "Critical": COLORS.get("critical", COLORS["bug"]),
+        "High": COLORS.get("high", COLORS["stale"]),
+        "Medium": COLORS.get("medium", COLORS["primary"]),
+        "Low": COLORS.get("low", COLORS["neutral"]),
+        "Unset": COLORS.get("unset", COLORS["neutral"]),
+        "P1": COLORS.get("p1", COLORS["bug"]),
+        "P2": COLORS.get("p2", COLORS["primary"]),
+        "P3": COLORS.get("p3", COLORS["neutral"]),
     }
 
     fig = px.box(

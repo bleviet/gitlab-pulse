@@ -101,7 +101,30 @@ validation:
 
 # Semantic color overrides (optional)
 colors:
-  Bug: "#EF4444"
-  Feature: "#3B82F6"
-  Task: "#10B981"
-  Epic: "#8B5CF6"
+  # Issue Types
+  bug: "#EF4444"
+  feature: "#006C3B"
+  task: "#10B981"
+  epic: "#8B5CF6"
+  
+  # Status/Flow
+  active: "#006C3B"
+  waiting: "#D62728"
+  completed: "#4D217A"
+  stale: "#D62728"
+  
+  # General UI
+  primary: "#4F46E5"
+  neutral: "#64748B"
+
+  # Severity
+  critical: "#EF4444"
+  high: "#D62728"
+  medium: "#EAB308"
+  low: "#22C55E"
+  unset: "#d3d3d3"
+
+  # Priority
+  p1: "#EF4444"
+  p2: "#EAB308"
+  p3: "#006C3B"

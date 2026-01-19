@@ -21,6 +21,7 @@ from app.dashboard.views.aging import render_aging
 from app.dashboard.views.flow import render_flow_view
 from app.dashboard.views.hygiene import render_hygiene
 from app.dashboard.views.overview import render_overview
+from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
 
 # Page configuration
@@ -58,6 +59,21 @@ def main() -> None:
     valid_df = load_valid_issues()
     quality_df = load_quality_issues()
 
+    # Load rules to get color overrides
+    rule_loader = RuleLoader()
+    # Try to find default team rule, otherwise use first available or empty default
+    default_rule = None
+    for rule in rule_loader.rules.values():
+        if rule.team == "default":
+            default_rule = rule
+            break
+    
+    if not default_rule:
+        # Fallback: try first available rule, else empty default
+        default_rule = next(iter(rule_loader.rules.values()), rule_loader.get_default_rule())
+
+    colors = default_rule.colors
+
     # Render sidebar and get filters
     filters = render_sidebar(valid_df)
 
@@ -93,16 +109,16 @@ def main() -> None:
     for i, (page_name, view_id) in enumerate(pages.items()):
         with tabs[i]:
             if view_id == "overview":
-                render_overview(filtered_df)
+                render_overview(filtered_df, colors=colors)
             elif view_id == "flow":
-                render_flow_view(filtered_df)
+                render_flow_view(filtered_df, colors=colors)
             elif view_id == "release":
                 from app.dashboard.views.release import render_release_view
                 render_release_view(filtered_df)
             elif view_id == "aging":
-                render_aging(filtered_df)
+                render_aging(filtered_df, colors=colors)
             elif view_id == "hygiene":
-                render_hygiene(filtered_df, quality_df)
+                render_hygiene(filtered_df, quality_df, colors=colors)
             elif view_id == "admin":
                 from app.dashboard.views.admin import render_admin_view
                 render_admin_view()

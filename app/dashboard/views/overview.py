@@ -16,15 +16,20 @@ COLORS = {
     "task": "#10B981",
     "stale": "#F59E0B",
     "neutral": "#64748B",
+    "epic": "#8B5CF6",
 }
 
 
-def render_overview(df: pd.DataFrame) -> None:
+def render_overview(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
     """Render the Overview (Strategic) page.
 
     Args:
         df: Filtered DataFrame with valid issues
+        colors: Optional dictionary of semantic colors to override defaults
     """
+    if colors:
+        COLORS.update(colors)
+
     st.header("📊 Overview")
     st.caption("Strategic view of project velocity and distribution")
 
@@ -226,7 +231,8 @@ def _render_work_distribution(df: pd.DataFrame) -> None:
         "Bug": COLORS["bug"],
         "Feature": COLORS["feature"],
         "Task": COLORS["task"],
-        "Epic": "#8B5CF6",
+        "Task": COLORS["task"],
+        "Epic": COLORS["epic"],
     }
 
     fig = px.bar(

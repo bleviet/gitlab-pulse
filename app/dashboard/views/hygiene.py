@@ -28,13 +28,18 @@ ERROR_SEVERITY = {
 }
 
 
-def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
+
+def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
     """Render the Hygiene (Quality) page.
 
     Args:
         valid_df: DataFrame with valid issues
         quality_df: DataFrame with quality (failed) issues
+        colors: Optional dictionary of semantic colors to override defaults
     """
+    if colors:
+        COLORS.update(colors)
+
     st.header("🧹 Data Hygiene")
     st.caption("Quality view for metadata cleanup and validation")
 

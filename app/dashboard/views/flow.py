@@ -20,12 +20,16 @@ COLORS = {
 }
 
 
-def render_flow_view(df: pd.DataFrame) -> None:
+def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
     """Render the Flow (Value Stream) page.
 
     Args:
         df: Filtered DataFrame with valid issues
+        colors: Optional dictionary of semantic colors to override defaults
     """
+    if colors:
+        COLORS.update(colors)
+
     st.header("🌊 Development Value Stream")
     st.caption("Flow metrics: Inventory, Staleness, and Efficiency")
 
@@ -121,11 +125,11 @@ def _render_funnel_chart(df: pd.DataFrame) -> None:
 
         # Define priority color palette (semantic)
         priority_colors = {
-            "Critical": "#EF4444",   # Red
-            "High": "#F97316",       # Orange
-            "Medium": "#EAB308",     # Yellow
-            "Low": "#22C55E",        # Green
-            "Unset": "#94A3B8",      # Gray
+            "Critical": COLORS.get("critical", "#EF4444"),
+            "High": COLORS.get("high", "#F97316"),
+            "Medium": COLORS.get("medium", "#EAB308"),
+            "Low": COLORS.get("low", "#22C55E"),
+            "Unset": COLORS.get("unset", "#94A3B8"),
         }
 
         fig = px.bar(
