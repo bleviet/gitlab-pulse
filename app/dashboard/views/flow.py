@@ -62,7 +62,7 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
 
     # Apply interactive filters (Apply to original DF which allows exploring contexts)
     filtered_df = df.copy()
-    
+
     # Filter by Funnel Selection
     if funnel_selection and funnel_selection.get("selection", {}).get("points"):
         selected_points = funnel_selection["selection"]["points"]
@@ -75,24 +75,24 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
             # customdata is likely needed to be robust
             stage = point.get("y")
             severity = point.get("customdata", [None])[0] # customdata[0] is severity if we add it
-            
+
             mask = (filtered_df["stage"] == stage)
             if severity:
                  # Normalize severity for comparison to match the chart's logic
                  # The chart uses Title Case for all severities, and "Unset" for NaNs
-                 
+
                  if severity == "Unset":
                      # Match "Unset", NaNs, None, empty strings
                      mask &= (
-                         filtered_df["severity"].isna() | 
+                         filtered_df["severity"].isna() |
                          (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
                      )
                  else:
                      # Match severity (case-insensitive to be safe)
                      mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
-            
+
             masks.append(mask)
-            
+
         if masks:
             final_mask = pd.Series(False, index=filtered_df.index)
             for m in masks:
@@ -117,7 +117,7 @@ def render_flow_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> 
 
 def _render_flow_metrics(df: pd.DataFrame) -> None:
     """Render Flow key metrics.
-    
+
     Args:
         df: DataFrame of issues (should be unique/deduplicated)
     """
@@ -126,7 +126,7 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
     # 1. Active WIP
     active_mask = df["stage_type"] == "active"
     active_count = len(df[active_mask])
-    
+
     with col1:
         st.metric("Active WIP", active_count, help="Issues in active stages")
 
@@ -139,8 +139,8 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
 
     with col2:
         st.metric(
-            "Flow Efficiency", 
-            f"{efficiency}%", 
+            "Flow Efficiency",
+            f"{efficiency}%",
             help="Active / (Active + Waiting)"
         )
 
@@ -167,20 +167,25 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
 
 def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
     """Render horizontal bar chart of issues per stage (The Funnel).
-    
+
     Returns:
         Selection state dictionary or None
     """
-    st.subheader("🔻 Project Funnel (WIP)")
+    total_issues = len(df)
+    st.subheader(f"🔻 Project Funnel (Total: {total_issues})")
 
     # Check if severity column exists for stacked view
     has_severity = "severity" in df.columns
+
+    # Calculate totals per stage for the labels
+    # We want these to appear at the end of the bars
+    stage_totals = df.groupby("stage", observed=True).size().reset_index(name="total_count")
 
     if has_severity:
         # Fill NaN severity with "Unset" for display
         # Convert to string first to handle Categorical dtype
         df_chart = df.copy()
-        
+
         # Normalize severity: handle NaNs, convert to string, strip whitespace, and title case
         # This fixes issues where "Critical" and "critical " might be treated as different
         df_chart["severity"] = (
@@ -193,7 +198,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
             .str.title()
         )
         # Ensure "Unset" remains "Unset" (title() handles it, but just to be sure if lowercased)
-        
+
         # Consolidate stage_order: use the minimum order for each stage to prevent splitting
         # This handles cases where different rules assign different orders to the same stage name
         stage_order_map = df_chart.groupby("stage")["stage_order"].min()
@@ -205,6 +210,16 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
 
         # Aggregation with severity breakdown
         stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
+        
+        # Calculate severity counts for legend labels
+        severity_counts = df_chart["severity"].value_counts()
+        severity_label_map = {
+            sev: f"{sev} ({count})" 
+            for sev, count in severity_counts.items()
+        }
+        
+        # Add formatted label column
+        stage_stats["severity_label"] = stage_stats["severity"].map(severity_label_map)
 
         # Sort by defined order
         stage_stats = stage_stats.sort_values("stage_order")
@@ -221,24 +236,44 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
             "Low": COLORS.get("low", "#22C55E"),
             "Unset": COLORS.get("unset", "#94A3B8"),
         }
+        
+        # Construct color map and order for formatted labels
+        final_color_map = {}
+        ordered_severity_labels = []
+        base_severity_order = ["Critical", "High", "Medium", "Low", "Unset"]
+        
+        for sev in base_severity_order:
+            if sev in severity_label_map:
+                label = severity_label_map[sev]
+                ordered_severity_labels.append(label)
+                final_color_map[label] = priority_colors.get(sev, priority_colors["Unset"])
+                
+        # Handle any other severities
+        for sev, label in severity_label_map.items():
+            if label not in final_color_map:
+                ordered_severity_labels.append(label)
+                final_color_map[label] = priority_colors.get("Unset")
 
         fig = px.bar(
             stage_stats,
             x="count",
             y="stage",
-            color="severity",
+            color="severity_label", # Use formatted label for legend
             orientation="h",
             text="count",
             title="",
-            color_discrete_map=priority_colors,
+            color_discrete_map=final_color_map,
             category_orders={
-                "severity": ["Critical", "High", "Medium", "Low", "Unset"],
+                "severity_label": ordered_severity_labels,
                 "stage": sorted_stages
             },
-            custom_data=["severity"], # Pass severity for filtering
+            custom_data=["severity"], # Keep usage of raw severity for filtering interactions
         )
 
-        fig.update_traces(textposition="inside")
+        fig.update_traces(textposition="inside", textangle=0)
+        
+        # Update legend title
+        fig.update_layout(legend_title_text="Priority")
     else:
         # Fallback: simple aggregation without severity
         stage_stats = df.groupby(["stage", "stage_order"]).size().reset_index(name="count")
@@ -263,23 +298,45 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
         )
         fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
 
+    # Add Total Labels (Scatter Trace)
+    # Filter stage_totals to only include stages present in sorted_stages (to avoid mismatch)
+    stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]
+
+    fig.add_trace(go.Scatter(
+        x=stage_totals["total_count"],
+        y=stage_totals["stage"],
+        mode="text",
+        text=stage_totals["total_count"].apply(lambda x: f"({x})"),
+        textposition="middle right",
+        hoverinfo="skip",
+        showlegend=False,
+        textfont=dict(color="white" if st.get_option("theme.base") == "dark" else "black"),
+    ))
+
+    # Calculate max range to fit the text label
+    max_count = stage_totals["total_count"].max() if not stage_totals.empty else 0
+
     fig.update_layout(
         height=400,
-        margin=dict(l=0, r=0, t=0, b=0),
+        margin=dict(l=0, r=20, t=0, b=0), # Add right margin for labels
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         # yaxis=dict(autorange="reversed"),  # Removed reversal as requested
-        xaxis=dict(showgrid=True, gridcolor="rgba(100,116,139,0.2)"),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(100,116,139,0.2)",
+            range=[0, max_count * 1.15] # Extend range to fit labels
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
         barmode="stack",
     )
 
     return st.plotly_chart(
-        fig, 
+        fig,
         width="stretch",
         on_select="rerun",
-        selection_mode=["points"] 
+        selection_mode=["points"]
     )
 
 
@@ -287,7 +344,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
 
 def _render_aging_chart(df: pd.DataFrame) -> dict | None:
     """Render boxplot of days in stage.
-    
+
     Returns:
         Selection state dictionary or None
     """
@@ -296,10 +353,10 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
     # Filter out completed/closed items to focus on active work aging
     # "Stickiness" implies items currently stuck in the flow.
     df = df[
-        (df["stage_type"] != "completed") & 
+        (df["stage_type"] != "completed") &
         (df["state"] != "closed")
     ].copy()
-    
+
     # Sort stages by order for x-axis
     df_sorted = df.sort_values("stage_order")
 
@@ -342,7 +399,7 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
     )
 
     return st.plotly_chart(
-        fig, 
+        fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"]
@@ -414,7 +471,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     if "context" in display_df.columns:
         from app.dashboard.data_loader import load_labels
         label_styles = load_labels()
-        
+
         def highlight_context(val):
             if not isinstance(val, str):
                 return None
@@ -422,7 +479,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             if style:
                 bg_color = style.get("color", "#FFFFFF")
                 text_color = style.get("text_color", "#000000")
-                return f'background-color: {bg_color}; color: {text_color}' 
+                return f'background-color: {bg_color}; color: {text_color}'
             return None
 
         styler = display_df.style.map(highlight_context, subset=["context"])
