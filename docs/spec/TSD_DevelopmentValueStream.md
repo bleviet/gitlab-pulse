@@ -24,6 +24,7 @@ workflow:
     - name: "Architecture"
       labels: ["workflow::architecture", "status::design"]
       type: "active"  # or "waiting"
+      description: "Initial design phase"
     - name: "Implementation"
       labels: ["workflow::implementation", "status::coding"]
       type: "active"
@@ -54,19 +55,29 @@ The `enrich_workflow_stage` function determines the current stage of an issue.
 A new **"Flow"** view provides insights into process health.
 
 ### **3.1. The Funnel (WIP by Stage)**
-*   **Type:** Bar Chart (Horizontal or Vertical).
+*   **Type:** Horizontal Bar Chart.
+*   **Layout:** Full-width Tab ("Project Funnel").
 *   **Data:** Count of issues per `stage`.
-*   **Sorting:** By defined workflow order (not count).
+    *   **Deduplication:** Issues with multiple contexts are counted only once (Unique Issue ID).
+*   **Sorting:** By defined workflow order.
+*   **Features:**
+    *   **Grand Total:** Displayed in chart header.
+    *   **Stage Totals:** Displayed numerically at bar ends (e.g., `(25)`).
+    *   **Descriptions:** Tooltips show stage descriptions from config.
+    *   **Interaction:** Click to filter, Shift+Click to multi-select, Double-Click to reset.
 
 ### **3.2. Stage Aging (Staleness)**
 *   **Type:** Boxplot.
+*   **Layout:** Full-width Tab ("Stage Stickiness").
+*   **Data:** Unique issues (deduplicated).
 *   **X-Axis:** Stage.
-*   **Y-Axis:** `days_in_stage` (calculated as `now - updated_at` as a proxy, or `update - label_added` if history available).
+*   **Y-Axis:** `days_in_stage`.
 *   **Goal:** Highlight stages with high median age or extreme outliers.
 
 ### **3.3. Stage Detail (Drill-down)**
 *   **Design:** Unified Data Grid (Table).
-*   **Interaction:** Users select specific stage(s) via a multi-select filter to inspect issues.
+*   **Interaction:** Filtered by interactive selection in Funnel/Aging charts or multi-select dropdown.
+*   **Multi-Context:** Displays duplicate rows for issues with multiple contexts (one row per context-match) to allow complete slicing.
 *   **Why (UX):**
     *   **Unified Grid:** Avoids the "Stack of Tables" vertical scroll fatigue.
     *   **Cross-Stage Sorting:** Allows finding the "Oldest Active Item" regardless of specific stage (e.g. Architecture vs Implementation).
