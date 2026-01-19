@@ -82,6 +82,14 @@ A low efficiency (e.g., < 20%) indicates that work spends most of its time waiti
 **Q: What are "Backlog" items?**
 **A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
 
+**Q: How do I interpret the "Stage Stickiness (Aging)" graph?**
+**A:** This **Box Plot** visualizes the distribution of time (in days) that issues have spent in their *current* stage without an update.
+- **X-Axis:** Workflow Stages (e.g., *Implementation*, *Review*).
+- **Y-Axis:** Days in current stage.
+- **Box & Whiskers:** Shows the median time (line inside box) and variability.
+- **Dots:** Outliers—issues that have been stuck significantly longer than others in the same stage.
+Use this to identify **stalled work** or process bottlenecks.
+
 ## License
 
 MIT
