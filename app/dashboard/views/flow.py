@@ -267,8 +267,12 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
     """
     st.subheader("⏳ Stage Stickiness (Aging)")
 
-    # Filter out completed if we want to focus on WIP aging? 
-    # Usually we want to see aging of current items.
+    # Filter out completed/closed items to focus on active work aging
+    # "Stickiness" implies items currently stuck in the flow.
+    df = df[
+        (df["stage_type"] != "completed") & 
+        (df["state"] != "closed")
+    ].copy()
     
     # Sort stages by order for x-axis
     df_sorted = df.sort_values("stage_order")
@@ -346,39 +350,53 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
 
-    # Rename for display
-    display_df = display_df[cols].rename(columns={
-        "days_in_stage": "Days in Stage",
-        "stage": "Stage",
-        "title": "Title",
-        "severity": "Priority",
-        "context": "Context",
-        "milestone": "Milestone",
-        "assignee": "Assignee",
-        "web_url": "IID",  # Map URL to IID column for clickable link
-    })
+    # 5. Configure Columns and Render
+    display_df = display_df[cols]
 
-    # 5. Render Dataframe with Links
+    column_config = {
+        "web_url": st.column_config.LinkColumn(
+            "IID",
+            display_text=r"/(?:issues|work_items)/(\d+)$",
+            width="small",
+            help="Click to open in GitLab"
+        ),
+        "assignee": st.column_config.TextColumn("Assignee", width="small"),
+        "stage": st.column_config.TextColumn("Stage", width="small"),
+        "title": st.column_config.TextColumn("Title", width="large"),
+        "days_in_stage": st.column_config.NumberColumn(
+            "Days in Stage",
+            help="Days since last update in this stage",
+            format="%d days",
+        ),
+        "severity": st.column_config.TextColumn("Priority", width="small"),
+        "context": st.column_config.TextColumn("Context", width="small"),
+        "milestone": st.column_config.TextColumn("Milestone", width="medium"),
+    }
+
+    # Apply styling if Context column exists
+    styler = None
+    if "context" in display_df.columns:
+        from app.dashboard.data_loader import load_labels
+        label_colors = load_labels()
+        
+        def highlight_context(val):
+            if not isinstance(val, str):
+                return None
+            color = label_colors.get(val)
+            if color:
+                return f'background-color: {color}; color: #ffffff' 
+            return None
+
+        styler = display_df.style.map(highlight_context, subset=["context"])
+
+    column_order = ["web_url", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+    if "context" in display_df.columns:
+        column_order.insert(5, "context")
+
     st.dataframe(
-        display_df,
-        column_config={
-            "IID": st.column_config.LinkColumn(
-                "IID",
-                display_text=r"/(?:issues|work_items)/(\d+)$",
-                width="small",
-                help="Click to open in GitLab"
-            ),
-            "Title": st.column_config.TextColumn("Title", width="large"),
-            "Days in Stage": st.column_config.NumberColumn(
-                "Days in Stage",
-                help="Days since last update in this stage",
-                format="%d days",
-            ),
-            "Priority": st.column_config.TextColumn("Priority", width="small"),
-            "Context": st.column_config.TextColumn("Context", width="small"),
-            "Milestone": st.column_config.TextColumn("Milestone", width="medium"),
-        },
-        column_order=["IID", "Title", "Stage", "Days in Stage", "Priority", "Context", "Milestone", "Assignee"],
-        width="stretch",
+        styler if styler is not None else display_df,
+        column_config=column_config,
+        column_order=column_order,
+        use_container_width=True,
         hide_index=True,
     )

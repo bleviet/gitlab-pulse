@@ -243,3 +243,36 @@ def filter_by_milestone(df: pd.DataFrame, milestone: str) -> pd.DataFrame:
     # Handle cases where milestone might be NaN but we want specific matches
     # This filter assumes strictly matching the milestone title
     return df[df["milestone"] == milestone]
+
+
+@st.cache_data(ttl=3600)  # 1-hour cache for labels (they change rarely)
+def load_labels(processed_path: Optional[str] = None) -> dict[str, str]:
+    """Load label colors from processed Parquet files.
+
+    Args:
+        processed_path: Path to processed directory
+
+    Returns:
+        Dict mapping label name to hex color
+    """
+    path = Path(processed_path) if processed_path else DEFAULT_PROCESSED_PATH
+
+    label_files = list(path.glob("labels_*.parquet"))
+    
+    label_colors = {}
+    if not label_files:
+        return label_colors
+
+    for filepath in label_files:
+        try:
+            df = pd.read_parquet(filepath)
+            if not df.empty and "name" in df.columns and "color" in df.columns:
+                # Create dict name -> color
+                # If duplicates across projects, last one wins (acceptable for now)
+                batch = dict(zip(df["name"], df["color"]))
+                label_colors.update(batch)
+        except Exception as e:
+            logger.warning(f"Failed to load labels from {filepath}: {e}")
+
+    logger.info(f"Loaded colors for {len(label_colors)} labels")
+    return label_colors

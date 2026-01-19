@@ -46,6 +46,9 @@ LABELS = {
     "workflow::review": "#f0ad4e",
     "workflow::test": "#5bc0de",
     "workflow::done": "#5cb85c",
+    "rnd::Alpha": "#6610f2",  # Purple for Context Alpha
+    "rnd::Beta": "#20c997",   # Teal for Context Beta
+    "cust::Gamma": "#d63384", # Pink for Customer Gamma
 }
 
 MILESTONES = [
@@ -181,6 +184,11 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
             issue_labels.append(random.choice([k for k in LABELS if "priority" in k]))
             
         issue_labels.append(random.choice([k for k in LABELS if "workflow" in k]))
+        
+        # Add Context Label (50% chance)
+        if random.random() < 0.5:
+             issue_labels.append(random.choice([k for k in LABELS if "rnd::" in k or "cust::" in k]))
+             
         description = fake.paragraph()
 
     # Milestone (Tasks can have milestones too)

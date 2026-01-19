@@ -208,8 +208,9 @@ def explode_contexts(
         for pattern in patterns:
             for label in label_list:
                 if isinstance(label, str) and label.startswith(pattern.prefix):
-                    # Extract context name (e.g., "rnd::Alpha" -> "Alpha")
-                    context_name = label[len(pattern.prefix):]
+                    # Use full label name (e.g., "rnd::Alpha") instead of stripping prefix
+                    # context_name = label[len(pattern.prefix):] 
+                    context_name = label
                     matched_contexts.append({
                         "context": context_name,
                         "context_group": pattern.alias,

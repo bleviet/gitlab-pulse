@@ -174,6 +174,41 @@ class RestClient:
 
         return validated
 
+    def fetch_labels(self, project_id: int) -> list[Any]:
+        """Fetch all labels from a GitLab project.
+
+        Args:
+            project_id: GitLab project ID
+
+        Returns:
+            List of validated RawLabel objects (returned as Any to avoid circular imports if strict typing issues arise, but effectively RawLabel)
+        """
+        from app.shared.schemas import RawLabel
+
+        project = self.gl.projects.get(project_id)
+        logger.info(f"Fetching labels from project {project_id}")
+
+        raw_labels = project.labels.list(iterator=True)
+        
+        validated: list[RawLabel] = []
+        for label in raw_labels:
+            try:
+                # python-gitlab label objects have attributes accessible
+                attrs = label.attributes
+                validated.append(RawLabel(
+                    id=attrs["id"],
+                    name=attrs["name"],
+                    color=attrs["color"],
+                    description=attrs.get("description"),
+                    project_id=project_id,
+                    text_color=attrs.get("text_color", "#FFFFFF")
+                ))
+            except Exception as e:
+                logger.warning(f"Validation error for label {getattr(label, 'name', 'unknown')}: {e}")
+
+        logger.info(f"Fetched {len(validated)} labels from project {project_id}")
+        return validated
+
 
     def _persist_raw(self, project_id: int, issues: list[dict[str, Any]]) -> None:
         """Persist raw JSON response to Layer 0.

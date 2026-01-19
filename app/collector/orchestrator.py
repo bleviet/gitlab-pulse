@@ -90,6 +90,14 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"Failed to fetch milestones for project {project_id}: {e}")
 
+        # Fetch labels (lightweight, independent)
+        try:
+             labels = self.rest_client.fetch_labels(project_id)
+             if labels:
+                 self._persist_labels(project_id, labels)
+        except Exception as e:
+            logger.warning(f"Failed to fetch labels for project {project_id}: {e}")
+
         if not issues:
             logger.info(f"No new issues found for project {project_id}")
             return 0
@@ -236,6 +244,23 @@ class Orchestrator:
         tmp_filepath.replace(filepath)
 
         logger.info(f"Persisted {len(milestones)} milestones to {filepath}")
+
+    def _persist_labels(self, project_id: int, labels: list) -> None:
+        """Persist labels to Parquet (Layer 1 output).
+
+        Replaces entire file.
+        """
+        filepath = self.processed_path / f"labels_{project_id}.parquet"
+
+        # Convert to DataFrame
+        df = pd.DataFrame([l.model_dump() for l in labels])
+
+        # Atomic write
+        tmp_filepath = filepath.with_suffix(".tmp")
+        df.to_parquet(tmp_filepath, engine="pyarrow", compression="snappy")
+        tmp_filepath.replace(filepath)
+
+        logger.info(f"Persisted {len(labels)} labels to {filepath}")
 
 
 def main() -> None:

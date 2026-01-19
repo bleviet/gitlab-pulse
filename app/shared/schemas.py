@@ -92,6 +92,22 @@ class RawMilestone(BaseModel):
         raise ValueError(f"Cannot parse date from {type(v)}")
 
 
+class RawLabel(BaseModel):
+    """Raw label data from GitLab API.
+
+    Used to persist label metadata like colors.
+    """
+
+    id: int = Field(description="GitLab label ID")
+    name: str = Field(description="Label name")
+    color: str = Field(description="Hex color code (e.g. #FF0000)")
+    description: Optional[str] = Field(default=None, description="Description")
+    project_id: int = Field(description="GitLab project ID")
+    text_color: Optional[str] = Field(default="#FFFFFF", description="Text color (calculated by GitLab)")
+
+    model_config = {"frozen": False, "extra": "ignore"}
+
+
 class AnalyticsIssue(BaseModel):
     """Enriched issue with calculated metrics (Layer 2 output schema).
 
