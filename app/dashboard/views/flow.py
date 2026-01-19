@@ -185,6 +185,10 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
         stage_order_map = df_chart.groupby("stage")["stage_order"].min()
         df_chart["stage_order"] = df_chart["stage"].map(stage_order_map)
 
+        # Prepare stage order for plotting
+        stage_order_df = df_chart[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
+        sorted_stages = stage_order_df["stage"].tolist()
+
         # Aggregation with severity breakdown
         stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
 
@@ -213,7 +217,10 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
             text="count",
             title="",
             color_discrete_map=priority_colors,
-            category_orders={"severity": ["Critical", "High", "Medium", "Low", "Unset"]},
+            category_orders={
+                "severity": ["Critical", "High", "Medium", "Low", "Unset"],
+                "stage": sorted_stages
+            },
             custom_data=["severity"], # Pass severity for filtering
         )
 
@@ -227,6 +234,10 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
             st.info("No stage data.")
             return None
 
+        # Sorted stages for fallback
+        stage_order_df = df[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
+        sorted_stages = stage_order_df["stage"].tolist()
+
         fig = px.bar(
             stage_stats,
             x="count",
@@ -234,6 +245,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
             orientation="h",
             text="count",
             title="",
+            category_orders={"stage": sorted_stages},
         )
         fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
 
@@ -243,7 +255,7 @@ def _render_funnel_chart(df: pd.DataFrame) -> dict | None:
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(autorange="reversed"),  # Top to bottom flow
+        # yaxis=dict(autorange="reversed"),  # Removed reversal as requested
         xaxis=dict(showgrid=True, gridcolor="rgba(100,116,139,0.2)"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
         barmode="stack",
@@ -281,6 +293,13 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
         st.info("No data.")
         return None
 
+    # Get sorted stages *after* filtering (Backlog might match but Done won't)
+    # Actually, we should use the global order if possible, but filtered set is fine.
+    # Note: df_sorted is already sorted by stage_order.
+    # We can extract the unique list preserving order.
+    # df_sorted["stage"].unique() returns in appearance order (which is sorted by stage_order)
+    sorted_stages_aging = df_sorted["stage"].unique().tolist()
+
     fig = px.box(
         df_sorted,
         x="stage",
@@ -292,6 +311,7 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
             "completed": COLORS["completed"],
             "active": COLORS["active"], # Duplicate key? No, just ensuring
         },
+        category_orders={"stage": sorted_stages_aging}, # Force correct order
         points="outliers", # Show outliers
     )
 
@@ -397,6 +417,6 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
         styler if styler is not None else display_df,
         column_config=column_config,
         column_order=column_order,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )

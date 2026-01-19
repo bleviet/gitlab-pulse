@@ -48,12 +48,23 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
         _render_scorecard(valid_df, quality_df)
 
     # Error Distribution and Action Table (Collapsible)
+    # Error Distribution and Action Table (Collapsible)
     if not quality_df.empty:
+        selection = None
         with st.expander("📈 Error Distribution", expanded=True):
-            _render_error_distribution(quality_df)
+            selection = _render_error_distribution(quality_df)
+
+        # Filter Action Table based on selection
+        filtered_df = quality_df.copy()
+        if selection and selection.get("selection", {}).get("points"):
+            selected_points = selection["selection"]["points"]
+            # Error code is on the Y axis
+            selected_errors = [p["y"] for p in selected_points]
+            if selected_errors:
+                filtered_df = filtered_df[filtered_df["error_code"].isin(selected_errors)]
 
         with st.expander("⚡ Action Items", expanded=True):
-            _render_action_table(quality_df)
+            _render_action_table(filtered_df)
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
 
@@ -125,7 +136,7 @@ def _render_scorecard(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
         st.metric("Total Processed", total)
 
 
-def _render_error_distribution(quality_df: pd.DataFrame) -> None:
+def _render_error_distribution(quality_df: pd.DataFrame) -> dict | None:
     """Render error code distribution."""
     st.subheader("📋 Error Distribution")
 
@@ -164,7 +175,12 @@ def _render_error_distribution(quality_df: pd.DataFrame) -> None:
         height=200,
     )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig, 
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"]
+    )
 
 
 def _render_action_table(quality_df: pd.DataFrame) -> None:
