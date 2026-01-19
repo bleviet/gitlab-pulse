@@ -70,6 +70,15 @@ uv run python -m cProfile -s time app/processor/main.py
 **Q: Do the issue lists include quality issues?**
 **A:** No. The lists in Flow, Release, and Aging views show only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
 
+### Flow View Metrics
+**Q: What does "Active WIP" mean?**
+**A:** It counts issues currently in a stage defined as `type: "active"` (e.g., *Architecture*, *Implementation*, *Testing*) in your `rules.yaml`. It represents work actively being processed, excluding items in "waiting" states (like *Review*).
+
+**Q: What is "Flow Efficiency"?**
+**A:** It is the ratio of meaningful work time vs. total time in the system.
+$$ \text{Flow Efficiency} = \frac{\text{Active Items}}{\text{Active Items} + \text{Waiting Items}} \times 100 $$
+A low efficiency (e.g., < 20%) indicates that work spends most of its time waiting (e.g., for Code Review) rather than being developed.
+
 ## License
 
 MIT
