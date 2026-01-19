@@ -341,7 +341,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # 4. Select Columns
     cols_to_show = [
-        "web_url", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"
+        "web_url", "title", "stage", "days_in_stage", "severity", "context", "milestone", "assignee"
     ]
     # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
@@ -352,6 +352,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
         "stage": "Stage",
         "title": "Title",
         "severity": "Priority",
+        "context": "Context",
         "milestone": "Milestone",
         "assignee": "Assignee",
         "web_url": "IID",  # Map URL to IID column for clickable link
@@ -374,9 +375,10 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
                 format="%d days",
             ),
             "Priority": st.column_config.TextColumn("Priority", width="small"),
+            "Context": st.column_config.TextColumn("Context", width="small"),
             "Milestone": st.column_config.TextColumn("Milestone", width="medium"),
         },
-        column_order=["IID", "Title", "Stage", "Days in Stage", "Priority", "Milestone", "Assignee"],
+        column_order=["IID", "Title", "Stage", "Days in Stage", "Priority", "Context", "Milestone", "Assignee"],
         width="stretch",
         hide_index=True,
     )
