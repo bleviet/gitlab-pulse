@@ -158,8 +158,9 @@ TypeError: Failed to fetch dynamically imported module: http://<IP>:8501/static/
 headless = true
 # Bind to all interfaces so the app is accessible from other machines
 address = "0.0.0.0"
-# Disable CORS for local network access during development
+# Disable CORS and XSRF protection for local network access during development
 enableCORS = false
+enableXsrfProtection = false
 ```
 
 > ⚠️ **Production Warning:** `enableCORS = false` is acceptable for local development but **should not be used in production**. For production deployments, use a reverse proxy (nginx, Caddy, Traefik) that handles CORS properly.

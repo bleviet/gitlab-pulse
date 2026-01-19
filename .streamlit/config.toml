@@ -10,5 +10,6 @@ headless = true
 # Bind to all interfaces so the app is accessible from other machines on the network
 address = "0.0.0.0"
 # Disable CORS for local network access during development
-# WARNING: Do not use enableCORS=false in production environments
+# WARNING: Do not use these settings in production environments
 enableCORS = false
+enableXsrfProtection = false
