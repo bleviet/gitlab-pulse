@@ -246,33 +246,41 @@ def filter_by_milestone(df: pd.DataFrame, milestone: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)  # 1-hour cache for labels (they change rarely)
-def load_labels(processed_path: Optional[str] = None) -> dict[str, str]:
+def load_labels(processed_path: Optional[str] = None) -> dict[str, dict[str, str]]:
     """Load label colors from processed Parquet files.
 
     Args:
         processed_path: Path to processed directory
 
     Returns:
-        Dict mapping label name to hex color
+        Dict mapping label name to style dict {'color': hex, 'text_color': hex}
     """
     path = Path(processed_path) if processed_path else DEFAULT_PROCESSED_PATH
 
     label_files = list(path.glob("labels_*.parquet"))
     
-    label_colors = {}
+    label_styles = {}
     if not label_files:
-        return label_colors
+        return label_styles
 
     for filepath in label_files:
         try:
             df = pd.read_parquet(filepath)
-            if not df.empty and "name" in df.columns and "color" in df.columns:
-                # Create dict name -> color
-                # If duplicates across projects, last one wins (acceptable for now)
-                batch = dict(zip(df["name"], df["color"]))
-                label_colors.update(batch)
+            if not df.empty and "name" in df.columns:
+                # Ensure columns exist
+                if "color" not in df.columns:
+                    df["color"] = "#FFFFFF"
+                if "text_color" not in df.columns:
+                    df["text_color"] = "#000000" # Default black text if missing
+
+                # Deduplicate by name (last wins)
+                df = df.drop_duplicates(subset=["name"], keep="last")
+                
+                # Convert to dict: name -> {color: ..., text_color: ...}
+                batch = df.set_index("name")[["color", "text_color"]].to_dict(orient="index")
+                label_styles.update(batch)
         except Exception as e:
             logger.warning(f"Failed to load labels from {filepath}: {e}")
 
-    logger.info(f"Loaded colors for {len(label_colors)} labels")
-    return label_colors
+    logger.info(f"Loaded styles for {len(label_styles)} labels")
+    return label_styles

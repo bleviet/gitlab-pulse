@@ -399,14 +399,16 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     styler = None
     if "context" in display_df.columns:
         from app.dashboard.data_loader import load_labels
-        label_colors = load_labels()
+        label_styles = load_labels()
         
         def highlight_context(val):
             if not isinstance(val, str):
                 return None
-            color = label_colors.get(val)
-            if color:
-                return f'background-color: {color}; color: #ffffff' 
+            style = label_styles.get(val)
+            if style:
+                bg_color = style.get("color", "#FFFFFF")
+                text_color = style.get("text_color", "#000000")
+                return f'background-color: {bg_color}; color: {text_color}' 
             return None
 
         styler = display_df.style.map(highlight_context, subset=["context"])
