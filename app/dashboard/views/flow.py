@@ -186,7 +186,8 @@ def _render_funnel_chart(
         "**Interaction Guide:**\n"
         "- **Hover** to view stage descriptions.\n"
         "- **Click** a bar segment to filter the Issue Drill-down below.\n"
-        "- **Shift+Click** to select multiple segments for combined filtering."
+        "- **Shift+Click** to select multiple segments for combined filtering.\n"
+        "- **Double-Click** to reset selection."
     )
     st.subheader(f"🔻 Project Funnel (Total: {total_issues})", help=help_text)
 
