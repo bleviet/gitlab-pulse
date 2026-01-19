@@ -77,7 +77,7 @@ def render_release_view(df: pd.DataFrame) -> None:
     status_color = "off"
     if pd.notna(ms_meta.get("milestone_due_date")):
         due_date = pd.to_datetime(ms_meta["milestone_due_date"])
-        remaining = (due_date - pd.Timestamp.now()).days
+        remaining = (due_date - pd.Timestamp.now(tz="UTC")).days
         days_remaining = f"{remaining} days"
         
         if remaining < 0 and pct_complete < 100:

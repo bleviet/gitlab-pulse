@@ -138,3 +138,42 @@ Do not edit main.py.
 * **Rule:** When modifying existing files, always mimic the coding style of the surrounding code.
 * **Why:** Consistent codebases are easier to read and maintain. If the file uses `type: ignore` comments, follow that pattern. If it uses specific variable naming conventions, adopt them.
 * **Review:** Changes that introduce inconsistent styling (e.g., using camelCase in a snake_case file) will be rejected.
+
+## **9. Streamlit Configuration**
+
+### **9.1. Network Access (Local Development)**
+
+When running the dashboard on one machine and accessing it from another (e.g., via `http://192.168.x.x:8501`), you may encounter:
+
+```
+TypeError: Failed to fetch dynamically imported module: http://<IP>:8501/static/js/index.*.js
+```
+
+**Root Cause:** By default, Streamlit binds to `localhost`, so when the browser fetches JavaScript/CSS assets from an external IP, the requests fail.
+
+**Solution:** Configure `.streamlit/config.toml`:
+
+```toml
+[server]
+headless = true
+# Bind to all interfaces so the app is accessible from other machines
+address = "0.0.0.0"
+# Disable CORS for local network access during development
+enableCORS = false
+```
+
+> ⚠️ **Production Warning:** `enableCORS = false` is acceptable for local development but **should not be used in production**. For production deployments, use a reverse proxy (nginx, Caddy, Traefik) that handles CORS properly.
+
+### **9.2. Timezone-Aware Date Arithmetic**
+
+When performing date arithmetic with Pandas timestamps, ensure timezone consistency:
+
+```python
+# BAD - Mixing tz-naive and tz-aware raises TypeError
+remaining = (due_date - pd.Timestamp.now()).days
+
+# GOOD - Both timestamps are tz-aware (UTC)
+remaining = (due_date - pd.Timestamp.now(tz="UTC")).days
+```
+
+**Why:** GitLab API returns ISO 8601 timestamps with timezone info (UTC). When parsed by Pandas, these become tz-aware. Subtracting a tz-naive `pd.Timestamp.now()` from a tz-aware timestamp raises `TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects`.
