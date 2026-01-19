@@ -222,3 +222,24 @@ def filter_by_context(df: pd.DataFrame, context: str) -> pd.DataFrame:
         return df
 
     return df[df["context"] == context]
+
+
+def filter_by_milestone(df: pd.DataFrame, milestone: str) -> pd.DataFrame:
+    """Filter DataFrame by milestone.
+
+    Args:
+        df: DataFrame to filter
+        milestone: Milestone title (or "All" for no filter)
+
+    Returns:
+        Filtered DataFrame
+    """
+    if df.empty or milestone == "All":
+        return df
+
+    if "milestone" not in df.columns:
+        return df
+
+    # Handle cases where milestone might be NaN but we want specific matches
+    # This filter assumes strictly matching the milestone title
+    return df[df["milestone"] == milestone]

@@ -54,6 +54,22 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
         st.divider()
 
+        # Milestone selector
+        milestones = ["All"]
+        if not df.empty and "milestone" in df.columns:
+            # Drop None/NaN and sort
+            unique_milestones = df["milestone"].dropna().unique().tolist()
+            milestones.extend(sorted(unique_milestones))
+
+        selected_milestone = st.selectbox(
+            "Milestone",
+            options=milestones,
+            index=0,
+            help="Filter specific milestone",
+        )
+
+        st.divider()
+
         # Time range picker
         st.subheader("📅 Time Range")
 
@@ -160,6 +176,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
     return {
         "team": selected_team,
         "context": selected_context,
+        "milestone": selected_milestone,
         "start_date": pd.Timestamp(start_date, tz="UTC"),
         "end_date": pd.Timestamp(end_date, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1),
     }
