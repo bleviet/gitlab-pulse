@@ -175,7 +175,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         df["created_date"] = pd.to_datetime(df["created_at"]).apply(to_naive_utc).dt.normalize()
         scope_counts = df.groupby("created_date").size().cumsum()
     else:
-        scope_counts = pd.Series(dtype=int)
+        scope_counts = pd.Series(dtype=int, index=pd.to_datetime([]))
     
     # Closed (Completed) -> Convert to Naive UTC
     completed_df = df[df["state"] == "closed"].copy()
@@ -183,7 +183,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         completed_df["closed_date"] = pd.to_datetime(completed_df["closed_at"]).apply(to_naive_utc).dt.normalize()
         completed_counts = completed_df.groupby("closed_date").size().sort_index().cumsum()
     else:
-        completed_counts = pd.Series(dtype=int)
+        completed_counts = pd.Series(dtype=int, index=pd.to_datetime([]))
     
     # Reindex series to timeline using ffill
     scope_series = scope_counts.reindex(timeline, method='ffill').fillna(0)
