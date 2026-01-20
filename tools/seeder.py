@@ -137,6 +137,7 @@ def generate_issues(
             "iid": i + 1,
             "project_id": project_id,
             "title": _generate_title(labels),
+            "description": _generate_description(labels),
             "state": state,
             "created_at": created_at,
             "updated_at": updated_at,
@@ -260,6 +261,84 @@ def _generate_title(labels: list[str]) -> str:
         keywords = ["Go", "SQL", "Postgres", "Database", "Vulnerability", "Exploit"]
         templates.append(f"{random.choice(keywords)}: {fake.sentence(nb_words=5)}")
 
+    return random.choice(templates)
+
+
+def _generate_description(labels: list[str]) -> str:
+    """Generate a realistic issue description based on type."""
+    if "type::bug" in labels:
+        templates = [
+            f"""## Bug Description
+The {fake.word()} module is throwing an unexpected error when processing {fake.word()} requests.
+
+### Steps to Reproduce
+1. Navigate to the {fake.word()} page
+2. Click on {fake.word()} button
+3. Observe the error in console
+
+### Expected Behavior
+The system should {fake.sentence(nb_words=6)}
+
+### Actual Behavior
+Instead, we see: `ERROR: {fake.sentence(nb_words=4)}`
+
+### Environment
+- Version: {random.randint(1,5)}.{random.randint(0,9)}.{random.randint(0,99)}
+- OS: {random.choice(['Linux', 'Windows', 'macOS'])}
+""",
+            f"""Error observed in production:
+```
+{fake.word().upper()}_ERROR: Failed to {fake.word()} the {fake.word()}
+Stack trace:
+  at {fake.word()}.{fake.word()}() line {random.randint(10, 500)}
+  at {fake.word()}.{fake.word()}() line {random.randint(10, 500)}
+```
+
+This started occurring after the last deployment. Affects approximately {random.randint(1, 50)}% of users.
+""",
+        ]
+    elif "type::feature" in labels:
+        templates = [
+            f"""## Feature Request
+
+### Description
+As a user, I want to be able to {fake.sentence(nb_words=6)} so that I can {fake.sentence(nb_words=5)}.
+
+### Acceptance Criteria
+- [ ] {fake.sentence(nb_words=6)}
+- [ ] {fake.sentence(nb_words=5)}
+- [ ] {fake.sentence(nb_words=4)}
+
+### Technical Notes
+This will require modifications to the {fake.word()} component.
+""",
+            f"""Implement {fake.word()} functionality to improve user experience.
+
+**Business Value:** {fake.sentence(nb_words=8)}
+
+**Technical Approach:**
+1. Update the {fake.word()} API endpoint
+2. Add new {fake.word()} validation
+3. Modify the {fake.word()} component
+""",
+        ]
+    else:
+        templates = [
+            f"""## Task Description
+
+{fake.paragraph(nb_sentences=3)}
+
+### Checklist
+- [ ] Review {fake.word()} documentation
+- [ ] Update {fake.word()} configuration
+- [ ] Test changes in staging
+""",
+            f"""{fake.paragraph(nb_sentences=2)}
+
+Related to: {fake.word()} refactoring initiative.
+""",
+        ]
+    
     return random.choice(templates)
 
 

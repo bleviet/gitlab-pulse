@@ -26,6 +26,7 @@ class RawIssue(BaseModel):
     updated_at: datetime = Field(description="Last update timestamp (UTC)")
     closed_at: Optional[datetime] = Field(default=None, description="Closure timestamp")
     labels: list[str] = Field(default_factory=list, description="Issue labels")
+    description: Optional[str] = Field(default=None, description="Issue description/body")
 
     # GraphQL-enriched fields (hierarchy)
     work_item_type: str = Field(default="ISSUE", description="Work item type")
@@ -124,6 +125,7 @@ class AnalyticsIssue(BaseModel):
     updated_at: datetime
     closed_at: Optional[datetime] = None
     labels: list[str] = Field(default_factory=list)
+    description: Optional[str] = None
     work_item_type: str = "ISSUE"
     parent_id: Optional[int] = None
     child_ids: list[int] = Field(default_factory=list)
