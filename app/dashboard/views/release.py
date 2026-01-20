@@ -133,6 +133,7 @@ def render_release_view(df: pd.DataFrame) -> None:
             },
             column_order=["IID", "Title", "Type", "State", "Assignee"],
             width="stretch",
+            height=800,
             hide_index=True,
         )
 

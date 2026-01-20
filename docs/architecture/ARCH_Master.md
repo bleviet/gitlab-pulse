@@ -20,6 +20,7 @@ The system uses a tiered storage approach, moving from high-volume raw files to 
 | **Layer 1** | **Processed** | data/processed/ | **Standardized Mirror:** Validated technical data (Parquet). |
 | **Layer 2** | **Analytics** | data/analytics/ | **Gold:** Enriched, context-mapped metrics (Parquet). |
 | **Layer 2** | **Quality** | data/analytics/ | **Exceptions:** Issues failing custom validation rules. |
+| **Layer 4** | **AI Services** | data/ai/ | **AI Memory:** Issue summaries and chat histories (Parquet). |
 
 ### **2.2. ADR: Why persistent Raw storage?**
 
@@ -131,12 +132,14 @@ To validate Layer 2 (Logic) and Layer 3 (UI Performance) without hitting GitLab 
 │   ├── collector/          \# Layer 1: REST/GQL Hybrid Logic  
 │   ├── processor/          \# Layer 2: Pandas/Pydantic Logic  
 │   ├── dashboard/          \# Layer 3: Streamlit UI  
+│   ├── ai/                 \# Layer 4: Ollama AI Service  
 │   └── config/rules/       \# Modular .yaml rule files  
 ├── data/  
 │   ├── raw/                \# L0 Output: JSON response dumps  
 │   ├── processed/          \# L1 Output: Technical Mirror (Parquet)  
 │   ├── analytics/          \# L2 Output: Trusted KPIs (Parquet)  
-│   └── state/              \# Sync timestamps  
+│   ├── ai/                 \# L4 Output: AI summaries & chat (Parquet)  
+│   └── state/              \# Sync timestamps, server configs  
 └── tools/  
     ├── seeder.py           \# Synthetic data generator for testing
     └── gitlab_seeder.py    \# Live data generator for integration testing

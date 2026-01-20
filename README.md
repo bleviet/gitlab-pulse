@@ -55,6 +55,38 @@ Edit `app/config/rules/default.yaml` to customize:
 - **Validation**: Enforce required labels (e.g., Bugs must have Severity).
 - **Contexts & Workflows**: Slice data by domain and define process stages.
 
+## AI Assistant (Layer 4)
+
+GitLabInsight includes a **local AI assistant** powered by [Ollama](https://ollama.com/). This enables context-aware issue summarization and chat without sending data to external APIs.
+
+### Setup
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3
+
+# Start the server (if not already running)
+ollama serve
+```
+
+### Features
+
+- **Executive Summary:** Generates a structured summary (Technical Details, Status, Next Steps) for any issue.
+- **Chat Interface:** Ask follow-up questions with full issue context.
+- **Staleness Detection:** Automatically flags when an issue has changed since the last summary.
+- **Multi-Server Support:** Configure remote Ollama servers via the sidebar (Settings > 🤖 AI Settings).
+- **Persistence:** Summaries and chat history are saved to `data/ai/` for future sessions.
+
+### Usage
+
+1. Go to the **Flow** tab in the dashboard.
+2. Select an issue from the **Issue Drill-down** table.
+3. Switch to the **🤖 AI Assistant** tab.
+4. Click **✨ Generate** to create a summary, or **🔄 Regenerate** to update it.
+
 ## Testing
 
 ```bash

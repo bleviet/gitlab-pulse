@@ -214,6 +214,7 @@ def _render_action_table(quality_df: pd.DataFrame) -> None:
     st.dataframe(
         display_df.style.apply(style_error_code, axis=1),
         width="stretch",
+        height=800,
         hide_index=True,
         column_order=["IID", "Title", "Error", "Details", "Assignee"],
         column_config={

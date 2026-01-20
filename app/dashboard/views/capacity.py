@@ -306,6 +306,7 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
     st.dataframe(
         display_df,
         width="stretch",
+        height=800,
         hide_index=True,
         column_config={
             "web_url": st.column_config.LinkColumn(

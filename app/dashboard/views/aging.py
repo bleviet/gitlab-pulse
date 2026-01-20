@@ -185,6 +185,7 @@ def _render_stale_table(df: pd.DataFrame) -> None:
     st.dataframe(
         display_df,
         width="stretch",
+        height=800,
         hide_index=True,
         column_order=["IID", "Title", "Type", "Assignee", "Age (Days)", "Last Update"],
         column_config={

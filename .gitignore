@@ -4,6 +4,7 @@
 data/raw/*.json
 data/processed/*.parquet
 data/analytics/*.parquet
+data/ai/*.parquet
 data/state/*.json
 
 # Keep directory structure
