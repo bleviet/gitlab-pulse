@@ -31,8 +31,8 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 
 ### **Q: Will the Streamlit visual be updated?**
 **A:** Yes, but with a delay.
-- **Cache TTL:** The Dashboard caches data in memory for **15 minutes** (900 seconds).
-- **Auto-Refresh:** If you leave the dashboard open, it will reload data from disk every 15 minutes.
+- **Cache TTL:** The Dashboard caches data in memory for **2 minutes** (120 seconds).
+- **Auto-Refresh:** If you leave the dashboard open, it will reload data from disk every 2 minutes.
 - **Manual Refresh:** To see changes immediately after running the Processor:
   1. Go to the Dashboard.
   2. Press `C` (Clear Cache) or click **Wait for it...** > **Clear Cache** in the menu.

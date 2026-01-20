@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_ANALYTICS_PATH = Path("data/analytics")
 
 
-@st.cache_data(ttl=900)  # 15-minute cache
+@st.cache_data(ttl=120)  # 2-minute cache
 def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
     """Load valid issues from analytics Parquet.
 
@@ -49,7 +49,7 @@ def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=120)
 def load_quality_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
     """Load quality (failed) issues from analytics Parquet.
 
@@ -75,7 +75,7 @@ def load_quality_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
 DEFAULT_PROCESSED_PATH = Path("data/processed")
 
 
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=120)
 def load_milestones(processed_path: Optional[str] = None) -> pd.DataFrame:
     """Load milestones from processed Parquet files.
 
