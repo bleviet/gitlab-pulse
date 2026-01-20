@@ -73,6 +73,15 @@ class ValidationConfig(BaseModel):
     max_cycle_time_days: int = 90
 
 
+class CapacityConfig(BaseModel):
+    """Configuration for Capacity view privacy and thresholds."""
+
+    max_wip_per_person: int = 5
+    max_contexts_per_person: int = 2
+    anonymize_users: bool = False
+    hidden_users: list[str] = Field(default_factory=list)
+
+
 class DomainRule(BaseModel):
     """Schema for a domain rule configuration file."""
 
@@ -83,7 +92,9 @@ class DomainRule(BaseModel):
     contexts: ContextConfig = Field(default_factory=ContextConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    capacity: CapacityConfig = Field(default_factory=CapacityConfig)
     colors: dict[str, str] = Field(default_factory=dict)
+
 
 
 class ConfigurationConflictError(Exception):

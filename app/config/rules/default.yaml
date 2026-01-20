@@ -145,3 +145,10 @@ colors:
   p1: "#EF4444"
   p2: "#EAB308"
   p3: "#006C3B"
+
+# Capacity View Configuration
+capacity:
+  max_wip_per_person: 5
+  max_contexts_per_person: 2
+  anonymize_users: false
+  hidden_users: []

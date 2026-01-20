@@ -93,6 +93,7 @@ def main() -> None:
     pages = {
         "📊 Overview": "overview",
         "🌊 Flow": "flow",
+        "⚖️ Capacity": "capacity",
         "🚀 Release": "release",
         "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
@@ -118,6 +119,11 @@ def main() -> None:
                     if hasattr(stage, "description")
                 }
                 render_flow_view(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
+            elif view_id == "capacity":
+                # Pass capacity config
+                capacity_config = default_rule.capacity.model_dump()
+                from app.dashboard.views.capacity import render_capacity_view
+                render_capacity_view(filtered_df, colors=colors, capacity_config=capacity_config)
             elif view_id == "release":
                 from app.dashboard.views.release import render_release_view
                 render_release_view(filtered_df)
