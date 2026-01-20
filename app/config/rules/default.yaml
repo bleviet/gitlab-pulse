@@ -11,55 +11,68 @@ project_ids:
 # Team/Domain identifier
 team: "default"
 
-# Label mappings: GitLab labels → human-readable terms
-label_mappings:
+# Classification Rules: Categorize issues by Type, Severity, Priority
+classification:
   type:
-    "type::bug": "Bug"
-    "type::feature": "Feature"
-    "type::task": "Task"
-    "type::epic": "Epic"
-  severity:
-    "severity::critical": "Critical"
-    "severity::high": "High"
-    "severity::medium": "Medium"
-    "severity::low": "Low"
-  priority:
-    "priority::1": "P1"
-    "priority::2": "P2"
-    "priority::3": "P3"
-
-# Title patterns: infer type from title when labels are missing (case-insensitive)
-# Simple keyword matching - if title contains any keyword, assign that type
-title_patterns:
-  type:
-    Bug:
-      - bug
-      - fix
-      - error
-      - crash
+    Bug: 
+      labels: ["type::bug"]
+      title: ["contains:bug", "contains:fix", "contains:error", "contains:crash"]
     Feature:
-      - feature
-      - enhancement
-      - add
+      labels: ["type::feature"]
+      title: ["contains:feature", "contains:enhancement", "contains:add"]
     Task:
-      - task
-      - refactor
-      - update
-      - clean
+      labels: ["type::task"]
+      title: ["contains:task", "contains:refactor", "contains:update", "contains:clean"]
+    Epic:
+      labels: ["type::epic"]
+      
+  severity:
+    Critical:
+      labels: ["severity::critical"]
+    High:
+      labels: ["severity::high"]
+    Medium:
+      labels: ["severity::medium"]
+    Low:
+      labels: ["severity::low"]
+      
+  priority:
+    P1:
+      labels: ["priority::1"]
+    P2:
+      labels: ["priority::2"]
+    P3:
+      labels: ["priority::3"]
 
-# Context Slicing: enable "Data Explosion" for sub-project tracking
-# Issues with matching labels are duplicated per context for analytics
+# Context rules: Categorize work into sub-projects or business domains using label patterns or title keywords
 contexts:
-  method: "label_prefix"
-  require_assignment: false  # Set true to flag issues without context as quality failures
-  patterns:
-    - prefix: "rnd::"
-      alias: "R&D"
-    - prefix: "cust::"
-      alias: "Customer"
-    # Custom Workflow Example (Uncomment to use)
-    - prefix: "iteration-"
-      alias: "Iteration"
+  rules:
+    - name: "ProjectA"
+      labels: ["contains:project::A"]
+    - name: "ProjectB"
+      labels: ["contains:project::B"]
+    
+    # --- Examples of Context Rules ---
+    #
+    # 1. Regex Match (Case-Insensitive):
+    # - name: "Go Lang"
+    #   title: ["regex:(?i)\\bgo\\b"] 
+    #
+    # 2. Strict Label Match (Exact):
+    # - name: "Urgent"
+    #   labels: ["exact:p1-urgent", "exact:critical-incident"]
+    #
+    # 3. Flexible Title Keywords (Contains):
+    # - name: "Database"
+    #   title: ["contains:sql", "contains:postgres", "contains:database"]
+    #
+    # 4. Mixed Criteria (Labels OR Title):
+    # - name: "Security"
+    #   labels: ["contains:security", "exact:cve"]
+    #   title: ["regex:(?i)vulnerability", "contains:exploit"]
+    
+    # - name: "iteration"
+    #   labels: ["regex:^iteration-\d+$"]
 
 # Validation rules
 workflow:
@@ -98,11 +111,11 @@ validation:
   # Required labels for specific issue types
   required_labels:
     Bug:
-      - "severity::"  # Any severity label required for bugs
+      - "contains:severity::"  # Matches labels containing "severity::" (e.g. severity::high)
     Feature:
-      - "priority::"  # Any priority label required for features
+      - "contains:priority::"
     Task:
-      - "priority::"  # Any priority label required for tasks
+      - "contains:priority::"
 
   # Required fields (column names)
   required_fields:

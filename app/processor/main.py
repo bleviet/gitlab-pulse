@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.processor.enricher import (
-    apply_label_mappings,
+    apply_classification,
     enrich_metrics,
     enrich_workflow_stage,
     explode_contexts,
@@ -116,7 +116,7 @@ class Processor:
 
         # Enrich with metrics
         df = enrich_metrics(df, rule)
-        df = apply_label_mappings(df, rule)
+        df = apply_classification(df, rule)
         df = enrich_workflow_stage(df, rule)
 
         # Context explosion (Data Explosion pattern)

@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from app.processor.enricher import apply_label_mappings, enrich_metrics
+from app.processor.enricher import apply_classification, enrich_metrics
 from app.processor.rule_loader import DomainRule, LabelMappings, ValidationConfig
 from app.processor.validator import ErrorCodes, validate_issues
 
@@ -26,7 +26,7 @@ def sample_rule() -> DomainRule:
             },
         ),
         validation=ValidationConfig(
-            required_labels={"Bug": ["severity::"]},
+            required_labels={"Bug": ["contains:severity::"]},
             stale_threshold_days=30,
         ),
     )
@@ -108,9 +108,10 @@ class TestEnricher:
         closed_row = result[result["id"] == 3]
         assert closed_row["cycle_time"].notna().all()
 
+
     def test_apply_label_mappings(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
-        """Test that labels are mapped correctly."""
-        result = apply_label_mappings(sample_issues_df, sample_rule)
+        """Test that classification rules are applied correctly."""
+        result = apply_classification(sample_issues_df, sample_rule)
         assert "issue_type" in result.columns
         assert "team" in result.columns
 
@@ -125,7 +126,7 @@ class TestValidator:
     def test_validate_perfect_bug_passes(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
         """Test that a properly labeled bug passes validation."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
-        enriched = apply_label_mappings(enriched, sample_rule)
+        enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
@@ -135,7 +136,7 @@ class TestValidator:
     def test_validate_missing_severity_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
         """Test that a bug without severity fails validation."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
-        enriched = apply_label_mappings(enriched, sample_rule)
+        enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
@@ -147,7 +148,7 @@ class TestValidator:
     def test_validate_conflicting_labels_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
         """Test that conflicting type labels fail validation."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
-        enriched = apply_label_mappings(enriched, sample_rule)
+        enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
@@ -160,7 +161,7 @@ class TestValidator:
     def test_validate_feature_passes(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
         """Test that a feature (no severity required) passes validation."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
-        enriched = apply_label_mappings(enriched, sample_rule)
+        enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 

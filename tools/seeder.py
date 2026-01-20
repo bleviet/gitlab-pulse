@@ -22,7 +22,11 @@ fake = Faker()
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
 SEVERITY_LABELS = ["severity::critical", "severity::high", "severity::medium", "severity::low"]
 PRIORITY_LABELS = ["priority::1", "priority::2", "priority::3"]
-CONTEXT_LABELS = ["rnd::Alpha", "rnd::Beta", "rnd::Gamma", "cust::BMW", "cust::Audi"]
+CONTEXT_LABELS = [
+    "project::A", "project::B", "project::C",
+    "p1-urgent", "critical-incident", # For "Urgent" context
+    "security", "cve", # For "Security" context
+]
 WORKFLOW_LABELS = [
     "workflow::architecture",
     "workflow::implementation",
@@ -246,7 +250,15 @@ def _generate_title(labels: list[str]) -> str:
             f"Refactor {fake.word()} component",
             f"Task: {fake.sentence(nb_words=4)}",
             f"Clean up {fake.word()} code",
+            # Context-specific templates
+            f"Investigate vulnerability report", # for Security
+            f"Review CVE-2024-{random.randint(1000,9999)}",
         ]
+    
+    # Inject keywords randomly for Context testing
+    if random.random() < 0.3:
+        keywords = ["Go", "SQL", "Postgres", "Database", "Vulnerability", "Exploit"]
+        templates.append(f"{random.choice(keywords)}: {fake.sentence(nb_words=5)}")
 
     return random.choice(templates)
 

@@ -11,6 +11,8 @@ import pandas as pd
 
 from app.processor.rule_loader import DomainRule
 
+from app.processor.utils import has_any_label
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +41,7 @@ def validate_issues(
 ) -> ValidationResult:
     """Validate issues against domain rules.
 
-    The Gatekeeper: splits data into valid and quality (failed) DataFrames.
+    The Gatekeeper: splits data into validation and quality (failed) DataFrames.
 
     Note: Only OPEN issues are validated. Closed issues are historical records
     and hygiene checks are not actionable, so they pass through without validation.
@@ -75,16 +77,16 @@ def validate_issues(
     if rule and rule.validation.required_labels:
         for issue_type, required_prefixes in rule.validation.required_labels.items():
             type_mask = open_df["issue_type"] == issue_type
-            for prefix in required_prefixes:
+            for pattern in required_prefixes:
                 missing = open_df[type_mask].apply(
-                    lambda row: not _has_label_prefix(row["labels"], prefix),
+                    lambda row: not has_any_label(row["labels"], [pattern]),
                     axis=1,
                 )
                 for idx in open_df[type_mask][missing].index:
                     errors.append((
                         idx,
                         ErrorCodes.MISSING_LABEL,
-                        f"{issue_type} missing required label: {prefix}*",
+                        f"{issue_type} missing required label: {pattern}",
                     ))
 
     # Validate required fields
@@ -185,21 +187,3 @@ def validate_issues(
 
     logger.info(f"Validation: {len(valid_df)} valid ({len(closed_df)} closed skipped), {len(quality_df)} failed")
     return ValidationResult(valid_df=valid_df, quality_df=quality_df)
-
-
-def _has_label_prefix(labels: object, prefix: str) -> bool:
-    """Check if any label starts with the given prefix."""
-    if labels is None:
-        return False
-
-    # Handle numpy arrays, lists, and other iterables
-    try:
-        label_list = list(labels) if not isinstance(labels, list) else labels
-    except (TypeError, ValueError):
-        return False
-
-    clean_prefix = prefix.rstrip("*")
-    return any(
-        isinstance(label, str) and label.startswith(clean_prefix)
-        for label in label_list
-    )

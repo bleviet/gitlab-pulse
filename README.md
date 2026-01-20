@@ -44,9 +44,16 @@ export PROJECT_IDS="101,102,103"
 ### Rules Configuration
 
 Edit `app/config/rules/default.yaml` to customize:
-- Label mappings (e.g., `type::bug` → "Bug")
-- Validation rules (required labels, staleness threshold)
-- Semantic colors
+- **Classification Rules**: Define Type, Severity, and Priority using flexible matching:
+  ```yaml
+  classification:
+    type:
+      Bug:
+        labels: ["type::bug"]
+        title: ["contains:fix", "contains:crash"]
+  ```
+- **Validation**: Enforce required labels (e.g., Bugs must have Severity).
+- **Contexts & Workflows**: Slice data by domain and define process stages.
 
 ## Testing
 

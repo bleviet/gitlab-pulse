@@ -10,6 +10,7 @@ from typing import Optional
 import pandas as pd
 
 from app.processor.rule_loader import DomainRule
+from app.processor.utils import has_any_label, match_text
 
 logger = logging.getLogger(__name__)
 
@@ -66,113 +67,83 @@ def enrich_metrics(
     return df
 
 
-def apply_label_mappings(
+def apply_classification(
     df: pd.DataFrame,
     rule: Optional[DomainRule] = None,
 ) -> pd.DataFrame:
-    """Apply label mappings to extract issue_type, severity, etc.
+    """Apply classification rules to extract attributes (type, severity, etc).
 
-    Falls back to title pattern matching when labels don't provide type.
-
-    Args:
-        df: DataFrame with labels column
-        rule: Domain rule with label mappings and title patterns
-
-    Returns:
-        DataFrame with issue_type, severity, team columns
+    Replaces legacy apply_label_mappings.
     """
     if df.empty or rule is None:
         return df
 
     df = df.copy()
+    
+    # 1. Ensure classification exists (migration logic handles legacy config)
+    classification = rule.classification
+    if not classification:
+        return df
 
-    # Extract issue type from labels
-    df["issue_type"] = df["labels"].apply(
-        lambda labels: _find_mapped_label(labels, rule.label_mappings.type)
-    )
-
-    # Fallback: infer type from title when label mapping didn't find a match
-    if rule.title_patterns.type:
-        missing_type_mask = df["issue_type"].isna()
-        if missing_type_mask.any():
-            df.loc[missing_type_mask, "issue_type"] = df.loc[missing_type_mask, "title"].apply(
-                lambda title: _infer_type_from_title(title, rule.title_patterns.type)
+    # 2. Iterate over each category (e.g., "type", "severity", "priority")
+    for category, values_map in classification.items():
+        # Prepare target column
+        # Standardize column naming if needed? For now matches category name.
+        col_name = "issue_type" if category == "type" else category
+        df[col_name] = None
+        
+        # We need to find the FIRST matching value for each row
+        # Optimization: Iterate rows or iterate rules? 
+        # Iterating rules is faster if number of rules < number of rows.
+        
+        # However, we need to respect priority (first match wins?). 
+        # In a dict, order is insertion order (Python 3.7+). 
+        # Assuming config order is priority.
+        
+        for value_name, match_rule in values_map.items():
+            # Create a mask for rows that match THIS value rule
+            # AND haven't been assigned a value yet
+            
+            # Check labels
+            label_mask = df["labels"].apply(
+                lambda labels: has_any_label(labels, match_rule.labels)
             )
+            
+            # Check title (only if checking 'type' or explicitly configured)
+            # Legacy logic only inferred TYPE from title.
+            # New logic: If title rules exist, check them.
+            if match_rule.title:
+                title_mask = df["title"].apply(
+                    lambda title: any(match_text(title, t) for t in match_rule.title) if isinstance(title, str) else False
+                )
+                match_mask = label_mask | title_mask
+            else:
+                match_mask = label_mask
+                
+            # Assign value to rows that matched and are currently None
+            current_missing = df[col_name].isna()
+            effective_mask = match_mask & current_missing
+            
+            if effective_mask.any():
+                df.loc[effective_mask, col_name] = value_name
 
-    # Extract severity from labels
-    df["severity"] = df["labels"].apply(
-        lambda labels: _find_mapped_label(labels, rule.label_mappings.severity)
-    )
-
-    # Set team from rule
+    # Set team from rule (legacy behavior preserved)
     df["team"] = rule.team
 
     return df
 
-
-def _infer_type_from_title(title: str, type_keywords: dict[str, list[str]]) -> Optional[str]:
-    """Infer issue type from title using keyword matching.
-
-    Args:
-        title: Issue title
-        type_keywords: Dict mapping type names to keyword lists
-
-    Returns:
-        Matched type name or None
-    """
-    if not title or not type_keywords:
-        return None
-
-    title_lower = title.lower()
-
-    for type_name, keywords in type_keywords.items():
-        for keyword in keywords:
-            # Word boundary matching: keyword surrounded by non-alphanumeric or at start/end
-            keyword_lower = keyword.lower()
-            if keyword_lower in title_lower:
-                return type_name
-
-    return None
-
-
-def _find_mapped_label(labels: object, mapping: dict[str, str]) -> Optional[str]:
-    """Find the first matching label in the mapping."""
-    if labels is None or mapping is None:
-        return None
-
-    # Handle numpy arrays, lists, and other iterables
-    try:
-        label_list = list(labels) if not isinstance(labels, list) else labels
-    except (TypeError, ValueError):
-        return None
-
-    if not label_list:
-        return None
-
-    for label in label_list:
-        if not isinstance(label, str):
-            continue
-        # Exact match
-        if label in mapping:
-            return mapping[label]
-        # Prefix match (e.g., "type::" matches "type::bug")
-        for pattern, value in mapping.items():
-            if label.startswith(pattern.rstrip("*")):
-                return value
-
-    return None
 
 
 def explode_contexts(
     df: pd.DataFrame,
     rule: Optional[DomainRule] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Explode DataFrame by context labels (Data Explosion).
+    """Explode DataFrame by context labels/titles (Data Explosion).
 
-    Each issue matching multiple context patterns becomes multiple rows.
+    Each issue matching multiple context rules becomes multiple rows.
 
     Args:
-        df: DataFrame with labels column
+        df: DataFrame with labels and title columns
         rule: Domain rule with context configuration
 
     Returns:
@@ -180,22 +151,27 @@ def explode_contexts(
         - exploded_df: Issues with context columns added (may have more rows than input)
         - orphan_df: Issues that matched no context (if require_assignment is True)
     """
-    if df.empty or rule is None or not rule.contexts.patterns:
+    if df.empty or rule is None or not rule.contexts.rules:
         # No context config - add empty context columns and return
         df = df.copy()
         df["context"] = None
         df["context_group"] = None
         return df, pd.DataFrame()
 
-    patterns = rule.contexts.patterns
+    rules = rule.contexts.rules
     require_assignment = rule.contexts.require_assignment
+
+    # Pre-compile regex patterns for performance if needed?
+    # For now, simplistic implementation.
 
     exploded_rows = []
     orphan_rows = []
 
     for _, row in df.iterrows():
+        # Prepare data for matching
         labels = row.get("labels", [])
-        # Handle numpy arrays
+        title = row.get("title", "")
+
         if labels is None:
             labels = []
         try:
@@ -203,22 +179,46 @@ def explode_contexts(
         except (TypeError, ValueError):
             label_list = []
 
-        # Find all matching contexts for this issue
-        matched_contexts = []
-        for pattern in patterns:
-            for label in label_list:
-                if isinstance(label, str) and label.startswith(pattern.prefix):
-                    # Use full label name (e.g., "rnd::Alpha") instead of stripping prefix
-                    # context_name = label[len(pattern.prefix):] 
-                    context_name = label
-                    matched_contexts.append({
-                        "context": context_name,
-                        "context_group": pattern.alias,
-                    })
+        # Ensure labels are strings
+        label_list = [str(l) for l in label_list if l]
 
-        if matched_contexts:
+        # Find all keys/values for this issue
+        matched_contexts = []
+
+        for ctx_rule in rules:
+            # check labels
+            for pattern in ctx_rule.labels:
+                for label in label_list:
+                    match_val = _match_text(label, pattern)
+                    if match_val:
+                        matched_contexts.append({
+                            "context": match_val if match_val is not True else label, # Use matched string or label
+                            "context_group": ctx_rule.name,
+                        })
+
+            # check title
+            for pattern in ctx_rule.title:
+                if isinstance(title, str):
+                    match_val = _match_text(title, pattern)
+                    if match_val:
+                         # For title matches, use rule name as context to avoid high cardinality
+                        matched_contexts.append({
+                            "context": ctx_rule.name,
+                            "context_group": ctx_rule.name,
+                        })
+
+        # Deduplicate matches (same context and group)
+        unique_matches = []
+        seen = set()
+        for m in matched_contexts:
+            key = (m["context"], m["context_group"])
+            if key not in seen:
+                seen.add(key)
+                unique_matches.append(m)
+
+        if unique_matches:
             # Create one row per matched context
-            for ctx in matched_contexts:
+            for ctx in unique_matches:
                 new_row = row.to_dict()  # Convert to dict to avoid dtype issues
                 new_row["context"] = ctx["context"]
                 new_row["context_group"] = ctx["context_group"]
@@ -249,6 +249,44 @@ def explode_contexts(
 
     logger.debug(f"Context explosion: {len(df)} -> {len(exploded_df)} rows, {len(orphan_df)} orphans")
     return exploded_df, orphan_df
+
+
+def _match_text(text: str, pattern: str) -> Optional[str|bool]:
+    """Check if text matches pattern.
+
+    Returns:
+        - None if no match
+        - Matched String (for regex capture) or True (for simple match)
+    """
+    if pattern.startswith("regex:"):
+        regex = pattern[6:]
+        try:
+            match = re.search(regex, text)
+            if match:
+                # Return the full match or the first group if present?
+                # Let's match existing logic: return the full text that matched effectively?
+                # Or just return True?
+                # For context extracting, usually we want the specific label.
+                return True
+        except re.error:
+            pass
+
+    elif pattern.startswith("contains:"):
+        substring = pattern[9:]
+        if substring in text:
+            return True
+
+    elif pattern.startswith("exact:"):
+        exact_str = pattern[6:]
+        if text == exact_str:
+            return True
+
+    else:
+        # Default to exact match
+        if text == pattern:
+            return True
+
+    return None
 
 
 def enrich_workflow_stage(
@@ -283,7 +321,7 @@ def enrich_workflow_stage(
     # Actually, let's just do forward iteration and only write to rows that are still 'Backlog'
     # But 'Backlog' is just the initial value.
     # Let's track which rows have been matched.
-    
+
     matched_mask = pd.Series(False, index=df.index)
 
     for i, stage in enumerate(rule.workflow.stages, start=1):
@@ -291,10 +329,10 @@ def enrich_workflow_stage(
         current_mask = df["labels"].apply(
             lambda labels: _has_any_label(labels, stage.labels)
         )
-        
+
         # Only consider rows that matched THIS stage AND haven't been matched by a previous (higher priority) stage
         effective_mask = current_mask & (~matched_mask)
-        
+
         if effective_mask.any():
             df.loc[effective_mask, "stage"] = stage.name
             df.loc[effective_mask, "stage_type"] = stage.type
@@ -324,8 +362,8 @@ import re
 
 def _has_any_label(issue_labels: object, target_labels: list[str]) -> bool:
     """Check if issue has any of the target labels.
-    
-    Supports "regex:" prefix in target_labels for pattern matching.
+
+    Supports "regex:", "contains:", and "exact:" prefixes via _match_text.
     """
     if issue_labels is None:
         return False
@@ -334,27 +372,17 @@ def _has_any_label(issue_labels: object, target_labels: list[str]) -> bool:
         i_labels = list(issue_labels) if not isinstance(issue_labels, list) else issue_labels
     except (TypeError, ValueError):
         return False
-        
+
     for target in target_labels:
-        # Check for Regex pattern
-        if target.startswith("regex:"):
-            pattern = target[6:] # Strip "regex:" prefix
-            try:
-                compiled = re.compile(pattern)
-                for label in i_labels:
-                    if not isinstance(label, str):
-                        continue
-                    if compiled.match(label):
-                        return True
-            except re.error as e:
-                # Log error or ignore invalid regex?
-                # logger.warning(f"Invalid regex pattern '{pattern}': {e}")
+        # Optimization: Check for simple exact match first if no prefix
+        is_simple = not (target.startswith("regex:") or target.startswith("contains:") or target.startswith("exact:"))
+        
+        for label in i_labels:
+            if not isinstance(label, str):
                 continue
-        else:
-            # Exact match
-            for label in i_labels:
-                if not isinstance(label, str):
-                    continue
-                if label == target:
-                    return True
+            
+            # Use unified matching logic
+            if _match_text(label, target):
+                 return True
+                 
     return False

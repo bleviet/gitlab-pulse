@@ -43,16 +43,19 @@ LABELS = {
     "priority::3": "#5bc0de",
     "workflow::architecture": "#5843ad",
     "workflow::implementation": "#428bca",
-    "workflow::review": "#f0ad4e",
     "workflow::test": "#5bc0de",
     "workflow::done": "#5cb85c",
-    "rnd::Alpha": "#6610f2",  # Purple for Context Alpha
-    "rnd::Beta": "#20c997",   # Teal for Context Beta
-    "cust::Gamma": "#d63384", # Pink for Customer Gamma
-    "iteration-1": "#6f42c1", # Purple
+    "project::A": "#6610f2",
+    "project::B": "#20c997",
+    "project::C": "#d63384",
+    "p1-urgent": "#ff0000",   # New context example
+    "critical-incident": "#ff0000", # New context example
+    "security": "#dc3545",    # New context example
+    "cve": "#dc3545",         # New context example
+    "iteration-1": "#6f42c1",
     "iteration-2": "#6f42c1",
     "iteration-3": "#6f42c1",
-    "iteration-1::verify": "#fd7e14", # Orange
+    "iteration-1::verify": "#fd7e14",
     "iteration-2::verify": "#fd7e14",
     "iteration-3::verify": "#fd7e14",
 }
@@ -203,7 +206,9 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
         # Add Context Label (50% chance)
         if random.random() < 0.5:
              # Pick 1 or 2 context labels to simulate multi-context issues
-             start_labels = [k for k in LABELS if "rnd::" in k or "cust::" in k]
+             # Updated to include new context labels
+             start_labels = [k for k in LABELS if any(sub in k for sub in ["project::", "p1-", "critical-", "security", "cve"])]
+             
              # Shuffle and pick 1 or 2
              random.shuffle(start_labels)
              num_contexts = 1 if random.random() < 0.8 else 2
@@ -216,9 +221,18 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
     if milestones and random.random() < 0.8:
         ms = random.choice(milestones)
         milestone_id = ms.id
+    
+    # Generate Title with Keywords (for title-based contexts)
+    # Inject keywords randomly
+    keywords = ["Go", "SQL", "Postgres", "Database", "Vulnerability", "Exploit"]
+    suffix = ""
+    if random.random() < 0.3:
+        suffix = f" regarding {random.choice(keywords)}"
         
+    title = f"{title_prefix}{fake.sentence(nb_words=6)}{suffix}"
+
     return {
-        "title": f"{title_prefix}{fake.sentence(nb_words=6)}",
+        "title": title,
         "description": description,
         "labels": issue_labels,
         "milestone_id": milestone_id,

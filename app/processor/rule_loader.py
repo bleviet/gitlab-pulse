@@ -31,6 +31,14 @@ class TitlePatterns(BaseModel):
     type: dict[str, list[str]] = Field(default_factory=dict)  # type_name -> keywords
 
 
+class ContextRule(BaseModel):
+    """Context logic rule definition."""
+
+    name: str
+    labels: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+
+
 class ContextPattern(BaseModel):
     """Single context pattern definition."""
 
@@ -41,12 +49,29 @@ class ContextPattern(BaseModel):
 class ContextConfig(BaseModel):
     """Context slicing configuration for Data Explosion.
 
-    Defines how to extract logical contexts from labels.
+    Defines how to extract logical contexts from labels/titles.
     """
 
-    method: str = "label_prefix"  # Currently only supports "label_prefix"
-    patterns: list[ContextPattern] = Field(default_factory=list)
-    require_assignment: bool = False  # If true, missing context is a validation failure
+    method: Optional[str] = None  # Deprecated
+    patterns: list[ContextPattern] = Field(default_factory=list)  # Deprecated
+    rules: list[ContextRule] = Field(default_factory=list)
+    require_assignment: bool = False
+
+    def model_post_init(self, __context: Any) -> None:
+        """Migrate deprecated patterns to rules."""
+        if self.patterns and not self.rules:
+            self._migrate_patterns()
+
+    def _migrate_patterns(self) -> None:
+        """Convert legacy patterns to rules."""
+        for pattern in self.patterns:
+            # Legacy patterns were prefix-based
+            self.rules.append(
+                ContextRule(
+                    name=pattern.alias,
+                    labels=[f"contains:{pattern.prefix}"],
+                )
+            )
 
 
 class StageConfig(BaseModel):
@@ -82,18 +107,72 @@ class CapacityConfig(BaseModel):
     hidden_users: list[str] = Field(default_factory=list)
 
 
+
+class ClassificationMatch(BaseModel):
+    """Rules for matching a specific classification value."""
+
+    labels: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+
+
 class DomainRule(BaseModel):
     """Schema for a domain rule configuration file."""
 
     project_ids: list[int] = Field(default_factory=list)
     team: str = "default"
+    
+    # Legacy mappings (Deprecated)
     label_mappings: LabelMappings = Field(default_factory=LabelMappings)
     title_patterns: TitlePatterns = Field(default_factory=TitlePatterns)
+    
+    # New unified classification
+    # Structure: Category -> Value -> Match Rules
+    # e.g. {"type": {"Bug": ClassificationMatch(labels=["type::bug"], ...)}}
+    classification: dict[str, dict[str, ClassificationMatch]] = Field(default_factory=dict)
+    
     contexts: ContextConfig = Field(default_factory=ContextConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     capacity: CapacityConfig = Field(default_factory=CapacityConfig)
     colors: dict[str, str] = Field(default_factory=dict)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Migrate legacy mappings to classification."""
+        if not self.classification and (self.label_mappings or self.title_patterns):
+            self._migrate_mappings()
+            
+    def _migrate_mappings(self) -> None:
+        """Convert legacy label relationships to classification rules."""
+        # Helper to ensure category dict exists
+        def get_match_rule(category: str, value: str) -> ClassificationMatch:
+            if category not in self.classification:
+                self.classification[category] = {}
+            if value not in self.classification[category]:
+                self.classification[category][value] = ClassificationMatch()
+            return self.classification[category][value]
+
+        # 1. Migrate Label Mappings
+        # label_mappings.type: {"type::bug": "Bug"}
+        for key, value in self.label_mappings.type.items():
+            rule = get_match_rule("type", value)
+            rule.labels.append(key) # Treat as exact/prefix based on utils logic? 
+            # Note: utils.has_any_label checks exact match if no prefix.
+            # Legacy simple strings were exact matches usually.
+            
+        for key, value in self.label_mappings.severity.items():
+             get_match_rule("severity", value).labels.append(key)
+             
+        for key, value in self.label_mappings.priority.items():
+             get_match_rule("priority", value).labels.append(key)
+             
+        # 2. Migrate Title Patterns
+        # title_patterns.type: {"Bug": ["bug", "fix"]}
+        for type_name, keywords in self.title_patterns.type.items():
+            rule = get_match_rule("type", type_name)
+            for kw in keywords:
+                # Title patterns were substring matches
+                rule.title.append(f"contains:{kw}")
+
 
 
 
