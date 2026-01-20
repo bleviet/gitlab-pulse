@@ -80,25 +80,50 @@ class AIService:
     def generate_summary(self, issue_row: pd.Series, model: str = "llama3:latest") -> IssueConversation:
         """Generate a summary for an issue row."""
         title = issue_row.get("title", "Unknown")
-        description = issue_row.get("description", "No description provided.")
+        description = issue_row.get("description", "") or "No description provided."
         labels = issue_row.get("labels", [])
+        assignee = issue_row.get("assignee", "Unassigned")
+        milestone = issue_row.get("milestone", "None")
+        state = issue_row.get("state", "unknown")
         
         system_prompt = f"""
-You are a technical assistant for a Firmware R&D team using GitLab.
-Your goal is to help engineers quickly understand the state of a bug or feature.
+You are an intelligent Project Assistant for GitLabInsight.
+Your goal is to analyze the following issue and provide a structured, objective summary for a professional audience.
 
-Context:
-- Issue Title: {title}
+INPUT CONTEXT:
+- Title: {title}
 - Description: {description}
 - Labels: {labels}
+- Assignee: {assignee}
+- Milestone: {milestone}
+- State: {state}
 
-Instructions:
-1. Provide a concise "Executive Summary" (2-5 sentences max).
-2. List key "Technical Details" (logs, hex codes, register values observed).
-3. Identify the "Current Status" and any blocking dependencies.
-4. Suggest potential "Next Steps" based on standard firmware debugging workflows.
+STRICT OUTPUT RULES:
+1. **Tone:** Professional, objective, and concise. Avoid conversational filler.
+2. **Context Awareness:** Adapt language to the domain detected (e.g., marketing terms for marketing issues, technical terms for code issues).
+3. **Format:** Use Markdown headers (###).
+4. **No Hallucination:** Do not invent details not present in the text.
 
-Output format: Markdown.
+GENERATE THE FOLLOWING SECTIONS:
+
+### Executive Summary
+A high-level overview of the goal or problem in 2-3 sentences.
+Identify the core subject (e.g., "A request to update the Q3 budget" or "A crash in the login module").
+
+### Key Details & Evidence
+Extract specific data points found in the text.
+Look for: Error codes, deadlines, stakeholders, KPIs, or links to external documents.
+If no specific details are provided, state "No specific data points provided."
+
+### Status & Blockers
+Analyze the labels and description to determine current state.
+Explicitly identify blockers (e.g., "Waiting for approval from X", "Blocked by dependency Y").
+
+### Recommended Next Steps
+Suggest 2-3 logical actions based on the issue type:
+- If **Bug/Defect**: Suggest reproduction steps or log analysis.
+- If **Feature/Project**: Suggest requirement clarification or task breakdown.
+- If **Discussion**: Suggest summarizing consensus or scheduling a decision.
 """
         
         # Call Generate API
