@@ -297,7 +297,7 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
     """Render filterable grid of active work."""
     # Simplified grid focused on Assignment and Age
     
-    cols_to_show = ["assignee", "title", "stage", "priority", "milestone", "days_in_stage", "context", "weight"]
+    cols_to_show = ["web_url", "assignee", "title", "stage", "priority", "milestone", "days_in_stage", "context", "weight"]
     available_cols = [c for c in cols_to_show if c in df.columns]
     
     # Default Sort: Assignee then Age
@@ -308,6 +308,12 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
         width="stretch",
         hide_index=True,
         column_config={
+            "web_url": st.column_config.LinkColumn(
+                "IID",
+                display_text=r"/(?:issues|work_items)/(\d+)$",
+                width="small",
+                help="Click to open in GitLab"
+            ),
             "assignee": st.column_config.TextColumn("Assignee"),
             "days_in_stage": st.column_config.NumberColumn("Age (Days)", format="%d"),
             "weight": st.column_config.NumberColumn("Weight"),
