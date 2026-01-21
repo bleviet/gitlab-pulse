@@ -465,20 +465,108 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
 
 def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     """Render unified issue detail grid with drill-down filters."""
-    # 1. Multi-select Filter
-    available_stages = sorted(df["stage"].unique(), key=lambda s: df[df["stage"] == s]["stage_order"].min())
-    selected_stages = st.multiselect(
-        "Filter by Stage",
-        options=available_stages,
-        default=[],
-        help="Select stages to drill down into specifics."
-    )
 
-    # 2. Filter Data
+    # --- Column Filters (Expandable) ---
+    with st.expander("🔍 Filters", expanded=False):
+        # Row 1: Title search (full width)
+        title_search = st.text_input(
+            "Search Title",
+            placeholder="Type to search issue titles...",
+            key="filter_title"
+        )
+
+        # Row 2: Multiselect filters (3 columns)
+        filter_cols_row1 = st.columns(3)
+
+        # 1. Stage Filter
+        with filter_cols_row1[0]:
+            available_stages = sorted(
+                df["stage"].unique(),
+                key=lambda s: df[df["stage"] == s]["stage_order"].min()
+            )
+            selected_stages = st.multiselect(
+                "Stage",
+                options=available_stages,
+                default=[],
+                key="filter_stage"
+            )
+
+        # 2. Priority Filter
+        with filter_cols_row1[1]:
+            if "severity" in df.columns:
+                available_priorities = sorted(df["severity"].dropna().unique().tolist())
+                selected_priorities = st.multiselect(
+                    "Priority",
+                    options=available_priorities,
+                    default=[],
+                    key="filter_priority"
+                )
+            else:
+                selected_priorities = []
+
+        # 3. Context Filter
+        with filter_cols_row1[2]:
+            if "context" in df.columns:
+                available_contexts = sorted(df["context"].dropna().unique().tolist())
+                selected_contexts = st.multiselect(
+                    "Context",
+                    options=available_contexts,
+                    default=[],
+                    key="filter_context"
+                )
+            else:
+                selected_contexts = []
+
+        # Row 3: Milestone and Assignee (2 columns)
+        filter_cols_row2 = st.columns(2)
+
+        # 4. Milestone Filter
+        with filter_cols_row2[0]:
+            if "milestone" in df.columns:
+                available_milestones = sorted(df["milestone"].dropna().unique().tolist())
+                selected_milestones = st.multiselect(
+                    "Milestone",
+                    options=available_milestones,
+                    default=[],
+                    key="filter_milestone"
+                )
+            else:
+                selected_milestones = []
+
+        # 5. Assignee Filter
+        with filter_cols_row2[1]:
+            if "assignee" in df.columns:
+                available_assignees = sorted(df["assignee"].dropna().unique().tolist())
+                selected_assignees = st.multiselect(
+                    "Assignee",
+                    options=available_assignees,
+                    default=[],
+                    key="filter_assignee"
+                )
+            else:
+                selected_assignees = []
+
+    # --- Apply Filters ---
+    display_df = df.copy()
+
+    # Title search (case-insensitive)
+    if title_search:
+        display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
+
     if selected_stages:
-        display_df = df[df["stage"].isin(selected_stages)].copy()
-    else:
-        display_df = df.copy()
+        display_df = display_df[display_df["stage"].isin(selected_stages)]
+
+    if selected_priorities:
+        display_df = display_df[display_df["severity"].isin(selected_priorities)]
+
+    if selected_contexts:
+        display_df = display_df[display_df["context"].isin(selected_contexts)]
+
+    if selected_milestones:
+        display_df = display_df[display_df["milestone"].isin(selected_milestones)]
+
+    if selected_assignees:
+        display_df = display_df[display_df["assignee"].isin(selected_assignees)]
 
     # 3. Sort by Hierarchy (Parent -> Child) or Staleness
     # User requested hierarchical view.
