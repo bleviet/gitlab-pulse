@@ -367,7 +367,7 @@ def _render_funnel_chart(
         textposition="middle right",
         hoverinfo="skip",
         showlegend=False,
-        textfont=dict(color="white" if st.get_option("theme.base") == "dark" else "black"),
+        textfont=dict(), # Let Plotly/Streamlit handle theme adaptation
     ))
 
     # Calculate max range to fit the text label
@@ -385,7 +385,7 @@ def _render_funnel_chart(
             gridcolor="rgba(128, 128, 128, 0.2)",
             range=[0, max_count * 1.15] # Extend range to fit labels
         ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, title=None),
         barmode="stack",
     )
 
@@ -452,7 +452,7 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
         yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)", title="Days in Stage"),
         xaxis=dict(title=None),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
 
     return st.plotly_chart(
