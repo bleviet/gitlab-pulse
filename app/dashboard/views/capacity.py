@@ -26,6 +26,10 @@ def render_capacity_view(
     st.header("⚖️ Risk & Capacity")
     st.caption("Identify bottlenecks, overload, and context-switching risks.")
     
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
+    
     if df.empty:
         st.warning("No data available.")
         return
@@ -206,7 +210,12 @@ def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, thre
         xaxis_title="Assignee",
         yaxis_title="Item Count",
         legend_title="Stage",
-        height=500
+        height=500,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
+        xaxis=dict(showgrid=False),
     )
     
     # Interactive Selection
@@ -267,7 +276,10 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
     fig.update_layout(
          xaxis_title="Context",
          yaxis_title="Assignee",
-         height=500
+         height=500,
+         paper_bgcolor="rgba(0,0,0,0)",
+         plot_bgcolor="rgba(0,0,0,0)",
+         font=dict(family="Inter, sans-serif"),
     )
     
     event = st.plotly_chart(

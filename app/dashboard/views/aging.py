@@ -41,6 +41,10 @@ def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None
     # Alert Banner for stale issues
     _render_stale_alert(df)
 
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
+
     # Boxplot by Issue Type (Collapsible)
     with st.expander("📊 Age Distribution by Type", expanded=True):
         _render_age_boxplot(df, "issue_type")

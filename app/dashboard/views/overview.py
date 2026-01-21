@@ -38,6 +38,8 @@ def render_overview(df: pd.DataFrame, colors: dict[str, str] | None = None) -> N
         return
 
     # Top Row: KPI Cards
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
     _render_kpi_cards(df)
 
     # Middle Row: Burn-up Chart (Collapsible)
@@ -202,7 +204,7 @@ def _render_burnup_chart(df: pd.DataFrame) -> None:
     for i in range(1, 4):
         fig.update_yaxes(
             showgrid=True,
-            gridcolor="rgba(100,116,139,0.2)",
+            gridcolor="rgba(128, 128, 128, 0.2)",
             zeroline=False,
             row=i, col=1,
         )
@@ -250,7 +252,7 @@ def _render_work_distribution(df: pd.DataFrame) -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
-        xaxis=dict(gridcolor="rgba(100,116,139,0.2)"),
+        xaxis=dict(gridcolor="rgba(128, 128, 128, 0.2)"),
         yaxis=dict(showgrid=False),
     )
 

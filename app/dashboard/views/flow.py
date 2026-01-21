@@ -138,6 +138,10 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
     """
     col1, col2, col3, col4 = st.columns(4)
 
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
+
     # 1. Active WIP
     active_mask = df["stage_type"] == "active"
     active_count = len(df[active_mask])
@@ -360,7 +364,7 @@ def _render_funnel_chart(
         # yaxis=dict(autorange="reversed"),  # Removed reversal as requested
         xaxis=dict(
             showgrid=True,
-            gridcolor="rgba(100,116,139,0.2)",
+            gridcolor="rgba(128, 128, 128, 0.2)",
             range=[0, max_count * 1.15] # Extend range to fit labels
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
@@ -427,7 +431,7 @@ def _render_aging_chart(df: pd.DataFrame) -> dict | None:
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(showgrid=True, gridcolor="rgba(100,116,139,0.2)", title="Days in Stage"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)", title="Days in Stage"),
         xaxis=dict(title=None),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)

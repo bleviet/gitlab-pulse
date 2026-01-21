@@ -35,20 +35,7 @@ st.set_page_config(
 # Custom CSS for consistent styling
 st.markdown("""
 <style>
-    .stMetric {
-        background-color: var(--secondary-background-color);
-        padding: 1rem;
-        border-radius: 0.5rem;
-    }
-    .stMetric label {
-        font-size: 0.875rem !important;
-        color: var(--text-color) !important;
-        opacity: 0.7;
-    }
-    .stMetric [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-    }
+    /* Metric styling moved to app/dashboard/components.py */
 </style>
 """, unsafe_allow_html=True)
 

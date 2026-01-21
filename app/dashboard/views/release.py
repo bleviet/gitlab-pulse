@@ -89,6 +89,10 @@ def render_release_view(df: pd.DataFrame) -> None:
         elif remaining < 7 and pct_complete < 80:
             status_color = "normal" # At Risk (using normal as warning-ish?)
             
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Progress", f"{pct_complete:.1f}%", f"{closed_issues}/{total_issues} Issues")
     col2.metric("Days Remaining", days_remaining)
@@ -231,10 +235,15 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         xaxis_title="Date",
         yaxis_title="Issues",
         margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(orientation="h", y=1.1)
+        legend=dict(orientation="h", y=1.1),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif"),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
     )
     
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_milestone_overview(milestones_df: pd.DataFrame) -> None:

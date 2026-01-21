@@ -43,6 +43,10 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
     st.header("🧹 Data Hygiene")
     st.caption("Quality view for metadata cleanup and validation")
 
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
+
     # Quality Scorecard (Collapsible)
     with st.expander("📊 Quality Score", expanded=True):
         _render_scorecard(valid_df, quality_df)

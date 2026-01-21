@@ -123,3 +123,41 @@ All charts must use the Streamlit theme integration for backgrounds but override
 ### **5.3. Why Semantic Color Mapping?**
 
 * **Cognitive Load:** By rigidly defining "Bug \= Red" and "Feature \= Blue", users instantly recognize patterns across different charts without re-reading legends. This mapping must persist regardless of whether the user is in Dark or Light mode.
+
+### **5.4. Why Custom CSS Injection for Cards?**
+
+* **Decision:** Use **Custom CSS Injection** (`st.markdown`) via a wrapper function.
+* **Why:** Streamlit's native `st.metric` does not support background colors, borders, or shadows. To achieve the "Bento Grid" look required for the **GitLabInsight** UI, we must inject a scoped CSS class. This trades a bit of purity for significantly better UX.
+
+## **6\. Bento Grid Design System**
+
+### **6.1. Metric Card Specification**
+To achieve the "Modern SaaS" aesthetic, metrics are not flat text but encapsulated in **Cards**.
+
+* **Class Name:** `.metric-card` (or targeted via `div[data-testid="stMetric"]`)
+* **Properties:**
+  * **Background:** Semantic (White for Light, Dark Grey for Dark).
+  * **Border Radius:** `10px` to `12px` (Modern standard).
+  * **Padding:** `15px 20px`.
+  * **Shadow:** `0 2px 4px rgba(0,0,0,0.05)` (Subtle elevation).
+  * **Border:** `1px solid #F0F2F6` (Light grey for definition).
+  * **Hover Effect:** `transform: translateY(-2px)` and increased shadow for interactivity.
+
+### **6.2. Implementation Strategy**
+A helper function `style_metric_cards()` in `app/dashboard/components.py` will inject the necessary `<style>` block. This function must be called at the beginning of any view rendering KPI cards.
+
+## **7. Adaptive Dark/Light Mode Support**
+
+### **7.1. Architecture Decision: CSS Variables**
+* **Decision:** Use **Streamlit Native CSS Variables** (e.g., `var(--secondary-background-color)`) for all custom styling.
+* **Why:** Hardcoding Hex values (e.g., `#FFFFFF`) breaks Dark Mode. Using variables ensures that custom components inherit the correct background, text, and border colors automatically when the theme switches.
+
+### **7.2. Implementation Guidelines**
+1.  **Card Variables:**
+    *   Background: `var(--secondary-background-color)`
+    *   Text: `var(--text-color)`
+    *   Border: `rgba(128, 128, 128, 0.2)` (Adaptive transparency)
+2.  **Chart Transparency:**
+    *   `paper_bgcolor='rgba(0,0,0,0)'`
+    *   `plot_bgcolor='rgba(0,0,0,0)'`
+    *   `yaxis=dict(gridcolor='rgba(128, 128, 128, 0.2)')`
