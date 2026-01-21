@@ -205,18 +205,19 @@ def _render_funnel_chart(
     # Check if severity column exists for stacked view
     has_severity = "severity" in df.columns
 
-    # --- Stage Filter Control ---
+    # --- Stage Filter Control (Collapsible) ---
     # Get all available stages sorted by order
     stage_orders = df.groupby("stage")["stage_order"].min().sort_values()
     all_stages = stage_orders.index.tolist()
-    
-    selected_stages = st.multiselect(
-        "Visible Stages",
-        options=all_stages,
-        default=all_stages,
-        help="Deselect stages (like 'Done') to rescale the chart."
-    )
-    
+
+    with st.expander("🔍 Filters", expanded=False):
+        selected_stages = st.multiselect(
+            "Visible Stages",
+            options=all_stages,
+            default=all_stages,
+            help="Deselect stages (like 'Done') to rescale the chart."
+        )
+
     if not selected_stages:
         st.warning("Please select at least one stage.")
         return None
