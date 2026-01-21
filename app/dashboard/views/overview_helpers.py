@@ -28,42 +28,56 @@ def _render_ai_assistant(df, display_df):
     # We need to access the selection from the table.
     # Since the table might be in another column or not rendered in the same run (if tabs switched),
     # we rely on st.session_state for the 'issue_drilldown_table' key.
-    
+
     selection_state = st.session_state.get("issue_drilldown_table", {})
-    
+
     # Make sure we handle the structure correctly
     if hasattr(selection_state, "selection"):
         selection_state = selection_state.selection
-        
+
     selected_indices = getattr(selection_state, "rows", [])
     # Access dict if it's a dict
     if not selected_indices and isinstance(selection_state, dict):
-             selected_indices = selection_state.get("rows", [])
+        selected_indices = selection_state.get("rows", [])
 
-    if not selected_indices:
-        st.info("👈 Please select an issue from the 'Issue Drill-down' table to start.")
+    # Try to find the matching row - either from current selection or persisted state
+    match_row = None
+
+    if selected_indices:
+        # Use current selection
+        selected_idx = selected_indices[0]
+        if selected_idx < len(display_df):
+            selected_display_row = display_df.iloc[selected_idx]
+            matches = df[
+                (df["title"] == selected_display_row["title"]) &
+                (df["web_url"] == selected_display_row["web_url"])
+            ]
+            if not matches.empty:
+                match_row = matches.iloc[0]
+    else:
+        # Fall back to persisted selection (survives sorting/rerun)
+        persisted_url = st.session_state.get("selected_issue_url", "")
+        if persisted_url:
+            matches = df[df["web_url"] == persisted_url]
+            if not matches.empty:
+                match_row = matches.iloc[0]
+
+    if match_row is None:
+        st.info("👈 Please select an issue from the table to start.")
         return
 
     try:
         from app.ai.service import AIService
-        
+
         # Get endpoint from sidebar settings
         ollama_endpoint = st.session_state.get("ollama_endpoint", "http://localhost:11434")
         ai_service = AIService(endpoint=ollama_endpoint)
-        
+
         # Verify Ollama Connection first
         if not ai_service.check_health():
             st.error(f"🔴 Ollama is offline at {ollama_endpoint}. Check AI Settings in sidebar.")
             st.code("ollama serve", language="bash")
         else:
-            selected_idx = selected_indices[0]
-            selected_display_row = display_df.iloc[selected_idx]
-            
-            match_row = df[
-                (df["title"] == selected_display_row["title"]) & 
-                (df["web_url"] == selected_display_row["web_url"])
-            ].iloc[0]
-            
             issue_id = int(match_row["id"])
             
             # Layout: Model Selector, Status, and Actions in a single header row

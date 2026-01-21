@@ -576,24 +576,50 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     else:
         display_df = display_df.sort_values("days_in_stage", ascending=False)
 
-    # 4. Select Columns
+    # 4. Select Columns (keep 'id' for AI status lookup, 'iid' for numeric sorting)
     cols_to_show = [
-        "web_url", "title", "stage", "days_in_stage", "severity", "context", "milestone", "assignee"
+        "id", "iid", "web_url", "title", "stage", "days_in_stage", "severity", "context", "milestone", "assignee"
     ]
     # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
 
     # 5. Configure Columns and Render
     display_df = display_df[cols]
-    
+
     # Reset index to ensure uniqueness for styling (sort_hierarchy can cause duplicate indices with exploded contexts)
     display_df = display_df.reset_index(drop=True)
 
+    # 6. Add AI Summary Status Column
+    # Check which issues have existing AI summaries using the 'id' column directly
+    from pathlib import Path
+    ai_storage_path = Path("data/ai")
+
+    def check_summary_status(issue_id):
+        """Check if an AI summary exists for the issue."""
+        if pd.isna(issue_id):
+            return "✨"
+        summary_file = ai_storage_path / f"chat_{int(issue_id)}.parquet"
+        if summary_file.exists():
+            return "📝"  # Has summary
+        return "✨"  # No summary (generate)
+
+    display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
+
     column_config = {
-        "web_url": st.column_config.LinkColumn(
+        "ai_status": st.column_config.TextColumn(
+            "AI",
+            width=40,
+            help="📝 = Has AI summary | ✨ = No summary yet"
+        ),
+        "iid": st.column_config.NumberColumn(
             "IID",
-            display_text=r"/(?:issues|work_items)/(\d+)$",
-            width="small",
+            width=60,
+            help="Issue IID (numeric for proper sorting)"
+        ),
+        "web_url": st.column_config.LinkColumn(
+            "Link",
+            display_text="🔗",
+            width=40,
             help="Click to open in GitLab"
         ),
         "assignee": st.column_config.TextColumn("Assignee", width="small"),
@@ -627,53 +653,66 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
         styler = display_df.style.map(highlight_context, subset=["context"])
 
-    column_order = ["web_url", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+    column_order = ["ai_status", "web_url", "iid", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
     if "context" in display_df.columns:
-        column_order.insert(5, "context")
+        column_order.insert(6, "context")
 
-    # --- UI LAYOUT SELECTION ---
-    col_layout, col_space = st.columns([1, 4])
-    with col_layout:
-        view_mode = st.radio(
-            "View Mode", 
-            ["Tabs", "Split"], 
-            horizontal=True, 
-            label_visibility="collapsed",
-            help="Switch between Tabbed view and Split view"
-        )
-    
-    # Define containers based on mode
-    # Define containers based on mode
-    # For "Tabs", we now use a Persistent Radio Button instead of st.tabs
-    active_tab = "Drill-down" # Default
-    
-    if view_mode == "Tabs":
-        active_tab = st.radio(
-            "Detail View",
-            ["📋 Issue List", "🤖 AI Assistant"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="flow_detail_radio"
-        )
-
-    # Layout Logic
-    # Layout Logic
-    # Import Helpers (Late import to avoid circular dependencies if any, though standard is fine)
+    # --- AI PANEL LOGIC ---
+    # Check if a row is selected - if so, auto-show split view
     from app.dashboard.views.overview_helpers import _render_drilldown_table, _render_ai_assistant
-    
-    if view_mode == "Split":
+
+    selection_state = st.session_state.get("issue_drilldown_table", {})
+    if hasattr(selection_state, "selection"):
+        selection_state = selection_state.selection
+    selected_indices = getattr(selection_state, "rows", [])
+    if not selected_indices and isinstance(selection_state, dict):
+        selected_indices = selection_state.get("rows", [])
+
+    has_selection = len(selected_indices) > 0
+
+    # Persist selected issue for AI panel (survives sorting/rerun)
+    if has_selection:
+        # Store the selected issue data in session state
+        selected_idx = selected_indices[0]
+        if selected_idx < len(display_df):
+            selected_row = display_df.iloc[selected_idx]
+            st.session_state.selected_issue_url = selected_row.get("web_url", "")
+            st.session_state.selected_issue_title = selected_row.get("title", "")
+
+    # Show/Hide AI Panel Toggle
+    if "show_ai_panel" not in st.session_state:
+        st.session_state.show_ai_panel = False
+
+    # Auto-show AI panel when a row is selected
+    if has_selection and not st.session_state.show_ai_panel:
+        st.session_state.show_ai_panel = True
+
+    # Determine if we have a persisted selection (even if current selection is lost due to sorting)
+    has_persisted_selection = st.session_state.get("selected_issue_url", "") != ""
+
+    # Header row with toggle
+    col_header, col_toggle = st.columns([4, 1])
+    with col_toggle:
+        if st.session_state.show_ai_panel:
+            if st.button("✕ Close AI", use_container_width=True, help="Hide AI Assistant panel"):
+                st.session_state.show_ai_panel = False
+                # Clear persisted selection when closing
+                st.session_state.selected_issue_url = ""
+                st.session_state.selected_issue_title = ""
+                st.rerun()
+
+    # Layout Logic - use persisted selection to maintain AI panel visibility
+    is_split_view = st.session_state.show_ai_panel and has_persisted_selection
+
+    # Compact column order for split view (essential columns + Priority)
+    if is_split_view:
+        compact_column_order = ["ai_status", "web_url", "iid", "title", "stage", "severity", "days_in_stage"]
         # Split view: Side-by-side columns
         col_left, col_right = st.columns([1.5, 1], gap="medium")
         with col_left:
-             _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
+            _render_drilldown_table(styler if styler is not None else display_df, column_config, compact_column_order)
         with col_right:
-             _render_ai_assistant(df, display_df)
-             
+            _render_ai_assistant(df, display_df)
     else:
-        # Tabbed view (Simulated via Radio)
-        if active_tab == "📋 Issue List":
-            _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
-        else:
-             _render_ai_assistant(df, display_df)
-
-
+        # Table only view - show all columns
+        _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
