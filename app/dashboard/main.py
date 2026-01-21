@@ -18,9 +18,9 @@ from app.dashboard.data_loader import (
     load_valid_issues,
 )
 from app.dashboard.views.aging import render_aging
-from app.dashboard.views.flow import render_flow_view
-from app.dashboard.views.hygiene import render_hygiene
 from app.dashboard.views.overview import render_overview
+from app.dashboard.views.hygiene import render_hygiene
+from app.dashboard.views.stats import render_stats_view
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
 
@@ -79,7 +79,7 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
-        "🌊 Flow": "flow",
+        "📈 Stats": "stats",
         "⚖️ Capacity": "capacity",
         "🚀 Release": "release",
         "⏱️ Aging": "aging",
@@ -117,15 +117,17 @@ def main() -> None:
     view_id = pages[selected_page]
 
     if view_id == "overview":
-        render_overview(filtered_df, colors=colors)
-    elif view_id == "flow":
+        # Overview is now the Flow view (Value Stream)
         # Extract stage descriptions
         stage_descriptions = {
             stage.name: stage.description 
             for stage in default_rule.workflow.stages 
             if hasattr(stage, "description")
         }
-        render_flow_view(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
+        render_overview(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
+    elif view_id == "stats":
+        # Stats is the old overview (KPIs, Burnup)
+        render_stats_view(filtered_df, colors=colors)
     elif view_id == "capacity":
         # Pass capacity config
         capacity_config = default_rule.capacity.model_dump()

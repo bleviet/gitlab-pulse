@@ -1,6 +1,6 @@
-"""Overview Page (Strategic View) for Layer 3 Dashboard.
+"""Overview Page (Value Stream) for Layer 3 Dashboard.
 
-KPI cards, burn-up chart, and distribution visualizations.
+Visualizes flow efficiency, bottlenecks, and aging.
 """
 
 import pandas as pd
@@ -8,284 +8,584 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.utils import sort_hierarchy
+
 # Semantic color palette
 COLORS = {
     "primary": "#4F46E5",
-    "bug": "#EF4444",
-    "feature": "#3B82F6",
-    "task": "#10B981",
-    "stale": "#F59E0B",
+    "active": "#3B82F6",
+    "waiting": "#F59E0B",
+    "completed": "#10B981",
     "neutral": "#64748B",
-    "epic": "#8B5CF6",
 }
 
 
-def render_overview(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
-    """Render the Overview (Strategic) page.
+def render_overview(
+    df: pd.DataFrame, 
+    colors: dict[str, str] | None = None,
+    stage_descriptions: dict[str, str] | None = None
+) -> None:
+    """Render the Overview (Flow) page.
 
     Args:
         df: Filtered DataFrame with valid issues
         colors: Optional dictionary of semantic colors to override defaults
+        stage_descriptions: Optional mapping of stage names to description strings
     """
     if colors:
         COLORS.update(colors)
 
     st.header("📊 Overview")
-    st.caption("Strategic view of project velocity and distribution")
 
+    # Filter out empty stages or irrelevant data if needed
+    # But for flow, we usually want to see everything
     if df.empty:
-        st.warning("No data available. Run the collector and processor first.")
+        st.warning("No data available.")
         return
 
-    # Top Row: KPI Cards
-    from app.dashboard.components import style_metric_cards
-    style_metric_cards()
-    _render_kpi_cards(df)
+    # Deduplicate for global metrics and charts to avoid double counting
+    # Multi-context issues appear as multiple rows in 'df' (one per context)
+    # We want to count the issue only once for WIP, Efficiency, and Charts
+    if "id" in df.columns:
+        unique_df = df.drop_duplicates(subset=["id"])
+    else:
+        unique_df = df
 
-    # Middle Row: Burn-up Chart (Collapsible)
-    with st.expander("📈 Cumulative Flow by Type", expanded=True):
-        _render_burnup_chart(df)
+    # Top Row: Metrics (Use unique issues)
+    _render_flow_metrics(unique_df)
 
-    # Bottom Row: Distribution Charts (Collapsible)
-    with st.expander("📊 Distribution Charts", expanded=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            _render_work_distribution(df)
-        with col2:
-            _render_status_donut(df)
+    # Charts (Collapsible)
+    with st.expander("📊 Visual Analysis", expanded=True):
+        chart_mode = st.radio(
+            "Chart Mode", 
+            ["📊 Work by Stage", "⏳ Days in Stage"], 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="flow_chart_radio"
+        )
+        
+        if chart_mode == "📊 Work by Stage":
+            # Use unique issues for funnel to show correct counts
+            funnel_selection = _render_funnel_chart(unique_df, stage_descriptions)
+            aging_selection = None
+            
+        else:
+            # Use unique issues for aging to show distinct items
+            aging_selection = _render_aging_chart(unique_df)
+            funnel_selection = None
+
+    # Apply interactive filters (Apply to original DF which allows exploring contexts)
+    filtered_df = df.copy()
+
+    # Filter by Funnel Selection
+    if funnel_selection and funnel_selection.get("selection", {}).get("points"):
+        selected_points = funnel_selection["selection"]["points"]
+        # Extract filters: stage and severity
+        # We perform an OR filter for multiple selected points
+        masks = []
+        for point in selected_points:
+            # Point has customdata or y (stage) and legend group/color (severity)
+            # px.bar with orientation h: y is stage, color is severity
+            # customdata is likely needed to be robust
+            stage = point.get("y")
+            severity = point.get("customdata", [None])[0] # customdata[0] is severity if we add it
+
+            mask = (filtered_df["stage"] == stage)
+            if severity:
+                 # Normalize severity for comparison to match the chart's logic
+                 # The chart uses Title Case for all severities, and "Unset" for NaNs
+
+                 if severity == "Unset":
+                     # Match "Unset", NaNs, None, empty strings
+                     mask &= (
+                         filtered_df["severity"].isna() |
+                         (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
+                     )
+                 else:
+                     # Match severity (case-insensitive to be safe)
+                     mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
+
+            masks.append(mask)
+
+        if masks:
+            final_mask = pd.Series(False, index=filtered_df.index)
+            for m in masks:
+                final_mask |= m
+            filtered_df = filtered_df[final_mask]
+
+    # Filter by Aging Selection (Intersection with Funnel)
+    if aging_selection and aging_selection.get("selection", {}).get("points"):
+        selected_points = aging_selection["selection"]["points"]
+        # Aging chart: x=stage, y=days_in_stage, color=stage_type
+        # We filter by stage (x). Days is continuous, so selecting a point usually implies interest in that item or stage.
+        # But boxplots selection might be selecting outliers?
+        # Let's assume selecting points filters by Stage of those points.
+        selected_stages = {p.get("x") for p in selected_points}
+        if selected_stages:
+            filtered_df = filtered_df[filtered_df["stage"].isin(selected_stages)]
+
+    # Detail grid (Collapsible)
+    with st.expander("📋 Issue List", expanded=True):
+        _render_issue_detail_grid(filtered_df)
 
 
-def _render_kpi_cards(df: pd.DataFrame) -> None:
-    """Render KPI metric cards."""
+def _render_flow_metrics(df: pd.DataFrame) -> None:
+    """Render Flow key metrics.
+
+    Args:
+        df: DataFrame of issues (should be unique/deduplicated)
+    """
     col1, col2, col3, col4 = st.columns(4)
 
-    # Total Open Issues
-    open_count = len(df[df["state"] == "opened"])
-    with col1:
-        st.metric(
-            label="Open Issues",
-            value=open_count,
-            delta=None,
-        )
+    # Apply Bento Grid Style
+    from app.dashboard.components import style_metric_cards
+    style_metric_cards()
 
-    # Velocity (Closed per Week)
-    closed_df = df[df["state"] == "closed"].copy()
-    if not closed_df.empty and "closed_at" in closed_df.columns:
-        closed_df["week"] = closed_df["closed_at"].dt.isocalendar().week
-        weekly_closed = closed_df.groupby("week").size()
-        velocity = round(weekly_closed.mean(), 1) if len(weekly_closed) > 0 else 0
+    # 1. Active WIP
+    active_mask = df["stage_type"] == "active"
+    active_count = len(df[active_mask])
+
+    with col1:
+        st.metric("Active Work In Progress", active_count, help="Issues in active stages")
+
+    # 2. Flow Efficiency
+    total_wip = len(df[df["stage_type"].isin(["active", "waiting"])])
+    if total_wip > 0:
+        efficiency = round((active_count / total_wip) * 100, 1)
     else:
-        velocity = 0
+        efficiency = 0
 
     with col2:
         st.metric(
-            label="Velocity (Closed/Week)",
-            value=velocity,
+            "Flow Efficiency",
+            f"{efficiency}%",
+            help="Active / (Active + Waiting)"
         )
 
-    # Bug Ratio
-    bug_count = len(df[df["issue_type"] == "Bug"])
-    total_count = len(df)
-    bug_ratio = round((bug_count / total_count) * 100, 1) if total_count > 0 else 0
+    # 3. Bottleneck (Max WIP Stage that is NOT Done)
+    # Exclude 'completed' stage types usually for bottleneck analysis
+    wip_df = df[df["stage_type"] != "completed"]
+    if not wip_df.empty:
+        stage_counts = wip_df["stage"].value_counts()
+        bottleneck_stage = stage_counts.idxmax()
+        bottleneck_count = stage_counts.max()
+    else:
+        bottleneck_stage = "None"
+        bottleneck_count = 0
 
     with col3:
-        st.metric(
-            label="Bug Ratio",
-            value=f"{bug_ratio}%",
-        )
+        st.metric("Top Bottleneck", bottleneck_stage, f"{bottleneck_count} items")
 
-    # Stale Issues
-    stale_count = len(df[df.get("is_stale", False) == True])
+    # 4. Max Staleness
+    max_days = df["days_in_stage"].max() if not df.empty else 0
     with col4:
-        st.metric(
-            label="Stale Issues",
-            value=stale_count,
-            delta_color="inverse" if stale_count > 0 else "off",
+        st.metric("Max Idle Days", f"{max_days} days", help="Longest time in current stage")
+
+
+
+def _render_funnel_chart(
+    df: pd.DataFrame, 
+    stage_descriptions: dict[str, str] | None = None
+) -> dict | None:
+    """Render horizontal bar chart of issues per stage (The Funnel).
+
+    Returns:
+        Selection state dictionary or None
+    """
+    total_issues = len(df)
+    help_text = (
+        "**Interaction Guide:**\n"
+        "- **Hover** to view stage descriptions.\n"
+        "- **Click** a bar segment to filter the Issue Drill-down below.\n"
+        "- **Shift+Click** to select multiple segments for combined filtering.\n"
+        "- **Double-Click** to reset selection."
+    )
+    st.subheader(f"Issues Total: {total_issues}", help=help_text)
+
+    # Check if severity column exists for stacked view
+    has_severity = "severity" in df.columns
+
+    # --- Stage Filter Control ---
+    # Get all available stages sorted by order
+    stage_orders = df.groupby("stage")["stage_order"].min().sort_values()
+    all_stages = stage_orders.index.tolist()
+    
+    selected_stages = st.multiselect(
+        "Visible Stages",
+        options=all_stages,
+        default=all_stages,
+        help="Deselect stages (like 'Done') to rescale the chart."
+    )
+    
+    if not selected_stages:
+        st.warning("Please select at least one stage.")
+        return None
+        
+    # Filter data for the chart
+    df = df[df["stage"].isin(selected_stages)].copy()
+
+    # Calculate totals per stage for the labels
+    # We want these to appear at the end of the bars
+    stage_totals = df.groupby("stage", observed=True).size().reset_index(name="total_count")
+
+    if has_severity:
+        # Fill NaN severity with "Unset" for display
+        # Convert to string first to handle Categorical dtype
+        df_chart = df.copy()
+
+        # Normalize severity: handle NaNs, convert to string, strip whitespace, and title case
+        # This fixes issues where "Critical" and "critical " might be treated as different
+        df_chart["severity"] = (
+            df_chart["severity"]
+            .astype(str)
+            .replace("nan", "Unset")
+            .replace("<NA>", "Unset")
+            .replace("None", "Unset")
+            .str.strip()
+            .str.title()
+        )
+        # Ensure "Unset" remains "Unset" (title() handles it, but just to be sure if lowercased)
+
+        # Consolidate stage_order: use the minimum order for each stage to prevent splitting
+        # This handles cases where different rules assign different orders to the same stage name
+        stage_order_map = df_chart.groupby("stage")["stage_order"].min()
+        df_chart["stage_order"] = df_chart["stage"].map(stage_order_map)
+
+        # Prepare stage order for plotting
+        stage_order_df = df_chart[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
+        sorted_stages = stage_order_df["stage"].tolist()
+
+        # Aggregation with severity breakdown
+        stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
+        
+        # Add description to stage_stats
+        if stage_descriptions:
+            stage_stats["description"] = stage_stats["stage"].map(stage_descriptions).fillna("")
+        else:
+            stage_stats["description"] = ""
+        
+        # Calculate severity counts for legend labels
+        severity_counts = df_chart["severity"].value_counts()
+        severity_label_map = {
+            sev: f"{sev} ({count})" 
+            for sev, count in severity_counts.items()
+        }
+        
+        # Add formatted label column
+        stage_stats["severity_label"] = stage_stats["severity"].map(severity_label_map)
+
+        # Sort by defined order
+        stage_stats = stage_stats.sort_values("stage_order")
+
+        if stage_stats.empty:
+            st.info("No stage data.")
+            return
+
+        # Define priority color palette (semantic)
+        priority_colors = {
+            "Critical": COLORS.get("critical", "#EF4444"),
+            "High": COLORS.get("high", "#F97316"),
+            "Medium": COLORS.get("medium", "#EAB308"),
+            "Low": COLORS.get("low", "#22C55E"),
+            "Unset": COLORS.get("unset", "#94A3B8"),
+        }
+        
+        # Construct color map and order for formatted labels
+        final_color_map = {}
+        ordered_severity_labels = []
+        base_severity_order = ["Critical", "High", "Medium", "Low", "Unset"]
+        
+        for sev in base_severity_order:
+            if sev in severity_label_map:
+                label = severity_label_map[sev]
+                ordered_severity_labels.append(label)
+                final_color_map[label] = priority_colors.get(sev, priority_colors["Unset"])
+                
+        # Handle any other severities
+        for sev, label in severity_label_map.items():
+            if label not in final_color_map:
+                ordered_severity_labels.append(label)
+                final_color_map[label] = priority_colors.get("Unset")
+
+        fig = px.bar(
+            stage_stats,
+            x="count",
+            y="stage",
+            color="severity_label", # Use formatted label for legend
+            orientation="h",
+            text="count",
+            title="",
+            color_discrete_map=final_color_map,
+            category_orders={
+                "severity_label": ordered_severity_labels,
+                "stage": sorted_stages
+            },
+            custom_data=["severity", "description"], # Include description
         )
 
+        fig.update_traces(
+            textposition="inside", 
+            textangle=0,
+            hovertemplate="<b>%{y}</b><br>%{customdata[1]}<br>Severity: %{customdata[0]}<br>Count: %{x}<extra></extra>"
+        )
+        
+        # Update legend title
+        fig.update_layout(legend_title_text="Priority")
+    else:
+        # Fallback: simple aggregation without severity
+        stage_stats = df.groupby(["stage", "stage_order"]).size().reset_index(name="count")
+        stage_stats = stage_stats.sort_values("stage_order")
 
-def _render_burnup_chart(df: pd.DataFrame) -> None:
-    """Render Faceted Cumulative Flow Diagram (Small Multiples).
+        if stage_stats.empty:
+            st.info("No stage data.")
+            return None
 
-    3 stacked panels: Features (top), Bugs (middle), Tasks (bottom).
-    All share the same X-axis (time) for vertical correlation.
-    """
-    st.subheader("📈 Cumulative Flow by Type")
+        # Sorted stages for fallback
+        stage_order_df = df[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
+        sorted_stages = stage_order_df["stage"].tolist()
 
-    if df.empty:
-        st.info("No data for cumulative flow chart")
-        return
+        fig = px.bar(
+            stage_stats,
+            x="count",
+            y="stage",
+            orientation="h",
+            text="count",
+            title="",
+            category_orders={"stage": sorted_stages},
+        )
+        fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
 
-    # Prepare weekly data (remove timezone before period conversion)
-    df_copy = df.copy()
-    df_copy["created_week"] = df_copy["created_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
+    # Add Total Labels (Scatter Trace)
+    # Filter stage_totals to only include stages present in sorted_stages (to avoid mismatch)
+    stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]
 
-    # Panel configuration per TSD spec
-    panels = [
-        {"type": "Feature", "title": "Features (Value Flow)", "fill": "#166534", "area": "#BBF7D0"},
-        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": "#991B1B", "area": "#FCA5A5"},
-        {"type": "Task", "title": "Tasks (Maintenance)", "fill": "#374151", "area": "#D1D5DB"},
-    ]
+    fig.add_trace(go.Scatter(
+        x=stage_totals["total_count"],
+        y=stage_totals["stage"],
+        mode="text",
+        text=stage_totals["total_count"].apply(lambda x: f"({x})"),
+        textposition="middle right",
+        hoverinfo="skip",
+        showlegend=False,
+        textfont=dict(color="white" if st.get_option("theme.base") == "dark" else "black"),
+    ))
 
-    # Create subplots with shared X-axis
-    from plotly.subplots import make_subplots
+    # Calculate max range to fit the text label
+    max_count = stage_totals["total_count"].max() if not stage_totals.empty else 0
 
-    fig = make_subplots(
-        rows=3, cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.08,
-        subplot_titles=[p["title"] for p in panels],
-    )
-
-    # Get all weeks for consistent x-axis
-    all_weeks = sorted(df_copy["created_week"].unique())
-
-    for i, panel in enumerate(panels, start=1):
-        type_df = df_copy[df_copy["issue_type"] == panel["type"]].copy()
-
-        if type_df.empty:
-            # Add empty traces for consistency
-            fig.add_trace(go.Scatter(
-                x=all_weeks, y=[0] * len(all_weeks),
-                mode="lines", name=f'{panel["type"]} Created',
-                line=dict(color=panel["fill"], width=2),
-                showlegend=False,
-            ), row=i, col=1)
-            continue
-
-        # Calculate cumulative created
-        weekly_created = type_df.groupby("created_week").size().reindex(all_weeks, fill_value=0).cumsum()
-
-        # Calculate cumulative closed
-        closed_df = type_df[type_df["closed_at"].notna()].copy()
-        if not closed_df.empty:
-            closed_df["closed_week"] = closed_df["closed_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
-            weekly_closed = closed_df.groupby("closed_week").size().reindex(all_weeks, fill_value=0).cumsum()
-        else:
-            weekly_closed = pd.Series([0] * len(all_weeks), index=all_weeks)
-
-        # Total Created line (background - shows scope)
-        fig.add_trace(go.Scatter(
-            x=weekly_created.index,
-            y=weekly_created.values,
-            mode="lines",
-            name=f'{panel["type"]} Created',
-            line=dict(color=panel["fill"], width=2),
-            fill="tozeroy",
-            fillcolor=panel["area"],
-            showlegend=False,
-            hovertemplate="Created: %{y}<extra></extra>",
-        ), row=i, col=1)
-
-        # Total Closed filled area (foreground - shows completed work)
-        fig.add_trace(go.Scatter(
-            x=weekly_closed.index,
-            y=weekly_closed.values,
-            mode="lines",
-            name=f'{panel["type"]} Closed',
-            line=dict(color=panel["fill"], width=2),
-            fill="tozeroy",
-            fillcolor=panel["fill"],
-            showlegend=False,
-            hovertemplate="Closed: %{y}<extra></extra>",
-        ), row=i, col=1)
-
-    # Update layout per TSD spec
     fig.update_layout(
-        height=600,
-        margin=dict(l=0, r=0, t=50, b=0),
+        height=400,
+        margin=dict(l=0, r=20, t=0, b=0), # Add right margin for labels
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified",
-    )
-
-    # Per-panel y-axis settings (independent scaling)
-    for i in range(1, 4):
-        fig.update_yaxes(
+        # yaxis=dict(autorange="reversed"),  # Removed reversal as requested
+        xaxis=dict(
             showgrid=True,
             gridcolor="rgba(128, 128, 128, 0.2)",
-            zeroline=False,
-            row=i, col=1,
-        )
-        fig.update_xaxes(
-            showgrid=False,
-            showticklabels=(i == 3),  # Only show x-axis labels on bottom panel
-            row=i, col=1,
-        )
+            range=[0, max_count * 1.15] # Extend range to fit labels
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
+        barmode="stack",
+    )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"]
+    )
 
 
-def _render_work_distribution(df: pd.DataFrame) -> None:
-    """Render work distribution bar chart."""
-    st.subheader("📦 Work Distribution")
 
-    if "issue_type" not in df.columns or df["issue_type"].isna().all():
-        st.info("No issue type data available")
-        return
 
-    type_counts = df["issue_type"].value_counts().reset_index()
-    type_counts.columns = ["Type", "Count"]
+def _render_aging_chart(df: pd.DataFrame) -> dict | None:
+    """Render boxplot of days in stage.
 
-    # Map colors
-    color_map = {
-        "Bug": COLORS["bug"],
-        "Feature": COLORS["feature"],
-        "Task": COLORS["task"],
-        "Task": COLORS["task"],
-        "Epic": COLORS["epic"],
-    }
+    Returns:
+        Selection state dictionary or None
+    """
+    st.subheader("⏳ Days in Stage")
 
-    fig = px.bar(
-        type_counts,
-        x="Count",
-        y="Type",
-        orientation="h",
-        color="Type",
-        color_discrete_map=color_map,
+    # Filter out completed/closed items to focus on active work aging
+    # "Stickiness" implies items currently stuck in the flow.
+    df = df[
+        (df["stage_type"] != "completed") &
+        (df["state"] != "closed")
+    ].copy()
+
+    # Sort stages by order for x-axis
+    df_sorted = df.sort_values("stage_order")
+
+    if df_sorted.empty:
+        st.info("No data.")
+        return None
+
+    # Get sorted stages *after* filtering (Backlog might match but Done won't)
+    # Actually, we should use the global order if possible, but filtered set is fine.
+    # Note: df_sorted is already sorted by stage_order.
+    # We can extract the unique list preserving order.
+    # df_sorted["stage"].unique() returns in appearance order (which is sorted by stage_order)
+    sorted_stages_aging = df_sorted["stage"].unique().tolist()
+
+    fig = px.box(
+        df_sorted,
+        x="stage",
+        y="days_in_stage",
+        color="stage_type",
+        color_discrete_map={
+            "active": COLORS["active"],
+            "waiting": COLORS["waiting"],
+            "completed": COLORS["completed"],
+            "active": COLORS["active"], # Duplicate key? No, just ensuring
+        },
+        category_orders={"stage": sorted_stages_aging}, # Force correct order
+        points="outliers", # Show outliers
     )
 
     fig.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
+        height=400,
+        margin=dict(l=0, r=0, t=0, b=0),
         font=dict(family="Inter, sans-serif"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=False,
-        xaxis=dict(gridcolor="rgba(128, 128, 128, 0.2)"),
-        yaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)", title="Days in Stage"),
+        xaxis=dict(title=None),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"]
+    )
 
 
-def _render_status_donut(df: pd.DataFrame) -> None:
-    """Render status split donut chart."""
-    st.subheader("🎯 Status Split")
+def _render_issue_detail_grid(df: pd.DataFrame) -> None:
+    """Render unified issue detail grid with drill-down filters."""
+    # 1. Multi-select Filter
+    available_stages = sorted(df["stage"].unique(), key=lambda s: df[df["stage"] == s]["stage_order"].min())
+    selected_stages = st.multiselect(
+        "Filter by Stage",
+        options=available_stages,
+        default=[],
+        help="Select stages to drill down into specifics."
+    )
 
-    status_counts = df["state"].value_counts().reset_index()
-    status_counts.columns = ["State", "Count"]
+    # 2. Filter Data
+    if selected_stages:
+        display_df = df[df["stage"].isin(selected_stages)].copy()
+    else:
+        display_df = df.copy()
 
-    color_map = {
-        "opened": COLORS["stale"],
-        "closed": COLORS["task"],
+    # 3. Sort by Hierarchy (Parent -> Child) or Staleness
+    # User requested hierarchical view.
+    if "parent_id" in display_df.columns:
+        # parent_id contains IID, so we must map to 'iid' column, not 'id'
+        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+    else:
+        display_df = display_df.sort_values("days_in_stage", ascending=False)
+
+    # 4. Select Columns
+    cols_to_show = [
+        "web_url", "title", "stage", "days_in_stage", "severity", "context", "milestone", "assignee"
+    ]
+    # Filter columns that exist
+    cols = [c for c in cols_to_show if c in display_df.columns]
+
+    # 5. Configure Columns and Render
+    display_df = display_df[cols]
+    
+    # Reset index to ensure uniqueness for styling (sort_hierarchy can cause duplicate indices with exploded contexts)
+    display_df = display_df.reset_index(drop=True)
+
+    column_config = {
+        "web_url": st.column_config.LinkColumn(
+            "IID",
+            display_text=r"/(?:issues|work_items)/(\d+)$",
+            width="small",
+            help="Click to open in GitLab"
+        ),
+        "assignee": st.column_config.TextColumn("Assignee", width="small"),
+        "stage": st.column_config.TextColumn("Stage", width="small"),
+        "title": st.column_config.TextColumn("Title", width="large"),
+        "days_in_stage": st.column_config.NumberColumn(
+            "Days in Stage",
+            help="Days since last update in this stage",
+            format="%d days",
+        ),
+        "severity": st.column_config.TextColumn("Priority", width="small"),
+        "context": st.column_config.TextColumn("Context", width="small"),
+        "milestone": st.column_config.TextColumn("Milestone", width="medium"),
     }
 
-    fig = px.pie(
-        status_counts,
-        values="Count",
-        names="State",
-        hole=0.6,
-        color="State",
-        color_discrete_map=color_map,
-    )
+    # Apply styling if Context column exists
+    styler = None
+    if "context" in display_df.columns:
+        from app.dashboard.data_loader import load_labels
+        label_styles = load_labels()
 
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.1),
-    )
+        def highlight_context(val):
+            if not isinstance(val, str):
+                return None
+            style = label_styles.get(val)
+            if style:
+                bg_color = style.get("color", "#FFFFFF")
+                text_color = style.get("text_color", "#000000")
+                return f'background-color: {bg_color}; color: {text_color}'
+            return None
 
-    st.plotly_chart(fig, width="stretch")
+        styler = display_df.style.map(highlight_context, subset=["context"])
+
+    column_order = ["web_url", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+    if "context" in display_df.columns:
+        column_order.insert(5, "context")
+
+    # --- UI LAYOUT SELECTION ---
+    col_layout, col_space = st.columns([1, 4])
+    with col_layout:
+        view_mode = st.radio(
+            "View Mode", 
+            ["Tabs", "Split"], 
+            horizontal=True, 
+            label_visibility="collapsed",
+            help="Switch between Tabbed view and Split view"
+        )
+    
+    # Define containers based on mode
+    # Define containers based on mode
+    # For "Tabs", we now use a Persistent Radio Button instead of st.tabs
+    active_tab = "Drill-down" # Default
+    
+    if view_mode == "Tabs":
+        active_tab = st.radio(
+            "Detail View",
+            ["📋 Issue List", "🤖 AI Assistant"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="flow_detail_radio"
+        )
+
+    # Layout Logic
+    # Layout Logic
+    # Import Helpers (Late import to avoid circular dependencies if any, though standard is fine)
+    from app.dashboard.views.overview_helpers import _render_drilldown_table, _render_ai_assistant
+    
+    if view_mode == "Split":
+        # Split view: Side-by-side columns
+        col_left, col_right = st.columns([1.5, 1], gap="medium")
+        with col_left:
+             _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
+        with col_right:
+             _render_ai_assistant(df, display_df)
+             
+    else:
+        # Tabbed view (Simulated via Radio)
+        if active_tab == "📋 Issue List":
+            _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
+        else:
+             _render_ai_assistant(df, display_df)
+
+

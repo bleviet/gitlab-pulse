@@ -49,36 +49,40 @@ font \= "sans serif"
 
 ### **2.2. The Three Views**
 
-#### **View 1: Overview Page (Strategic)**
+#### **View 1: Overview Page (Value Stream)**
 
-* **Top Row (KPI Cards):** \* Use st.metric with delta\_color="normal".  
-  * *Total Open*, *Velocity (Closed/Week)*, *Bug Ratio*.  
-* **Middle Row (Burn-up):** \* Full-width Plotly Line Chart.  
-  * **Styling:** Minimalist mode. Remove grid lines on X-axis.  
+* **Concept:** The starting point of the dashboard. Focuses on **Flow Efficiency** and **Work in Progress**.
+* **Metrics:** Active WIP, Flow Efficiency %, Top Bottleneck, Max Idle Days.
+* **Charts:** Work by Stage (Bar) with Stage Filter, Days in Stage (Boxplot).
+* **Drill-down:** Hierarchical grid (Issue List) showing parent-child relationships and AI Assistant.
+
+#### **View 2: Stats Page (Strategic Reports)**
+
+* **Concept:** High-level statistical summary and health checks.
+* **Top Row (KPI Cards):** \* Use style_metric_cards.
+  * *Total Open*, *Velocity (Closed/Week)*, *Bug Ratio*.
+* **Middle Row (Burn-up):** \* Full-width Plotly Line Chart.
+  * **Styling:** Minimalist mode. Remove grid lines on X-axis.
 * **Bottom Row (Distribution):** \* Two columns: *Work Distribution (Bar)* and *Status Split (Donut)*.
 
-#### **View 2: Aging Page (Operational)**
+#### **View 3: Aging Page (Operational)**
 
-* **Alert Banner:** If stale issues \> threshold, show st.warning("⚠️ High volume of stale issues detected").  
-* **Chart:** Boxplots showing distribution of age\_days by Priority/Type.  
+* **Alert Banner:** If stale issues \> threshold, show st.warning("⚠️ High volume of stale issues detected").
+* **Chart:** Boxplots showing distribution of age\_days by Priority/Type.
   * *UX:* Hovering over outlier dots must show the specific Issue Title and Assignee.
 
-#### **View 3: Hygiene Page (Quality)**
+#### **View 4: Hygiene Page (Quality)**
 
-* **Scorecard:** Large Radial Gauge (0-100%) showing overall data quality.  
-* **Action Table:** A data grid (st.dataframe) showing invalid issues.  
+* **Scorecard:** Large Radial Gauge (0-100%) showing overall data quality.
+* **Action Table:** A data grid (st.dataframe) showing invalid issues.
   * *Highlighting:* Use pandas.style to color-code the error\_code column (Red background for critical errors).
 
-#### **View 4: Release Management**
+#### **View 5: Release Management**
 
 * **KPIs:** Progress %, Days Remaining, Scope (Total Issues).
 * **Charts:** Burn-up Chart (Scope vs Completed over time).
 * **Scope Table:** List of issues in the milestone, sorted by status.
 
-#### **View 5: Value Stream (Flow)**
-
-* **Charts:** Throughput (Bar), Cycle Time Scatter.
-* **Drill-down:** Hierarchical grid showing parent-child relationships.
 
 ### **2.3. Hierarchical Data Grids**
 
