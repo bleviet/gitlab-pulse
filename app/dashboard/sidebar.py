@@ -157,12 +157,12 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         with st.expander("🤖 AI Settings"):
             import json
             from pathlib import Path
-            
+
             # State file path
             state_dir = Path("data/state")
             state_dir.mkdir(parents=True, exist_ok=True)
             ollama_state_file = state_dir / "ollama_servers.json"
-            
+
             # Load saved servers
             def load_saved_servers() -> list[str]:
                 if ollama_state_file.exists():
@@ -173,43 +173,63 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                     except Exception:
                         pass
                 return ["http://localhost:11434"]
-            
+
             def save_servers(servers: list[str]):
                 with open(ollama_state_file, "w") as f:
                     json.dump({"servers": servers}, f)
-            
+
             saved_servers = load_saved_servers()
-            
-            # Initialize session state
+
+            # Initialize session state (Smart Auto-discovery)
             if "ollama_endpoint" not in st.session_state:
-                st.session_state.ollama_endpoint = saved_servers[0] if saved_servers else "http://localhost:11434"
-            
+                # Default to None, then probe
+                active_endpoint = None
+
+                # Probing known servers to find the first working one
+                # This solves the issue of defaulting to an offline server when a working one exists
+                import requests
+                for server in saved_servers:
+                    try:
+                        # Short timeout for probing
+                        resp = requests.get(f"{server.rstrip('/')}/", timeout=0.5)
+                        if resp.status_code == 200:
+                            active_endpoint = server
+                            break
+                    except Exception:
+                        continue
+
+                # Fallback to first if none found (or if list empty, default)
+                if not active_endpoint:
+                     active_endpoint = saved_servers[0] if saved_servers else "http://localhost:11434"
+
+                st.session_state.ollama_endpoint = active_endpoint
+
             # Server selection dropdown
             server_options = saved_servers.copy()
             current_idx = 0
             if st.session_state.ollama_endpoint in server_options:
                 current_idx = server_options.index(st.session_state.ollama_endpoint)
-            
+
             selected_server = st.selectbox(
                 "Ollama Server",
                 options=server_options,
                 index=current_idx,
                 key="ollama_server_select"
             )
-            
+
             if selected_server != st.session_state.ollama_endpoint:
                 st.session_state.ollama_endpoint = selected_server
                 st.rerun()
-            
+
             # Add new server
             new_server = st.text_input(
                 "Add Server URL",
                 placeholder="http://192.168.1.100:11434",
                 key="new_ollama_server"
             )
-            
+
             col_add, col_del = st.columns(2)
-            
+
             with col_add:
                 if st.button("➕ Add", disabled=not new_server):
                     if new_server and new_server not in saved_servers:
@@ -231,7 +251,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                                     st.error(f"Server responded with {resp.status_code}")
                             except requests.RequestException as e:
                                 st.error(f"Connection failed: {e}")
-            
+
             with col_del:
                 if st.button("🗑️ Delete", disabled=(len(saved_servers) <= 1 or selected_server == "http://localhost:11434")):
                     if selected_server in saved_servers:
@@ -239,14 +259,14 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                         save_servers(saved_servers)
                         st.session_state.ollama_endpoint = saved_servers[0]
                         st.rerun()
-            
+
             # Show connection status
             st.caption(f"**Active:** {st.session_state.ollama_endpoint}")
 
         # Admin Access
         with st.expander("⚡ Admin Access"):
             import os
-            
+
             if st.session_state.get("is_admin"):
                 st.success("Authenticated")
                 if st.button("Logout"):
