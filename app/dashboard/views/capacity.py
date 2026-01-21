@@ -84,25 +84,39 @@ def render_capacity_view(
 
     # --- Visualizations ---
 
-    # Tabbed layout for different risk perspectives
-    tab1, tab2, tab3 = st.tabs(["🏋️ Workload Balancer", "🔀 Context Switching", "⚠️ Unassigned Risk"])
+    # Radio Buttons for different risk perspectives (State-Aware)
+    risk_views = {
+        "🏋️ Workload Balancer": "workload",
+        "🔀 Context Switching": "context",
+        "⚠️ Unassigned Risk": "unassigned"
+    }
+    
+    selected_view_label = st.radio(
+        "Risk View",
+        options=list(risk_views.keys()),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="capacity_risk_view_radio"
+    )
+    
+    selected_view = risk_views[selected_view_label]
 
     # Store formatted filters: list of dicts {assignee: str, stage: str | None}
     active_filters = []
 
-    with tab1:
+    if selected_view == "workload":
         # Returns list of {assignee, stage}
         sel = _render_workload_chart(work_df, colors, max_wip)
         if sel:
             active_filters.extend(sel)
     
-    with tab2:
+    elif selected_view == "context":
         # Returns list of {assignee, context}
         sel = _render_context_matrix(work_df, max_contexts)
         if sel:
             active_filters.extend(sel)
         
-    with tab3:
+    elif selected_view == "unassigned":
         _render_unassigned_risk(work_df)
 
     # --- Filter Logic ---

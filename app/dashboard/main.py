@@ -103,37 +103,57 @@ def main() -> None:
     if st.session_state.get("is_admin"):
         pages["⚡ Admin"] = "admin"
 
-    # Tabs for navigation
-    tabs = st.tabs(list(pages.keys()))
+    # --- MAIN NAVIGATION (Persistent Radio Button) ---
+    # We use st.radio with 'horizontal' to mimic a tab bar but with state persistence
+    
+    # Ensure current page is valid
+    current_page = st.session_state.get("current_page", list(pages.keys())[0])
+    if current_page not in pages:
+        current_page = list(pages.keys())[0]
+        st.session_state.current_page = current_page
 
-    # Dynamic rendering
-    for i, (page_name, view_id) in enumerate(pages.items()):
-        with tabs[i]:
-            if view_id == "overview":
-                render_overview(filtered_df, colors=colors)
-            elif view_id == "flow":
-                # Extract stage descriptions
-                stage_descriptions = {
-                    stage.name: stage.description 
-                    for stage in default_rule.workflow.stages 
-                    if hasattr(stage, "description")
-                }
-                render_flow_view(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
-            elif view_id == "capacity":
-                # Pass capacity config
-                capacity_config = default_rule.capacity.model_dump()
-                from app.dashboard.views.capacity import render_capacity_view
-                render_capacity_view(filtered_df, colors=colors, capacity_config=capacity_config)
-            elif view_id == "release":
-                from app.dashboard.views.release import render_release_view
-                render_release_view(filtered_df)
-            elif view_id == "aging":
-                render_aging(filtered_df, colors=colors)
-            elif view_id == "hygiene":
-                render_hygiene(filtered_df, quality_df, colors=colors)
-            elif view_id == "admin":
-                from app.dashboard.views.admin import render_admin_view
-                render_admin_view()
+    selected_page = st.radio(
+        "Navigation",
+        options=list(pages.keys()),
+        index=list(pages.keys()).index(current_page),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="main_nav_radio"
+    )
+
+    # Update session state if changed
+    if selected_page != st.session_state.get("current_page"):
+        st.session_state.current_page = selected_page
+        st.rerun()
+
+    # Dynamic rendering based on selection
+    view_id = pages[selected_page]
+
+    if view_id == "overview":
+        render_overview(filtered_df, colors=colors)
+    elif view_id == "flow":
+        # Extract stage descriptions
+        stage_descriptions = {
+            stage.name: stage.description 
+            for stage in default_rule.workflow.stages 
+            if hasattr(stage, "description")
+        }
+        render_flow_view(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
+    elif view_id == "capacity":
+        # Pass capacity config
+        capacity_config = default_rule.capacity.model_dump()
+        from app.dashboard.views.capacity import render_capacity_view
+        render_capacity_view(filtered_df, colors=colors, capacity_config=capacity_config)
+    elif view_id == "release":
+        from app.dashboard.views.release import render_release_view
+        render_release_view(filtered_df)
+    elif view_id == "aging":
+        render_aging(filtered_df, colors=colors)
+    elif view_id == "hygiene":
+        render_hygiene(filtered_df, quality_df, colors=colors)
+    elif view_id == "admin":
+        from app.dashboard.views.admin import render_admin_view
+        render_admin_view()
 
 
 if __name__ == "__main__":

@@ -57,15 +57,23 @@ def render_flow_view(
 
     # Charts (Collapsible)
     with st.expander("📊 Flow Charts", expanded=True):
-        tab1, tab2 = st.tabs(["🔻 Project Funnel", "⏳ Stage Stickiness"])
+        chart_mode = st.radio(
+            "Chart Mode", 
+            ["🔻 Project Funnel", "⏳ Stage Stickiness"], 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="flow_chart_radio"
+        )
         
-        with tab1:
+        if chart_mode == "🔻 Project Funnel":
             # Use unique issues for funnel to show correct counts
             funnel_selection = _render_funnel_chart(unique_df, stage_descriptions)
+            aging_selection = None
             
-        with tab2:
+        else:
             # Use unique issues for aging to show distinct items
             aging_selection = _render_aging_chart(unique_df)
+            funnel_selection = None
 
     # Apply interactive filters (Apply to original DF which allows exploring contexts)
     filtered_df = df.copy()
@@ -528,167 +536,37 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
         )
     
     # Define containers based on mode
+    # Define containers based on mode
+    # For "Tabs", we now use a Persistent Radio Button instead of st.tabs
+    active_tab = "Drill-down" # Default
+    
     if view_mode == "Tabs":
-        tab1, tab2 = st.tabs(["📋 Issue Drill-down", "🤖 AI Assistant"])
-    else:
-        tab1, tab2 = st.columns([1.5, 1], gap="medium")
-
-    with tab1:
-        st.caption("Select an issue to view AI insights.")
-        
-        # 1. Render Table with Selection
-        selection = st.dataframe(
-            styler if styler is not None else display_df,
-            column_config=column_config,
-            column_order=column_order,
-            width="stretch",
-            height=800,                   # Increased height for better visibility
-            hide_index=True,
-            on_select="rerun",           # Enable selection events
-            selection_mode="single-row"  # Allow single row selection
+        active_tab = st.radio(
+            "Detail View",
+            ["📋 Issue Drill-down", "🤖 AI Assistant"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="flow_detail_radio"
         )
 
-    # 2. Handle Selection & AI Tab
-    with tab2:
-        # Streamlit dataframe selection returns a dict-like object.
-        # We should access "rows" safely.
-        selection_state = selection.selection if hasattr(selection, "selection") else selection
-        
-        selected_indices = getattr(selection_state, "rows", [])
-        if not selected_indices and isinstance(selection_state, dict):
-             selected_indices = selection_state.get("rows", [])
-
-        if not selected_indices:
-            st.info("👈 Please select an issue from the 'Issue Drill-down' tab to start.")
+    # Layout Logic
+    # Layout Logic
+    # Import Helpers (Late import to avoid circular dependencies if any, though standard is fine)
+    from app.dashboard.views.flow_helpers import _render_drilldown_table, _render_ai_assistant
+    
+    if view_mode == "Split":
+        # Split view: Side-by-side columns
+        col_left, col_right = st.columns([1.5, 1], gap="medium")
+        with col_left:
+             _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
+        with col_right:
+             _render_ai_assistant(df, display_df)
+             
+    else:
+        # Tabbed view (Simulated via Radio)
+        if active_tab == "📋 Issue Drill-down":
+            _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
         else:
-            try:
-                from app.ai.service import AIService
-                
-                # Get endpoint from sidebar settings
-                ollama_endpoint = st.session_state.get("ollama_endpoint", "http://localhost:11434")
-                ai_service = AIService(endpoint=ollama_endpoint)
-                
-                # Verify Ollama Connection first
-                if not ai_service.check_health():
-                    st.error(f"🔴 Ollama is offline at {ollama_endpoint}. Check AI Settings in sidebar.")
-                    st.code("ollama serve", language="bash")
-                else:
-                    selected_idx = selected_indices[0]
-                    selected_display_row = display_df.iloc[selected_idx]
-                    
-                    match_row = df[
-                        (df["title"] == selected_display_row["title"]) & 
-                        (df["web_url"] == selected_display_row["web_url"])
-                    ].iloc[0]
-                    
-                    issue_id = int(match_row["id"])
-                    
-                    # Layout: Model Selector, Status, and Actions in a single header row
-                    col_model, col_status, col_actions = st.columns([2, 2, 1])
-                    
-                    with col_model:
-                        available_models = ai_service.get_available_models()
-                        if not available_models:
-                            st.warning("⚠️ No models found.")
-                            selected_model = None
-                        else:
-                            selected_model = st.selectbox("Model", available_models, index=0)
-
-                    if selected_model:
-                        # Load AI Data
-                        conversation = ai_service.get_conversation(issue_id)
-
-                        # Check logic
-                        is_stale = False
-                        if conversation:
-                            issue_updated = pd.to_datetime(match_row["updated_at"], utc=True)
-                            if conversation.ref_issue_updated_at.tzinfo is None:
-                                ref_updated = conversation.ref_issue_updated_at.replace(tzinfo=issue_updated.tzinfo)
-                            else:
-                                ref_updated = conversation.ref_issue_updated_at
-                            
-                            if issue_updated > ref_updated:
-                                is_stale = True
-
-                        with col_status:
-                            st.write("")  # Spacer to align with selectbox
-                            if is_stale:
-                                st.warning("⚠️ Content changed")
-                            elif conversation:
-                                st.success("✅ Up to date")
-                            else:
-                                st.info("No summary yet")
-
-                        with col_actions:
-                            st.write("")  # Spacer to align with selectbox
-                            if not conversation:
-                                if st.button("✨ Generate", type="primary", use_container_width=True):
-                                    with st.spinner(f"Generating..."):
-                                        ai_service.generate_summary(match_row, model=selected_model)
-                                        st.rerun()
-                            else:
-                                if st.button("🔄 Regenerate", use_container_width=True, help="Regenerate summary"):
-                                    with st.spinner(f"Regenerating..."):
-                                        ai_service.generate_summary(match_row, model=selected_model)
-                                        st.rerun()
-
-                        # Content Display
-                        if conversation:
-                            # Issue Metadata
-                            issue_iid = match_row.get("iid", "N/A")
-                            issue_title = match_row.get("title", "Unknown")
-                            issue_labels = match_row.get("labels", [])
-                            created_at = pd.to_datetime(match_row.get("created_at"), utc=True)
-                            updated_at = pd.to_datetime(match_row.get("updated_at"), utc=True)
-
-                            st.subheader(f"#{issue_iid} - {issue_title}")
-                            
-                            # Format labels as badges (handle list, array, or string)
-                            if issue_labels is None:
-                                labels_str = "_No labels_"
-                            elif isinstance(issue_labels, (list, tuple)):
-                                labels_str = " ".join([f"`{lbl}`" for lbl in issue_labels]) if len(issue_labels) > 0 else "_No labels_"
-                            elif hasattr(issue_labels, '__iter__') and not isinstance(issue_labels, str):
-                                # Handle numpy arrays or similar iterables
-                                labels_list = list(issue_labels)
-                                labels_str = " ".join([f"`{lbl}`" for lbl in labels_list]) if len(labels_list) > 0 else "_No labels_"
-                            else:
-                                labels_str = f"`{issue_labels}`" if issue_labels else "_No labels_"
-                            
-                            st.markdown(f"""
-**Labels:** {labels_str}  
-**Created:** {created_at.strftime('%Y-%m-%d %H:%M')} | **Updated:** {updated_at.strftime('%Y-%m-%d %H:%M')}
-""")
-                            st.divider()
-                            st.markdown(conversation.summary_short)
-                            
-                            st.divider()
-                            st.subheader("Chat Assistant")
-                            
-                            # Chat container
-                            chat_container = st.container(height=400)
-                            
-                            # Display History
-                            with chat_container:
-                                for msg in conversation.chat_history:
-                                    role_icon = "🤖" if msg.role == "assistant" else "👤"
-                                    # Use Streamlit chat message
-                                    with st.chat_message(msg.role):
-                                        st.markdown(msg.content)
-
-                            # Input (outside container to stick to bottom)
-                            if prompt := st.chat_input("Ask about this issue..."):
-                                with chat_container:
-                                    with st.chat_message("user"):
-                                        st.markdown(prompt)
-                                
-                                with st.status("Thinking...", expanded=True) as status:
-                                    response = ai_service.chat(prompt, context=conversation, model=selected_model)
-                                    status.update(label="Response generated!", state="complete", expanded=False)
-                                
-                                st.rerun()
-
-            except Exception as e:
-                st.error(f"Error loading AI Assistant: {e}")
+             _render_ai_assistant(df, display_df)
 
 
