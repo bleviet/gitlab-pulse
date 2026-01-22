@@ -24,10 +24,10 @@ def render_release_view(df: pd.DataFrame) -> None:
     # Load milestones directly for overview
     milestones_df = load_milestones()
     
-    # Milestone Overview Section (Collapsible, collapsed by default)
+    # Milestone Timeline Section (Collapsible, collapsed by default)
     if not milestones_df.empty:
-        with st.expander("📅 All Milestones", expanded=False):
-            _render_milestone_overview(milestones_df)
+        with st.expander("📅 Milestone Timeline", expanded=False):
+            _render_milestone_timeline(milestones_df, df)
     
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
@@ -246,70 +246,170 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
     st.plotly_chart(fig, width="stretch")
 
 
-def _render_milestone_overview(milestones_df: pd.DataFrame) -> None:
-    """Render milestone overview table with due dates and status indicators."""
-    # Calculate days until due
+def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFrame) -> None:
+    """Render milestone timeline chart with color-coded status.
+
+    Color scheme:
+    - Purple: Closed milestone with all issues resolved
+    - Red: Closed milestone with unresolved issues remaining
+    - Green: Open milestone, due date not yet reached
+    - Orange: Open milestone, due date already passed (overdue)
+    """
+    if milestones_df.empty:
+        st.info("No milestones to display.")
+        return
+
     now = pd.Timestamp.now(tz="UTC")
     display_df = milestones_df.copy()
-    
-    if "due_date" in display_df.columns:
-        def calc_days_until_due(x):
-            if pd.isna(x):
-                return None
-            # Normalize timezone: some GitLab instances return tz-naive
-            if x.tz is None:
-                x = x.tz_localize("UTC")
-            return (x - now).days
 
-        display_df["days_until_due"] = display_df["due_date"].apply(calc_days_until_due)
-        
-        # Add status indicator
-        def get_status(row):
-            if row["state"] == "closed":
-                return "✅ Closed"
-            days = row.get("days_until_due")
-            if days is None:
-                return "📋 Active"
-            elif days < 0:
-                return "🔴 Overdue"
-            elif days <= 7:
-                return "🟡 Due Soon"
+    # Get date range from session state (set by sidebar)
+    date_range = st.session_state.get("date_range")
+    if date_range and len(date_range) == 2:
+        filter_start = pd.Timestamp(date_range[0], tz="UTC")
+        filter_end = pd.Timestamp(date_range[1], tz="UTC") + pd.Timedelta(days=1)
+    else:
+        # Fallback: show all milestones
+        filter_start = None
+        filter_end = None
+
+    # Calculate issue completion per milestone
+    milestone_issue_stats = {}
+    if not issues_df.empty and "milestone_id" in issues_df.columns:
+        for ms_id in display_df["id"].unique():
+            ms_issues = issues_df[issues_df["milestone_id"] == ms_id]
+            total = len(ms_issues)
+            closed = len(ms_issues[ms_issues["state"] == "closed"])
+            milestone_issue_stats[ms_id] = {"total": total, "closed": closed}
+
+    # Prepare timeline data
+    timeline_data = []
+    for _, row in display_df.iterrows():
+        ms_id = row["id"]
+        title = row.get("title", f"Milestone {ms_id}")
+        state = row.get("state", "active")
+
+        # Get start and due dates
+        start_date = row.get("start_date")
+        due_date = row.get("due_date")
+
+        # Normalize timezones
+        if pd.notna(start_date):
+            start_date = pd.to_datetime(start_date)
+            if start_date.tz is None:
+                start_date = start_date.tz_localize("UTC")
+        if pd.notna(due_date):
+            due_date = pd.to_datetime(due_date)
+            if due_date.tz is None:
+                due_date = due_date.tz_localize("UTC")
+
+        # Skip if no dates (can't display on timeline)
+        if pd.isna(start_date) and pd.isna(due_date):
+            continue
+
+        # If only due date, set start to 30 days before
+        if pd.isna(start_date):
+            start_date = due_date - pd.Timedelta(days=30)
+        # If only start date, set due to 30 days after
+        if pd.isna(due_date):
+            due_date = start_date + pd.Timedelta(days=30)
+
+        # Filter by date range if specified
+        if filter_start and filter_end:
+            # Include if milestone overlaps with filter range
+            if due_date < filter_start or start_date > filter_end:
+                continue
+
+        # Determine color based on status
+        stats = milestone_issue_stats.get(ms_id, {"total": 0, "closed": 0})
+        all_issues_closed = stats["total"] == 0 or stats["closed"] == stats["total"]
+
+        if state == "closed":
+            if all_issues_closed:
+                # Purple: Closed milestone, all issues resolved
+                color = "#9333EA"  # Purple-600
+                status = "Complete"
             else:
-                return "🟢 On Track"
-        
-        display_df["Status"] = display_df.apply(get_status, axis=1)
-    else:
-        display_df["Status"] = display_df["state"].apply(
-            lambda x: "✅ Closed" if x == "closed" else "📋 Active"
-        )
-    
-    # Format due date for display
-    if "due_date" in display_df.columns:
-        display_df["Due"] = display_df["due_date"].dt.strftime("%Y-%m-%d")
-    else:
-        display_df["Due"] = "—"
-    
-    # Sort by due date (active first, then by due date)
-    if "due_date" in display_df.columns:
-        display_df = display_df.sort_values(
-            ["state", "due_date"],
-            ascending=[True, True],
-            na_position="last"
-        )
-    
-    # Select columns for display
-    show_cols = ["title", "Status", "Due", "state"]
-    show_cols = [c for c in show_cols if c in display_df.columns]
-    
-    st.dataframe(
-        display_df[show_cols],
-        column_config={
-            "title": st.column_config.TextColumn("Milestone", width="large"),
-            "Status": st.column_config.TextColumn("Status", width="medium"),
-            "Due": st.column_config.TextColumn("Due Date", width="small"),
-            "state": None,  # Hide raw state column
+                # Red: Closed milestone, issues remaining
+                color = "#DC2626"  # Red-600
+                status = "Incomplete"
+        else:
+            # Open milestone
+            if pd.notna(due_date) and due_date < now:
+                # Orange: Open but overdue
+                color = "#EA580C"  # Orange-600
+                status = "Overdue"
+            else:
+                # Green: Open and on track
+                color = "#16A34A"  # Green-600
+                status = "On Track"
+
+        timeline_data.append({
+            "Milestone": title,
+            "Start": start_date,
+            "Finish": due_date,
+            "Status": status,
+            "Color": color,
+            "Issues": f"{stats['closed']}/{stats['total']}",
+        })
+
+    if not timeline_data:
+        st.info("No milestones with dates in the selected range.")
+        return
+
+    chart_df = pd.DataFrame(timeline_data)
+
+    # Create timeline chart using Plotly
+    fig = px.timeline(
+        chart_df,
+        x_start="Start",
+        x_end="Finish",
+        y="Milestone",
+        color="Status",
+        color_discrete_map={
+            "Complete": "#9333EA",
+            "Incomplete": "#DC2626",
+            "On Track": "#16A34A",
+            "Overdue": "#EA580C",
         },
-        hide_index=True,
-        height=200,
+        hover_data=["Issues"],
     )
+
+    # Add vertical line for today
+    fig.add_vline(
+        x=now.timestamp() * 1000,
+        line_width=2,
+        line_dash="dash",
+        line_color="rgba(128, 128, 128, 0.8)",
+        annotation_text="Today",
+        annotation_position="top",
+    )
+
+    # Style for dark/light mode compatibility
+    fig.update_layout(
+        height=max(200, len(timeline_data) * 50),
+        margin=dict(l=0, r=0, t=30, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif"),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(128, 128, 128, 0.2)",
+            title="",
+        ),
+        yaxis=dict(
+            showgrid=False,
+            title="",
+            autorange="reversed",
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
+        showlegend=True,
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
