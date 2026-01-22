@@ -15,20 +15,41 @@ from app.dashboard.data_loader import load_milestones
 
 def render_release_view(df: pd.DataFrame) -> None:
     """Render the release management dashboard.
-    
+
     Args:
         df: DataFrame containing all issues
     """
     st.header("Release Management")
-    
-    # Load milestones directly for overview
-    milestones_df = load_milestones()
-    
+
+    # Build milestone data from issues (same source as dropdown)
+    # This ensures timeline shows all milestones that have issues
+    if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
+        milestone_df = df[df["milestone_id"].notna()].copy()
+        ms_agg = milestone_df.groupby("milestone").agg({
+            "milestone_id": "first",
+            "milestone_due_date": "first",
+            "milestone_start_date": "first",
+            "iid": "count",  # Use iid for count to avoid column name conflict
+            "state": lambda x: "closed" if (x == "closed").all() else "active"
+        }).reset_index()
+        ms_agg = ms_agg.rename(columns={
+            "milestone": "title",
+            "milestone_id": "id",
+            "milestone_due_date": "due_date",
+            "milestone_start_date": "start_date",
+            "iid": "issue_count",
+            "state": "milestone_state"
+        })
+        # Use milestone_state for timeline status
+        ms_agg["state"] = ms_agg["milestone_state"]
+    else:
+        ms_agg = pd.DataFrame()
+
     # Milestone Timeline Section (Collapsible, collapsed by default)
-    if not milestones_df.empty:
+    if not ms_agg.empty:
         with st.expander("📅 Milestone Timeline", expanded=False):
-            _render_milestone_timeline(milestones_df, df)
-    
+            _render_milestone_timeline(ms_agg, df)
+
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
         st.warning("No issues with milestones found. Assign issues to milestones to see release scope.")
@@ -36,7 +57,7 @@ def render_release_view(df: pd.DataFrame) -> None:
 
     # Filter to items with milestones
     milestone_df = df[df["milestone_id"].notna()].copy()
-    
+
     # Get unique milestones sorted by due date (if available) or name
     # We want a nice label like "Title (Due: Date)"
     ms_agg = milestone_df.groupby("milestone").agg({
@@ -45,33 +66,33 @@ def render_release_view(df: pd.DataFrame) -> None:
         "milestone_start_date": "first",
         "id": "count"
     }).reset_index()
-    
+
     # Sort by due date desc
     if "milestone_due_date" in ms_agg.columns:
         ms_agg = ms_agg.sort_values("milestone_due_date", ascending=False)
-        
+
     # Create selection map
     ms_map = {row["milestone"]: row["milestone_id"] for _, row in ms_agg.iterrows()}
     allowed_milestones = list(ms_map.keys())
-    
+
     if not allowed_milestones:
         st.info("No milestones found.")
         return
-        
+
     selected_milestone_name = st.selectbox("Select Milestone", allowed_milestones)
     selected_ms_id = ms_map[selected_milestone_name]
-    
+
     # Filter data for selected milestone
     ms_data = milestone_df[milestone_df["milestone_id"] == selected_ms_id].copy()
-    
+
     # Get milestone metadata
     ms_meta = ms_agg[ms_agg["milestone_id"] == selected_ms_id].iloc[0]
-    
+
     # 2. Release KPIs
     total_issues = len(ms_data)
     closed_issues = len(ms_data[ms_data["state"] == "closed"])
     pct_complete = (closed_issues / total_issues * 100) if total_issues > 0 else 0
-    
+
     # Calculate days remaining
     days_remaining = "N/A"
     status_color = "off"
@@ -83,12 +104,12 @@ def render_release_view(df: pd.DataFrame) -> None:
         now = pd.Timestamp.now(tz="UTC")
         remaining = (due_date - now).days
         days_remaining = f"{remaining} days"
-        
+
         if remaining < 0 and pct_complete < 100:
             status_color = "inverse" # Late
         elif remaining < 7 and pct_complete < 80:
             status_color = "normal" # At Risk (using normal as warning-ish?)
-            
+
     # Apply Bento Grid Style
     from app.dashboard.components import style_metric_cards
     style_metric_cards()
@@ -97,37 +118,37 @@ def render_release_view(df: pd.DataFrame) -> None:
     col1.metric("Progress", f"{pct_complete:.1f}%", f"{closed_issues}/{total_issues} Issues")
     col2.metric("Days Remaining", days_remaining)
     col3.metric("Scope", total_issues, help="Total issues in milestone")
-    
+
     # 3. Burn-up Chart (Collapsible)
     with st.expander("📈 Burn-up Chart", expanded=True):
         _render_burnup_chart(ms_data, ms_meta)
-    
+
     # 4. Scope Table (Collapsible)
     with st.expander("📋 Release Scope", expanded=True):
         # Format for display
         display_df = ms_data.copy()
-        
+
         # Sort hierarchy if available
         if "parent_id" in display_df.columns:
             display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
         else:
             display_df = display_df.sort_values(["state", "updated_at"], ascending=[True, False])
-        
+
         # Link
         display_df = display_df.rename(columns={
-            "web_url": "IID", 
-            "title": "Title", 
-            "state": "State", 
+            "web_url": "IID",
+            "title": "Title",
+            "state": "State",
             "assignee": "Assignee",
             "issue_type": "Type"
         })
-        
+
         st.dataframe(
             display_df,
             column_config={
                 "IID": st.column_config.LinkColumn(
-                    "IID", 
-                    display_text=r"/(?:issues|work_items)/(\d+)$", 
+                    "IID",
+                    display_text=r"/(?:issues|work_items)/(\d+)$",
                     width="small"
                 ),
                 "Title": st.column_config.TextColumn("Title", width="large"),
@@ -145,7 +166,7 @@ def render_release_view(df: pd.DataFrame) -> None:
 def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
     """Render burn-up chart (Scope vs Completed)."""
     st.subheader("Burn-up Chart")
-    
+
     # helper to ensure naive UTC
     def to_naive_utc(ts):
         if pd.isna(ts): return pd.NaT
@@ -162,18 +183,18 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
             start_date = to_naive_utc(df["created_at"].min())
         else:
             start_date = pd.Timestamp.utcnow().replace(tzinfo=None) # fallback
-        
+
     end_date = to_naive_utc(meta.get("milestone_due_date"))
-    
+
     # Current time (Naive UTC)
     now = pd.Timestamp.utcnow().replace(tzinfo=None).normalize()
-    
+
     if pd.isna(end_date):
         end_date = now + pd.Timedelta(days=30)
-    
+
     # Generate timeline (Naive UTC)
     timeline = pd.date_range(start=start_date, end=max(end_date, now), freq="D")
-    
+
     # Pre-calculate counts per day
     # Created (Scope) -> Convert to Naive UTC
     if not df.empty:
@@ -181,7 +202,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         scope_counts = df.groupby("created_date").size().cumsum()
     else:
         scope_counts = pd.Series(dtype=int, index=pd.to_datetime([]))
-    
+
     # Closed (Completed) -> Convert to Naive UTC
     completed_df = df[df["state"] == "closed"].copy()
     if not completed_df.empty:
@@ -189,47 +210,47 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         completed_counts = completed_df.groupby("closed_date").size().sort_index().cumsum()
     else:
         completed_counts = pd.Series(dtype=int, index=pd.to_datetime([]))
-    
+
     # Reindex series to timeline using ffill
     scope_series = scope_counts.reindex(timeline, method='ffill').fillna(0)
     completed_series = completed_counts.reindex(timeline, method='ffill').fillna(0)
-    
+
     chart_df = pd.DataFrame({
         "Date": timeline,
         "Total Scope": scope_series.values,
         "Completed": completed_series.values,
     })
-    
+
     # Plot
     fig = go.Figure()
-    
+
     # Ideal line? (Start 0 to Total Scope at Due Date)
     # Only if we have strict dates
-    
+
     fig.add_trace(go.Scatter(
-        x=chart_df["Date"], 
+        x=chart_df["Date"],
         y=chart_df["Total Scope"],
         mode='lines',
         name='Total Scope',
         line=dict(shape='hv', color='gray', dash='dash')
     ))
-    
+
     fig.add_trace(go.Scatter(
-        x=chart_df["Date"], 
+        x=chart_df["Date"],
         y=chart_df["Completed"],
         mode='lines',
         name='Completed',
         fill='tozeroy',
         line=dict(color='#3B82F6')
     ))
-    
+
     # Add vertical line for Today
     fig.add_vline(x=now.timestamp() * 1000, line_width=1, line_dash="dash", line_color="red", annotation_text="Today")
-    
+
     # Add vertical line for Due Date
     if pd.notna(meta.get("milestone_due_date")):
         fig.add_vline(x=pd.to_datetime(meta["milestone_due_date"]).timestamp() * 1000, line_width=2, line_color="green", annotation_text="Due Date")
-    
+
     fig.update_layout(
         height=400,
         xaxis_title="Date",
@@ -242,7 +263,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
     )
-    
+
     st.plotly_chart(fig, width="stretch")
 
 
@@ -262,15 +283,8 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
     now = pd.Timestamp.now(tz="UTC")
     display_df = milestones_df.copy()
 
-    # Get date range from session state (set by sidebar)
-    date_range = st.session_state.get("date_range")
-    if date_range and len(date_range) == 2:
-        filter_start = pd.Timestamp(date_range[0], tz="UTC")
-        filter_end = pd.Timestamp(date_range[1], tz="UTC") + pd.Timedelta(days=1)
-    else:
-        # Fallback: show all milestones
-        filter_start = None
-        filter_end = None
+    # Note: We intentionally do NOT filter by sidebar date range here
+    # to show all milestones regardless of the issue filter dates
 
     # Calculate issue completion per milestone
     milestone_issue_stats = {}
@@ -302,9 +316,11 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
             if due_date.tz is None:
                 due_date = due_date.tz_localize("UTC")
 
-        # Skip if no dates (can't display on timeline)
+        # Handle milestones without dates
         if pd.isna(start_date) and pd.isna(due_date):
-            continue
+            # Use today as reference for dateless milestones
+            start_date = now - pd.Timedelta(days=15)
+            due_date = now + pd.Timedelta(days=15)
 
         # If only due date, set start to 30 days before
         if pd.isna(start_date):
@@ -312,12 +328,6 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
         # If only start date, set due to 30 days after
         if pd.isna(due_date):
             due_date = start_date + pd.Timedelta(days=30)
-
-        # Filter by date range if specified
-        if filter_start and filter_end:
-            # Include if milestone overlaps with filter range
-            if due_date < filter_start or start_date > filter_end:
-                continue
 
         # Determine color based on status
         stats = milestone_issue_stats.get(ms_id, {"total": 0, "closed": 0})
