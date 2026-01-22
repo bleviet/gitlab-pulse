@@ -36,6 +36,7 @@ class RawIssue(BaseModel):
     iid: int  
     project\_id: int  
     title: str  
+    description: Optional\[str\] \= None
     state: Literal\['opened', 'closed'\]  
     created\_at: datetime  
     updated\_at: datetime  
