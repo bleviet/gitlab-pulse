@@ -50,16 +50,16 @@ class AIService:
             df = pd.read_parquet(filepath)
             if df.empty:
                 return None
-            
+
             # Reconstruct from single-row DataFrame
             data = df.iloc[0].to_dict()
-            
+
             # Parse nested JSON structures if stored as strings (common for complex types in Parquet)
             # However, direct Pydantic dump -> Parquet usually handles lists naturally if using pyarrow
             # For robustness, we'll assume standard JSON serialization for complex fields if needed
-            # But let's verify if we need bespoke logic. 
+            # But let's verify if we need bespoke logic.
             # Strategy: Store specific fields. For simplicity in V1, let's use the raw dict
-            
+
             # Note: Parquet handles lists, but validation is safer
             return IssueConversation(**data)
         except Exception as e:
@@ -85,10 +85,11 @@ class AIService:
         assignee = issue_row.get("assignee", "Unassigned")
         milestone = issue_row.get("milestone", "None")
         state = issue_row.get("state", "unknown")
-        
+
         system_prompt = f"""
 You are an intelligent Project Assistant for GitLabInsight.
-Your goal is to analyze the following issue and provide a structured, objective summary for a professional audience.
+Analyze the following GitLab issue and provide a structured, actionable summary.
+
 
 INPUT CONTEXT:
 - Title: {title}
@@ -98,37 +99,65 @@ INPUT CONTEXT:
 - Milestone: {milestone}
 - State: {state}
 
-STRICT OUTPUT RULES:
-1. **Tone:** Professional, objective, and concise. Avoid conversational filler.
-2. **Context Awareness:** Adapt language to the domain detected (e.g., marketing terms for marketing issues, technical terms for code issues).
-3. **Format:** Use Markdown headers (###).
-4. **No Hallucination:** Do not invent details not present in the text.
 
-GENERATE THE FOLLOWING SECTIONS:
+CORE PRINCIPLES:
+1. **Be Explicit and Concrete:** Extract only factual information present in the input. Never invent, assume, or extrapolate details [web:20][web:25].
+2. **Preserve Domain Language:** Use the exact terminology from the issue. Adapt your tone to match the domain (technical for engineering, business-focused for operations, creative for marketing) [web:25].
+3. **Never Explain Abbreviations:** Present all abbreviations exactly as written. Each organization has domain-specific meanings—do not attempt to expand or interpret them.
+4. **Output Format:** Use Markdown headers (###) with concise, scannable sections [web:21][web:22].
+
+
+ISSUE CLASSIFICATION (Infer from labels and content):
+Detect the issue type to shape your analysis [web:26][web:29]:
+- **Bug/Defect:** Focus on reproduction, impact, error details
+- **Feature/Enhancement:** Focus on requirements, user value, scope
+- **Task/Operations:** Focus on deliverables, dependencies, resources
+- **Support/Feedback:** Focus on user needs, resolution paths
+- **Documentation:** Focus on target audience, content gaps
+- **Process/Policy:** Focus on stakeholders, decision points, compliance
+
+
+REQUIRED OUTPUT SECTIONS:
+
+### Issue Classification
+State the detected issue type in one line (e.g., "Bug Report", "Feature Request", "Operational Task", "Marketing Campaign", "Legal Review").
 
 ### Executive Summary
-A high-level overview of the goal or problem in 2-3 sentences.
-Identify the core subject (e.g., "A request to update the Q3 budget" or "A crash in the login module").
+Provide 2-3 sentences answering: What is being requested/reported? Why does it matter? Who is impacted?
+Focus on business value or technical impact, not procedural details.
 
-### Key Details & Evidence
-Extract specific data points found in the text.
-Look for: Error codes, deadlines, stakeholders, KPIs, or links to external documents.
-If no specific details are provided, state "No specific data points provided."
+### Critical Information
+Extract factual data points in bullet format. Look for:
+- Specific identifiers (error codes, ticket IDs, system names, deadlines)
+- Quantifiable metrics (budget amounts, performance numbers, user counts)
+- Named entities (stakeholders, teams, external vendors, dependencies)
+- Concrete artifacts (URLs, file paths, document references)
 
-### Status & Blockers
-Analyze the labels and description to determine current state.
-Explicitly identify blockers (e.g., "Waiting for approval from X", "Blocked by dependency Y").
+If no specific data exists, state: "No concrete data points provided."
 
-### Recommended Next Steps
-Suggest 2-3 logical actions based on the issue type:
-- If **Bug/Defect**: Suggest reproduction steps or log analysis.
-- If **Feature/Project**: Suggest requirement clarification or task breakdown.
-- If **Discussion**: Suggest summarizing consensus or scheduling a decision.
+### Status & Dependencies
+- **Current State:** Describe progress based on labels and description
+- **Blockers:** Explicitly list blocking factors (approvals, external dependencies, technical constraints)
+- **Dependencies:** Note related issues, systems, or teams mentioned
+
+If no blockers exist, state: "No blockers identified."
+
+### Open Questions or Gaps
+List any ambiguities, missing information, or unresolved decisions that could delay resolution.
+If the issue is well-defined, state: "Issue appears well-defined."
+
+
+QUALITY STANDARDS:
+- Use active voice with varied sentence structure [web:22][web:25]
+- Keep each section under 5 bullet points or 4 sentences
+- Avoid generic statements—be specific to this issue
+- Do not create a summary or conclusion section [web:25]
 """
-        
+
+
         # Call Generate API
         summary_text = self._call_generate(model, system_prompt, stream=False)
-        
+
         # Create Conversation Object
         conversation = IssueConversation(
             issue_id=int(issue_row["id"]),
@@ -136,7 +165,7 @@ Suggest 2-3 logical actions based on the issue type:
             ref_issue_updated_at=pd.to_datetime(issue_row["updated_at"], utc=True),
             summary_short=summary_text
         )
-        
+
         self.save_conversation(conversation)
         return conversation
 
@@ -144,22 +173,22 @@ Suggest 2-3 logical actions based on the issue type:
         """Continue conversation about the issue."""
         # Append User Message
         context.chat_history.append(ChatMessage(role="user", content=user_prompt))
-        
+
         # Build Context for LLM
         # We include the summary as the "system" context for the chat
         messages = [
             {"role": "system", "content": f"Context Summary:\n{context.summary_short}"}
         ]
-        
+
         for msg in context.chat_history:
              messages.append({"role": msg.role, "content": msg.content})
-             
+
         # Call Chat API
         response_text = self._call_chat(model, messages, stream=False)
-        
+
         # Append Assistant Response
         context.chat_history.append(ChatMessage(role="assistant", content=response_text))
-        
+
         self.save_conversation(context)
         return response_text
 
