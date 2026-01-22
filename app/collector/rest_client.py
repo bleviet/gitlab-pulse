@@ -113,6 +113,7 @@ class RestClient:
             "iid": attrs.get("iid"),
             "project_id": attrs.get("project_id"),
             "title": attrs.get("title"),
+            "description": attrs.get("description"),
             "state": attrs.get("state"),
             "created_at": attrs.get("created_at"),
             "updated_at": attrs.get("updated_at"),
@@ -189,7 +190,7 @@ class RestClient:
         logger.info(f"Fetching labels from project {project_id}")
 
         raw_labels = project.labels.list(iterator=True)
-        
+
         validated: list[RawLabel] = []
         for label in raw_labels:
             try:
