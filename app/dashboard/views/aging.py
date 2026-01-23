@@ -74,13 +74,13 @@ def _render_stale_alert(df: pd.DataFrame) -> None:
 
     if stale_ratio > 0.2:  # More than 20% stale
         st.warning(
-            f"⚠️ **High volume of stale issues detected!** "
+            f"**High volume of stale issues detected!** "
             f"{stale_count} issues ({stale_ratio:.0%} of open) have not been updated recently.",
             icon="⚠️",
         )
     elif stale_count > 0:
         st.info(
-            f"ℹ️ {stale_count} stale issue(s) need attention.",
+            f"{stale_count} stale issue(s) need attention.",
             icon="ℹ️",
         )
 
