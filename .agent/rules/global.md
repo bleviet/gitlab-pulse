@@ -20,7 +20,10 @@ trigger: always_on
 - **Review First:** You may `git add` files to stage them, but you must ask for explicit user confirmation before committing.
 - **Commit Messages:** When requested to commit, always draft the commit message for the user to review first.
 
-## 3. Documentation Standards: Usage vs. Architecture
+## 3. Python and Streamlit Bestpractices
+- Always refer to `python.md`
+
+## 4. Documentation Standards: Usage vs. Architecture
 
 ### 1. Separation of Concerns
 Documentation must be split into two distinct categories:

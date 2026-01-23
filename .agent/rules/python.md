@@ -15,3 +15,8 @@ trigger: always_on
 - **Imports:** Absolute imports preferred instead of relative imports.
 - **Docstrings:** Use Google-style docstrings for all public APIs.
 - **Whitespace:** ALWAYS trim trailing spaces from all lines. No trailing whitespace allowed.
+
+## Streamlit Best Practices
+- **Layout sizing:** NEVER use `use_container_width=True` for charts (Plotly, Altair) or dataframes. Instead, use `width='stretch'` (or `width="stretch"`).
+  - *Reason:* Streamlit has deprecated `use_container_width` for these elements and it will be removed.
+  - *Exception:* `st.button` and `st.container` still use `use_container_width` or `border` arguments respectively where appropriate, check latest docs. But for `st.plotly_chart` and `st.dataframe`, strict `width="stretch"` rule applies.

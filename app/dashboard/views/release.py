@@ -468,5 +468,5 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
         hovermode="closest",
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
