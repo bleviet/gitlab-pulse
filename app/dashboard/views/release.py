@@ -47,7 +47,7 @@ def render_release_view(df: pd.DataFrame) -> None:
 
     # Milestone Timeline Section (Collapsible, collapsed by default)
     if not ms_agg.empty:
-        with st.expander("📅 Milestone Timeline", expanded=False):
+        with st.expander("📅 Milestone Timeline", expanded=True):
             _render_milestone_timeline(ms_agg, df)
 
     # 1. Milestone Selection
@@ -268,7 +268,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
 
 
 def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFrame) -> None:
-    """Render milestone timeline chart with color-coded status.
+    """Render milestone timeline as a scatter plot with markers.
 
     Color scheme:
     - Purple: Closed milestone with all issues resolved
@@ -283,9 +283,6 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
     now = pd.Timestamp.now(tz="UTC")
     display_df = milestones_df.copy()
 
-    # Note: We intentionally do NOT filter by sidebar date range here
-    # to show all milestones regardless of the issue filter dates
-
     # Calculate issue completion per milestone
     milestone_issue_stats = {}
     if not issues_df.empty and "milestone_id" in issues_df.columns:
@@ -295,109 +292,151 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
             closed = len(ms_issues[ms_issues["state"] == "closed"])
             milestone_issue_stats[ms_id] = {"total": total, "closed": closed}
 
-    # Prepare timeline data
-    timeline_data = []
+    # Prepare scatter data
+    scatter_data = []
     for _, row in display_df.iterrows():
         ms_id = row["id"]
         title = row.get("title", f"Milestone {ms_id}")
         state = row.get("state", "active")
 
-        # Get start and due dates
-        start_date = row.get("start_date")
+        # Get due date (primary) or start date as fallback
         due_date = row.get("due_date")
+        start_date = row.get("start_date")
+
+        # Skip milestones without a due date
+        if pd.isna(due_date):
+            continue
 
         # Normalize timezones
-        if pd.notna(start_date):
-            start_date = pd.to_datetime(start_date)
-            if start_date.tz is None:
-                start_date = start_date.tz_localize("UTC")
         if pd.notna(due_date):
             due_date = pd.to_datetime(due_date)
             if due_date.tz is None:
                 due_date = due_date.tz_localize("UTC")
+        if pd.notna(start_date):
+            start_date = pd.to_datetime(start_date)
+            if start_date.tz is None:
+                start_date = start_date.tz_localize("UTC")
 
-        # Handle milestones without dates
-        if pd.isna(start_date) and pd.isna(due_date):
-            # Use today as reference for dateless milestones
-            start_date = now - pd.Timedelta(days=15)
-            due_date = now + pd.Timedelta(days=15)
+        # Use due date as marker position
+        marker_date = due_date
 
-        # If only due date, set start to 30 days before
-        if pd.isna(start_date):
-            start_date = due_date - pd.Timedelta(days=30)
-        # If only start date, set due to 30 days after
-        if pd.isna(due_date):
-            due_date = start_date + pd.Timedelta(days=30)
-
-        # Determine color based on status
+        # Determine status and color
         stats = milestone_issue_stats.get(ms_id, {"total": 0, "closed": 0})
         all_issues_closed = stats["total"] == 0 or stats["closed"] == stats["total"]
 
         if state == "closed":
             if all_issues_closed:
-                # Purple: Closed milestone, all issues resolved
                 color = "#9333EA"  # Purple-600
                 status = "Complete"
             else:
-                # Red: Closed milestone, issues remaining
                 color = "#DC2626"  # Red-600
                 status = "Incomplete"
         else:
-            # Open milestone
             if pd.notna(due_date) and due_date < now:
-                # Orange: Open but overdue
                 color = "#EA580C"  # Orange-600
                 status = "Overdue"
             else:
-                # Green: Open and on track
                 color = "#16A34A"  # Green-600
                 status = "On Track"
 
-        timeline_data.append({
-            "Milestone": title,
-            "Start": start_date,
-            "Finish": due_date,
-            "Status": status,
-            "Color": color,
-            "Issues": f"{stats['closed']}/{stats['total']}",
+        # Format date for display
+        date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "No date"
+
+        scatter_data.append({
+            "date": marker_date,
+            "date_str": date_str,
+            "title": title,
+            "status": status,
+            "color": color,
+            "issues": f"{stats['closed']}/{stats['total']}",
         })
 
-    if not timeline_data:
-        st.info("No milestones with dates in the selected range.")
+    if not scatter_data:
+        st.info("No milestones to display.")
         return
 
-    chart_df = pd.DataFrame(timeline_data)
+    chart_df = pd.DataFrame(scatter_data)
 
-    # Create timeline chart using Plotly
-    fig = px.timeline(
-        chart_df,
-        x_start="Start",
-        x_end="Finish",
-        y="Milestone",
-        color="Status",
-        color_discrete_map={
-            "Complete": "#9333EA",
-            "Incomplete": "#DC2626",
-            "On Track": "#16A34A",
-            "Overdue": "#EA580C",
-        },
-        hover_data=["Issues"],
+    # Sort by date for staggering calculation
+    chart_df = chart_df.sort_values("date").reset_index(drop=True)
+
+    # Assign staggered y-positions to avoid overlapping markers
+    # Group by date and assign alternating rows
+    date_counts = {}
+    y_positions = []
+    for _, row in chart_df.iterrows():
+        date_val = row["date"]
+        if pd.notna(date_val):
+            # Convert to string key to avoid timestamp issues
+            date_key = str(pd.to_datetime(date_val).date())
+        else:
+            date_key = "nodate"
+        count = date_counts.get(date_key, 0)
+        y_positions.append(float(count % 3))  # Max 3 rows, use float
+        date_counts[date_key] = count + 1
+
+    chart_df["y_pos"] = y_positions
+
+    # Create scatter plot
+    fig = go.Figure()
+
+    # Add traces for each status (for legend)
+    status_colors = {
+        "Complete": "#9333EA",
+        "Incomplete": "#DC2626",
+        "On Track": "#16A34A",
+        "Overdue": "#EA580C",
+    }
+
+    for status, color in status_colors.items():
+        status_df = chart_df[chart_df["status"] == status]
+        if not status_df.empty:
+            fig.add_trace(go.Scatter(
+                x=status_df["date"],
+                y=status_df["y_pos"],
+                mode="markers+text",
+                name=status,
+                marker=dict(
+                    size=16,
+                    color=color,
+                    symbol="diamond",
+                    line=dict(width=1, color="white"),
+                ),
+                text=status_df["title"],
+                textposition="top center",
+                textfont=dict(size=10),
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "Due: %{customdata[0]}<br>"
+                    "Issues: %{customdata[1]}<br>"
+                    "Status: " + status +
+                    "<extra></extra>"
+                ),
+                customdata=list(zip(status_df["date_str"], status_df["issues"])),
+            ))
+
+    # Add vertical line for today using shape (avoids annotation arithmetic issues)
+    today_str = now.strftime("%Y-%m-%d")
+    fig.add_shape(
+        type="line",
+        x0=today_str, x1=today_str,
+        y0=0, y1=1,
+        yref="paper",
+        line=dict(width=2, dash="dash", color="rgba(128, 128, 128, 0.8)"),
     )
-
-    # Add vertical line for today
-    fig.add_vline(
-        x=now.timestamp() * 1000,
-        line_width=2,
-        line_dash="dash",
-        line_color="rgba(128, 128, 128, 0.8)",
-        annotation_text="Today",
-        annotation_position="top",
+    fig.add_annotation(
+        x=today_str,
+        y=1.05,
+        yref="paper",
+        text="Today",
+        showarrow=False,
+        font=dict(size=10),
     )
 
     # Style for dark/light mode compatibility
     fig.update_layout(
-        height=max(200, len(timeline_data) * 50),
-        margin=dict(l=0, r=0, t=30, b=0),
+        height=200,  # Fixed compact height
+        margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif"),
@@ -405,11 +444,18 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
             showgrid=True,
             gridcolor="rgba(128, 128, 128, 0.2)",
             title="",
+            type="date",
+            # Default view: 9 months before, 3 months after today
+            range=[
+                (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
+                (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
+            ],
         ),
         yaxis=dict(
             showgrid=False,
+            showticklabels=False,
             title="",
-            autorange="reversed",
+            range=[-0.5, 2.5],  # Fixed range for 3 rows
         ),
         legend=dict(
             orientation="h",
@@ -419,6 +465,7 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
             x=0,
         ),
         showlegend=True,
+        hovermode="closest",
     )
 
     st.plotly_chart(fig, use_container_width=True)
