@@ -81,11 +81,6 @@ def render_capacity_view(
         # For privacy, better to replace completely.
         work_df["assignee"] = work_df["assignee"].apply(hash_user)
 
-    # --- Interactive Filters ---
-    
-    unique_assignees = sorted(work_df["assignee"].unique())
-    selected_assignees = st.multiselect("Filter by Assignee", unique_assignees)
-
     # --- Visualizations ---
 
     # Radio Buttons for different risk perspectives (State-Aware)
@@ -110,7 +105,8 @@ def render_capacity_view(
 
     if selected_view == "workload":
         # Returns list of {assignee, stage}
-        sel = _render_workload_chart(work_df, colors, max_wip)
+        with st.expander("📊 Workload Distribution", expanded=True):
+            sel = _render_workload_chart(work_df, colors, max_wip)
         if sel:
             active_filters.extend(sel)
     
@@ -125,11 +121,8 @@ def render_capacity_view(
 
     # --- Filter Logic ---
     
-    # 1. Global Field Filter (Dropdown)
-    if selected_assignees:
-        display_df = work_df[work_df["assignee"].isin(selected_assignees)]
-    else:
-        display_df = work_df
+    # Base DF for filtering (Charts use work_df directly)
+    display_df = work_df
 
     # 2. Chart Drill-down (Compound Filter)
     grid_msg = "Active Inventory"
@@ -169,7 +162,7 @@ def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, thre
     Returns:
         List of selected points [{'assignee': '...', 'stage': '...'}] if any.
     """
-    st.subheader("Workload Distribution")
+    # st.subheader("Workload Distribution") - Removed as redundant with expander title
     
     # Aggregation: Assignee -> Stage -> Count
     # We want to stack by Stage to see *where* they are stuck
@@ -323,11 +316,91 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
     """Render filterable grid of active work."""
     # Simplified grid focused on Assignment and Age
     
+    # --- Column Filters (Expandable) ---
+    with st.expander("🔍 Filters", expanded=False):
+        # Row 1: Title search (full width)
+        title_search = st.text_input(
+            "Search Title",
+            placeholder="Type to search issue titles...",
+            key="cap_filter_title"
+        )
+
+        filter_cols = st.columns(3)
+
+        # 1. Assignee Filter
+        with filter_cols[0]:
+            if "assignee" in df.columns:
+                available_assignees = sorted(df["assignee"].dropna().unique().tolist())
+                selected_assignees = st.multiselect(
+                    "Assignee",
+                    options=available_assignees,
+                    default=[],
+                    key="cap_filter_assignee"
+                )
+            else:
+                selected_assignees = []
+
+        # 2. Priority Filter
+        with filter_cols[1]:
+            # Check for priority column (it's in the grid config, so likely present)
+            if "priority" in df.columns:
+                available_priorities = sorted(df["priority"].dropna().unique().tolist())
+                selected_priorities = st.multiselect(
+                    "Priority",
+                    options=available_priorities,
+                    default=[],
+                    key="cap_filter_priority"
+                )
+            elif "severity" in df.columns: # Fallback if mapped
+                 available_priorities = sorted(df["severity"].dropna().unique().tolist())
+                 selected_priorities = st.multiselect(
+                    "Priority (Severity)",
+                    options=available_priorities,
+                    default=[],
+                    key="cap_filter_priority"
+                )
+            else:
+                selected_priorities = []
+
+        # 3. Milestone Filter
+        with filter_cols[2]:
+            if "milestone" in df.columns:
+                available_milestones = sorted(df["milestone"].dropna().unique().tolist())
+                selected_milestones = st.multiselect(
+                    "Milestone",
+                    options=available_milestones,
+                    default=[],
+                    key="cap_filter_milestone"
+                )
+            else:
+                selected_milestones = []
+
+    # --- Apply Filters ---
+    display_df = df.copy()
+
+    # Title search (case-insensitive)
+    if title_search:
+        display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
+
+    if selected_assignees:
+        display_df = display_df[display_df["assignee"].isin(selected_assignees)]
+
+    if selected_priorities:
+        # Handle both if priority or severity
+        if "priority" in display_df.columns:
+             display_df = display_df[display_df["priority"].isin(selected_priorities)]
+        elif "severity" in display_df.columns:
+             display_df = display_df[display_df["severity"].isin(selected_priorities)]
+
+    if selected_milestones:
+        display_df = display_df[display_df["milestone"].isin(selected_milestones)]
+
+    
     cols_to_show = ["web_url", "assignee", "title", "stage", "priority", "milestone", "days_in_stage", "context", "weight"]
-    available_cols = [c for c in cols_to_show if c in df.columns]
+    available_cols = [c for c in cols_to_show if c in display_df.columns]
     
     # Default Sort: Assignee then Age
-    display_df = df[available_cols].sort_values(["assignee", "days_in_stage"], ascending=[True, False])
+    display_df = display_df[available_cols].sort_values(["assignee", "days_in_stage"], ascending=[True, False])
     
     st.dataframe(
         display_df,
