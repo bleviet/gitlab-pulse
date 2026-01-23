@@ -91,11 +91,24 @@ def render_release_view(df: pd.DataFrame) -> None:
         st.info("No milestones found.")
         return
 
-    selected_milestone_name = st.selectbox(
-        "Select Milestone",
-        allowed_milestones,
-        key="release_milestone_selector"
-    )
+    # Determine active milestone:
+    # 1. Timeline click (session_state)
+    # 2. Default to first in list
+
+    selected_milestone_name = None
+
+    # Check session state override from timeline
+    if "release_milestone_selector" in st.session_state:
+        candidate = st.session_state["release_milestone_selector"]
+        if candidate in allowed_milestones:
+            selected_milestone_name = candidate
+
+    # Fallback to first available
+    if not selected_milestone_name:
+        selected_milestone_name = allowed_milestones[0]
+        # Sync back to session state so interactions are consistent
+        st.session_state["release_milestone_selector"] = selected_milestone_name
+
     selected_ms_id = ms_map[selected_milestone_name]
 
     # Filter data for selected milestone
@@ -131,9 +144,10 @@ def render_release_view(df: pd.DataFrame) -> None:
     style_metric_cards()
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Progress", f"{pct_complete:.1f}%", f"{closed_issues}/{total_issues} Issues")
-    col2.metric("Days Remaining", days_remaining)
-    col3.metric("Scope", total_issues, help="Total issues in milestone")
+    col1.metric("Milestone", selected_milestone_name, help="Selected release scope")
+    col2.metric("Progress", f"{pct_complete:.1f}%", f"{closed_issues}/{total_issues} Issues")
+    col3.metric("Days Remaining", days_remaining)
+    col4.metric("Total Issues", total_issues, help="Total issues in milestone")
 
     # 3. Burn-up Chart (Collapsible)
     with st.expander("📈 Burn-up Chart", expanded=True):
