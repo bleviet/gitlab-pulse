@@ -48,7 +48,19 @@ def render_release_view(df: pd.DataFrame) -> None:
     # Milestone Timeline Section (Collapsible, collapsed by default)
     if not ms_agg.empty:
         with st.expander("📅 Milestone Timeline", expanded=True):
-            _render_milestone_timeline(ms_agg, df)
+            timeline_selection = _render_milestone_timeline(ms_agg, df)
+
+            # Handle selection from timeline
+            if timeline_selection and timeline_selection.get("selection", {}).get("points"):
+                points = timeline_selection["selection"]["points"]
+                if points:
+                    # We added title as customdata[2]
+                    try:
+                        selected_milestone = points[0]["customdata"][2]
+                        st.session_state["release_milestone_selector"] = selected_milestone
+                        # Rerun is handled by st.plotly_chart(on_select="rerun")
+                    except (IndexError, KeyError):
+                        pass
 
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
@@ -79,7 +91,11 @@ def render_release_view(df: pd.DataFrame) -> None:
         st.info("No milestones found.")
         return
 
-    selected_milestone_name = st.selectbox("Select Milestone", allowed_milestones)
+    selected_milestone_name = st.selectbox(
+        "Select Milestone",
+        allowed_milestones,
+        key="release_milestone_selector"
+    )
     selected_ms_id = ms_map[selected_milestone_name]
 
     # Filter data for selected milestone
@@ -267,7 +283,7 @@ def _render_burnup_chart(df: pd.DataFrame, meta: pd.Series):
     st.plotly_chart(fig, width="stretch")
 
 
-def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFrame) -> None:
+def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFrame) -> dict | None:
     """Render milestone timeline as a scatter plot with markers.
 
     Color scheme:
@@ -412,7 +428,8 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
                     "Status: " + status +
                     "<extra></extra>"
                 ),
-                customdata=list(zip(status_df["date_str"], status_df["issues"])),
+                # Add title to customdata[2] for selection
+                customdata=list(zip(status_df["date_str"], status_df["issues"], status_df["title"])),
             ))
 
     # Add vertical line for today using shape (avoids annotation arithmetic issues)
@@ -468,5 +485,10 @@ def _render_milestone_timeline(milestones_df: pd.DataFrame, issues_df: pd.DataFr
         hovermode="closest",
     )
 
-    st.plotly_chart(fig, width="stretch")
+    return st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points"
+    )
 
