@@ -40,12 +40,22 @@ def issue_detail_grid(
         # Stage filter
         if "stage" in df.columns:
             with filter_cols[0]:
-                all_stages = df["stage"].dropna().unique().tolist()
+                all_stages = sorted(df["stage"].dropna().unique().tolist())
+
+                # Reset filter if options changed
+                stage_hash = hash(tuple(all_stages))
+                hash_key = f"{widget_key}_stage_hash"
+                filter_key = f"{widget_key}_stage_filter"
+                if st.session_state.get(hash_key) != stage_hash:
+                    if filter_key in st.session_state:
+                        del st.session_state[filter_key]
+                    st.session_state[hash_key] = stage_hash
+
                 selected_stages = st.multiselect(
                     "Stage",
                     options=all_stages,
                     default=all_stages,
-                    key=f"{widget_key}_stage_filter"
+                    key=filter_key
                 )
                 if selected_stages:
                     df = df[df["stage"].isin(selected_stages)]
@@ -65,12 +75,22 @@ def issue_detail_grid(
         # Type filter
         if "issue_type" in df.columns:
             with filter_cols[2]:
-                all_types = df["issue_type"].dropna().unique().tolist()
+                all_types = sorted(df["issue_type"].dropna().unique().tolist())
+
+                # Reset filter if options changed
+                type_hash = hash(tuple(all_types))
+                hash_key = f"{widget_key}_type_hash"
+                filter_key = f"{widget_key}_type_filter"
+                if st.session_state.get(hash_key) != type_hash:
+                    if filter_key in st.session_state:
+                        del st.session_state[filter_key]
+                    st.session_state[hash_key] = type_hash
+
                 selected_types = st.multiselect(
                     "Type",
                     options=all_types,
                     default=all_types,
-                    key=f"{widget_key}_type_filter"
+                    key=filter_key
                 )
                 if selected_types:
                     df = df[df["issue_type"].isin(selected_types)]
