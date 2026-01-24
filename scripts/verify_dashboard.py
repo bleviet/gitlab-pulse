@@ -1,13 +1,24 @@
 import sys
 import os
+import logging
+
+# Config logging before imports
+# Force Streamlit to be quiet via Env Var if it checks it
+os.environ["STREAMLIT_LOG_LEVEL"] = "error"
 
 # Add project root to path
 sys.path.append(os.getcwd())
 
-import logging
-
-# Suppress Streamlit warnings when running without runtime
-logging.getLogger("streamlit").setLevel(logging.ERROR)
+# Aggressively silence Streamlit loggers
+loggers = [
+    "streamlit",
+    "streamlit.runtime.caching",
+    "streamlit.runtime.caching.cache_data_api",
+    "streamlit.runtime.caching.cache_resource_api",
+]
+for name in loggers:
+    logging.getLogger(name).setLevel(logging.CRITICAL)
+    logging.getLogger(name).disabled = True
 
 print("Verifying dashboard imports...")
 
