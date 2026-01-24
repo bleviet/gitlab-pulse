@@ -4,6 +4,11 @@ import os
 # Add project root to path
 sys.path.append(os.getcwd())
 
+import logging
+
+# Suppress Streamlit warnings when running without runtime
+logging.getLogger("streamlit").setLevel(logging.ERROR)
+
 print("Verifying dashboard imports...")
 
 try:
