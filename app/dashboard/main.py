@@ -80,8 +80,8 @@ def main() -> None:
     pages = {
         "📊 Overview": "overview",
         "🚀 Release": "release",
-        "📈 Stats": "stats",
         "⚖️ Capacity": "capacity",
+        "📈 Stats": "stats",
         "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
     }
