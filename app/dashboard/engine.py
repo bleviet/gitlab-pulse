@@ -110,112 +110,204 @@ def render_grid(
     df: pd.DataFrame,
     layout_data: dict,
     edit_mode: bool = False,
-    key: str = "dashboard_grid"
+    key: str = "dashboard_grid",
+    quality_df: pd.DataFrame = None
 ) -> dict | None:
-    """Render widgets in a grid layout using streamlit-elements.
+    """Render widgets using Hybrid Strategy: Edit Mode (Blueprint) vs View Mode (Native).
 
     Args:
         df: DataFrame with issue data
-        layout_data: Layout dictionary with widget positions
-        edit_mode: If True, widgets are draggable and resizable
-        key: Unique key for the elements context
+        layout_data: Layout dictionary
+        edit_mode: If True, uses streamlit-elements for drag-and-drop
+        key: Unique key
 
     Returns:
-        Updated layout if in edit mode and changed, None otherwise
+        Updated layout if changed in edit mode
     """
     layout_items = layout_data.get("layout", [])
 
-    if not layout_items:
+    if not layout_items and not edit_mode:
         st.info("No widgets in this layout. Switch to Edit Mode to add widgets.")
         return None
 
-    # Convert layout items to dashboard format
-    grid_layout = []
-    for item in layout_items:
-        grid_layout.append(
+    # --- EDIT MODE: Streamlit Elements Grid ---
+    if edit_mode:
+        if not layout_items:
+            st.warning("No widgets yet. Use the Widget Toolbox in the sidebar to add widgets.")
+            return None
+        
+        st.caption(f"📐 Editing {len(layout_items)} widget(s) • 12-column grid • Drag to reposition • Resize from any corner")
+        
+        # Inject CSS for grid visualization
+        st.markdown("""
+        <style>
+        /* Grid background pattern for 12-column visualization */
+        .stElementsFrame iframe {
+            background-image: 
+                linear-gradient(to right, rgba(79, 70, 229, 0.1) 1px, transparent 1px);
+            background-size: calc(100% / 12) 100%;
+        }
+        
+        /* Resize handles styling */
+        .react-resizable-handle {
+            background-color: #4F46E5 !important;
+            border-radius: 3px !important;
+            opacity: 0.8 !important;
+        }
+        .react-resizable-handle:hover {
+            opacity: 1 !important;
+            background-color: #3730A3 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Build dashboard layout items with resize handles on all corners
+        grid_layout = [
             dashboard.Item(
-                i=item["i"],
-                x=item["x"],
-                y=item["y"],
-                w=item["w"],
-                h=item["h"],
-                isDraggable=edit_mode,
-                isResizable=edit_mode,
+                str(item["i"]),
+                int(item["x"]),
+                int(item["y"]),
+                int(item["w"]),
+                int(item["h"]),
+                isResizable=True,
+                isDraggable=True,
             )
-        )
+            for item in layout_items
+        ]
+        
+        # Session state key for tracking changes
+        layout_state_key = f"{key}_layout_state"
+        
+        def handle_layout_change(updated_layout):
+            """Callback when user drags/resizes items."""
+            st.session_state[layout_state_key] = updated_layout
+        
+        # Render the grid with explicit configuration
+        with elements(key):
+            with dashboard.Grid(
+                grid_layout, 
+                onLayoutChange=handle_layout_change,
+            ):
+                for item in layout_items:
+                    widget_type = item.get("type", "unknown")
+                    item_id = str(item["i"])
+                    
+                    # Display position info for user feedback
+                    pos_info = f"x:{item['x']} y:{item['y']} | {item['w']}×{item['h']}"
+                    
+                    # Use mui.Paper as recommended in docs
+                    mui.Paper(
+                        f"📦 {widget_type}\n({pos_info})",
+                        key=item_id,
+                        elevation=3,
+                        sx={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "justifyContent": "center",
+                            "height": "100%",
+                            "bgcolor": "#EEF2FF",
+                            "border": "2px dashed #4F46E5",
+                            "borderRadius": "8px",
+                            "cursor": "move",
+                            "textAlign": "center",
+                            "p": 2,
+                            "fontSize": "0.85rem",
+                        }
+                    )
+        
+        # Check if layout was changed
+        if layout_state_key in st.session_state:
+            updated = st.session_state[layout_state_key]
+            # Merge position updates with original type data
+            new_layout = []
+            for updated_item in updated:
+                item_id = updated_item.get("i") if isinstance(updated_item, dict) else updated_item["i"]
+                # Find original to get type
+                original = next((x for x in layout_items if str(x["i"]) == str(item_id)), None)
+                if original:
+                    new_layout.append({
+                        "i": item_id,
+                        "x": updated_item.get("x", original["x"]) if isinstance(updated_item, dict) else updated_item["x"],
+                        "y": updated_item.get("y", original["y"]) if isinstance(updated_item, dict) else updated_item["y"],
+                        "w": updated_item.get("w", original["w"]) if isinstance(updated_item, dict) else updated_item["w"],
+                        "h": updated_item.get("h", original["h"]) if isinstance(updated_item, dict) else updated_item["h"],
+                        "type": original["type"]
+                    })
+            if new_layout != layout_items:
+                return new_layout
+        
+        return None
 
-    # Track layout changes in session state
-    layout_key = f"{key}_layout"
-    if layout_key not in st.session_state:
-        st.session_state[layout_key] = layout_items
-
-    def handle_layout_change(updated_layout):
-        """Callback when layout changes in edit mode."""
-        st.session_state[layout_key] = updated_layout
-
-    # Render the grid
-    with elements(key):
-        with dashboard.Grid(
-            grid_layout,
-            onLayoutChange=handle_layout_change if edit_mode else None,
-            draggableHandle=".drag-handle" if edit_mode else None,
-            cols=12,
-            rowHeight=60,
-        ):
-            for item in layout_items:
-                widget_type = item.get("type")
-                item_id = item["i"]
-
-                with mui.Card(
-                    key=item_id,
-                    sx={
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "height": "100%",
-                        "bgcolor": "background.paper",
-                        "borderRadius": 2,
-                        "overflow": "hidden",
-                    }
-                ):
-                    # Header with drag handle in edit mode
-                    if edit_mode:
-                        with mui.Box(
-                            className="drag-handle",
-                            sx={
-                                "cursor": "move",
-                                "bgcolor": "primary.main",
-                                "color": "white",
-                                "px": 2,
-                                "py": 0.5,
-                                "display": "flex",
-                                "alignItems": "center",
-                            }
-                        ):
-                            mui.Icon("drag_indicator", sx={"mr": 1})
-                            mui.Typography(widget_type, variant="caption")
-
-                    # Widget content
-                    with mui.CardContent(sx={"flexGrow": 1, "overflow": "auto"}):
-                        try:
-                            renderer = WidgetRegistry.get_renderer(widget_type)
-                            # Note: We can't directly call Streamlit widgets inside
-                            # streamlit-elements cards. We'll render a placeholder.
-                            mui.Typography(
-                                f"Widget: {widget_type}",
-                                variant="body2",
-                                color="text.secondary"
-                            )
-                        except ValueError:
-                            mui.Typography(
-                                f"Unknown widget: {widget_type}",
-                                color="error"
-                            )
-
-    # Return updated layout if changed
-    if edit_mode and st.session_state.get(layout_key):
-        return st.session_state[layout_key]
+    # --- VIEW MODE: Native Streamlit (Row-based Rendering) ---
+    
+    # Sort items by Y, then X to process top-to-bottom, left-to-right
+    sorted_items = sorted(layout_items, key=lambda x: (int(x["y"]), int(x["x"])))
+    
+    # Group items by Y-coordinate for row-based rendering
+    y_groups = {}
+    for item in sorted_items:
+        y = int(item["y"])
+        if y not in y_groups:
+            y_groups[y] = []
+        y_groups[y].append(item)
+    
+    # Process each row group independently
+    for row_y in sorted(y_groups.keys()):
+        row_items = y_groups[row_y]
+        
+        if not row_items:
+            continue
+        
+        # Sort by X position
+        row_items = sorted(row_items, key=lambda x: int(x["x"]))
+        
+        # Create columns based on widths
+        widths = [int(item["w"]) for item in row_items]
+        
+        # If only one item with w>=12, render full width (no columns needed)
+        if len(row_items) == 1 and widths[0] >= 12:
+            _render_single_widget(row_items[0], df, quality_df)
+        else:
+            # Multiple items in this row - create columns
+            active_cols = st.columns(widths)
+            
+            for col, item in zip(active_cols, row_items):
+                with col:
+                    _render_single_widget(item, df, quality_df)
 
     return None
+
+def _render_single_widget(item: dict, df: pd.DataFrame, quality_df: pd.DataFrame = None):
+    """Helper to render a widget inside a column container."""
+    from app.dashboard.registry import WidgetRegistry
+    
+    widget_type = item.get("type", "unknown")
+    widget_id = item["i"]
+    height_px = item.get("h", 2) * 100 # map grid units to pixels
+    
+    # Container for visual separation
+    with st.container(border=True):
+        try:
+            renderer = WidgetRegistry.get_renderer(widget_type)
+            # Inject key and height into config
+            config = {
+                "key": widget_id,
+                "height": height_px,
+            }
+            
+            # Special handling for Quality widgets which need two dataframes
+            if widget_type in ["kpi_quality_score", "chart_quality_gauge"]:
+                if quality_df is not None:
+                     renderer(df, quality_df, config)
+                else:
+                     st.warning("Quality data not available for this widget")
+            else:
+                selection = renderer(df, config)
+                # Store selection if available (simplified for now, main.py logic was more complex)
+                # Ideally we bubble this up, but for the grid refactor we focus on layout first.
+                
+        except Exception as e:
+            st.error(f"Error {widget_type}: {e}")
 
 
 def render_widget_toolbox() -> str | None:

@@ -12,92 +12,67 @@ The Dashboard Builder enables users to create custom views by composing widgets 
 
 ### 2.1. Widget Registry (`app/dashboard/registry.py`)
 
-Central dispatcher mapping widget IDs to render functions.
-
-| Category | Widget ID | Function |
-|----------|-----------|----------|
-| KPI | `kpi_flow_metrics` | Flow metrics (WIP, Efficiency, Backlog) |
-| KPI | `kpi_stats` | Statistics KPIs |
-| KPI | `kpi_stale_count` | Stale issue count |
-| KPI | `kpi_quality_score` | Quality percentage |
-| Chart | `chart_stage_distribution` | Horizontal bar by stage |
-| Chart | `chart_aging_boxplot` | Age distribution boxplot |
-| Chart | `chart_burnup_velocity` | Burnup + velocity chart |
-| Chart | `chart_workload_distribution` | Assignee workload |
-| Chart | `chart_work_type_distribution` | Issue type breakdown |
-| Chart | `chart_status_donut` | Open/Closed donut |
-| Chart | `chart_quality_gauge` | Quality score gauge |
-| Chart | `chart_error_distribution` | Error code distribution |
-| Table | `table_issue_detail_grid` | Issue detail grid |
-| Table | `table_stale_issues_list` | Stale issues list |
-| Table | `table_quality_action` | Quality action items |
-| Table | `table_capacity_grid` | Capacity planning grid |
+Central dispatcher mapping widget IDs to render functions. (See registry.py for full list).
 
 ### 2.2. Layout Schema
 
-Layouts stored in `data/config/layouts/*.json`:
+Layouts stored in `data/config/layouts/*.json`. Uses a 12-column Grid System.
 
 ```json
 {
-  "name": "My Dashboard",
-  "description": "Custom view",
+  "name": "Management View",
   "layout": [
-    {"i": "widget_1", "type": "kpi_flow_metrics", "x": 0, "y": 0, "w": 12, "h": 2},
-    {"i": "widget_2", "type": "chart_stage_distribution", "x": 0, "y": 2, "w": 6, "h": 4}
+    // Mosaic Layout: Tall widget on left, stacked widgets on right
+    {"i": "w1", "type": "chart_aging_boxplot", "x": 0, "y": 0, "w": 6, "h": 4},
+    {"i": "w2", "type": "kpi_flow_metrics",    "x": 6, "y": 0, "w": 6, "h": 2},
+    {"i": "w3", "type": "kpi_quality_score",   "x": 6, "y": 2, "w": 6, "h": 2}
   ]
 }
 ```
 
 ### 2.3. Grid Engine (`app/dashboard/engine.py`)
 
-Functions:
-- `load_layout(name)` - Load JSON layout
-- `save_layout(name, data)` - Persist layout
-- `delete_layout(name)` - Remove layout (protected: default)
-- `create_layout(name)` - Create new empty layout
-- `add_widget_to_layout(data, type)` - Add widget
-- `remove_widget_from_layout(data, id)` - Remove widget
+The engine uses a **Hybrid Rendering Strategy**:
+
+1.  **Edit Mode (Blueprint):**
+    -   Uses `streamlit-elements` (React-Grid-Layout) to render a visual "Blueprint" of the dashboard.
+    -   Displays simplified "Cards" representing widgets.
+    -   Allows **Drag-and-Drop** positioning and **Resizing**.
+    -   Updates the internal `layout` state in real-time.
+
+2.  **View Mode (Native Render):**
+    -   Converts the grid coordinates `(x, y, w, h)` into native Streamlit structures.
+    -   **Mosaic Detection:** Identifies vertical columns of widgets.
+        -   *Example:* If Widget A is at `x=0, w=6` and Widget B/C are at `x=6, w=6`, it creates 2 main columns.
+        -   Col 1 renders Widget A (height handled via `st.container(height=...)` or natural height).
+        -   Col 2 renders Widget B then Widget C vertically.
+    -   **Fallback:** Row-based rendering for linear layouts.
 
 ## 3. User Interface
 
-### 3.1. Sidebar Controls
-
-Located at top of sidebar (immediately visible):
-- **View dropdown** - Select layout
-- **➕ button** - Create new view
-- **🗑️ button** - Delete view (disabled for default)
-- **✏️ Edit Mode toggle** - Enable editing
+### 3.1. Interactive Grid (Edit Mode)
+-   **Toggle:** "✏️ Edit Layout" button in sidebar.
+-   **Visuals:**
+    -   Widgets appear as Draggable Cards with handles.
+    -   "Empty" grid spaces are visible hints.
+-   **Actions:**
+    -   **Resize:** Grab corner to span multiple rows/columns.
+    -   **Swap:** Drag Widget A over Widget B to swap positions.
+    -   **Remove:** 'X' button on card corner.
+-   **Persist:** "Save Changes" button commits JSON to disk.
 
 ### 3.2. Widget Toolbox
-
-Visible when Edit Mode is on:
-- **📊 KPIs** - 4 widgets
-- **📈 Charts** - 8 widgets
-- **📋 Tables** - 4 widgets
-
-### 3.3. Custom View Tab
-
-Navigation: **🎨 Custom**
-- Renders widgets from selected layout
-- Edit mode: ✕ buttons to remove widgets
-- Save/Exit Edit buttons in header
+-   Sidebar panel listing available widgets by category (KPIs, Charts, Tables).
+-   "Add +" button injects widget into the first available grid space.
 
 ## 4. Widget Contract
 
-```python
-def widget_function(
-    df: pd.DataFrame,
-    config: dict[str, Any] | None = None
-) -> None:
-```
-
-Config keys:
-- `key` - Unique Streamlit key (required for multiple instances)
-- `height` - Chart height in pixels
-- `title` - Override header
+Widgets must support flexible sizing to fit grid containers:
+-   `height`: passed from grid row-span logic (e.g. 1 unit = 150px).
+-   `use_container_width`: always True.
 
 ## 5. Implementation Notes
 
-- Widgets use native Streamlit rendering (not streamlit-elements)
-- Quality widgets require both `valid_df` and `quality_df`
-- Chart keys derived from `config["key"]` to prevent conflicts
+-   **Mosaic Support:** The rendering algorithm must prioritize "Vertical Stacks" over "Horizontal Rows" to support the "Tall Left, Stacked Right" pattern requested.
+-   **Row Units:** Base row height set to ~150px. Widget height `h=2` -> 300px container.
+-   **Responsive:** Grid collapses to single column on mobile, but preserves relative order.
