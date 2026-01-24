@@ -134,7 +134,7 @@ WidgetRegistry._registry = {
     "chart_stage_distribution": stage_distribution,
     "chart_aging_boxplot": aging_boxplot,
     "table_issue_detail_grid": issue_detail_grid,
-    # ... 11 more
+    # (Consolidated Table Widget replacing capacity, stale, and quality tables)
 }
 ```
 
