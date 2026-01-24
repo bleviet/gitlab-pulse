@@ -7,7 +7,8 @@ Refactored to use Widget Registry.
 import pandas as pd
 import streamlit as st
 
-from app.dashboard.widgets import charts, tables
+from app.dashboard.widgets import tables, charts
+from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
 
 
@@ -58,7 +59,23 @@ def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None
     # Stale Issues Table (Collapsible) - using widget
     with st.expander("⚠️ Stale Issues", expanded=True):
         st.subheader("📋 Stale Issues List")
-        tables.stale_issues_list(df)
+        stale_df = df[df["is_stale"] == True] if "is_stale" in df.columns else pd.DataFrame()
+        if stale_df.empty:
+            st.success("✅ No stale issues! All issues are actively maintained.")
+        else:
+            tables.issue_detail_grid(
+                stale_df,
+                config={
+                    "height": 400,
+                    "columns": ["web_url", "title", "issue_type", "assignee", "age_days", "updated_at"],
+                    "column_config": {
+                        "Age (Days)": st.column_config.NumberColumn("Age (Days)", width="small"),
+                        "Last Update": st.column_config.TextColumn("Last Update", width="medium"),
+                    },
+                    "title": "📋 Stale Issues List",
+                    "key": "stale_issues_grid"
+                }
+            )
 
 
 def _render_stale_alert(df: pd.DataFrame) -> None:

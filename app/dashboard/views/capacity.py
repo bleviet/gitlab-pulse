@@ -138,9 +138,17 @@ def render_capacity_view(
     else:
         grid_df = display_df
 
-    # --- Detailed Grid ---
     with st.expander(f"📋 {grid_msg}", expanded=True):
-        tables.capacity_grid(grid_df, config={"height": 500})
+        tables.issue_detail_grid(
+            grid_df, 
+            config={
+                "height": 500,
+                "columns": ["web_url", "title", "assignee", "stage", "days_in_stage", "context", "weight"],
+                "column_config": {
+                    "Age (Days)": st.column_config.NumberColumn("Age", format="%d days"),
+                }
+            }
+        )
 
 
 

@@ -30,7 +30,7 @@ try:
     print("Checking widget attributes...")
     _ = charts.milestone_timeline
     _ = charts.milestone_burnup
-    _ = tables.quality_action_table
+    _ = tables.issue_detail_grid
     _ = features.ai_assistant
     print("✅ Widget attributes verified")
 

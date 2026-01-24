@@ -10,6 +10,7 @@ import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
+from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
 
 # Semantic color palette
@@ -79,7 +80,50 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
             if "parent_id" in display_df.columns:
                  display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
             
-            tables.quality_action_table(display_df, config={"key": "hygiene_action_table"})
+            # Rename columns before styling (because issue_detail_grid doesn't rename Styler data)
+            renames = {
+                "web_url": "IID",
+                "title": "Title",
+                "error_code": "Error",
+                "error_message": "Message",
+                "assignee": "Assignee"
+            }
+            display_df = display_df.rename(columns={k: v for k, v in renames.items() if k in display_df.columns})
+
+            # Style the Error column (logic moved from widget)
+            ERROR_SEVERITY = {
+                "MISSING_LABEL": "warning",
+                "CONFLICTING_LABELS": "error",
+                "STALE_WITHOUT_UPDATE": "warning",
+                "ORPHAN_TASK": "error",
+                "EXCEEDS_CYCLE_TIME": "info",
+            }
+            
+            def style_error_code(row: pd.Series) -> list[str]:
+                code = row.get("Error", "")
+                severity = ERROR_SEVERITY.get(code, "info")
+                bg_colors = {
+                    "error": "background-color: rgba(239,68,68,0.2)",
+                    "warning": "background-color: rgba(245,158,11,0.2)",
+                    "info": "background-color: rgba(100,116,139,0.1)",
+                }
+                style = bg_colors.get(severity, "")
+                return [style if c == "Error" else "" for c in row.index]
+
+            styler = display_df.style.apply(style_error_code, axis=1)
+
+            tables.issue_detail_grid(
+                styler, 
+                config={
+                    "key": "hygiene_action_table",
+                    # Pass the NEW names because Styler data already has them
+                    "columns": ["IID", "Title", "Error", "Message", "Assignee"],
+                    "column_config": {
+                         "Error": st.column_config.TextColumn("Error", width="medium"),
+                         "Message": st.column_config.TextColumn("Message", width="large")
+                    }
+                }
+            )
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
 

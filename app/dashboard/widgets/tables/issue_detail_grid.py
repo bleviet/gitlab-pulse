@@ -102,38 +102,66 @@ def issue_detail_grid(
                             df = df[df["issue_type"].isin(selected_types)]
 
         # Column handling
-        if config.get("minimize_columns", True):
-            default_columns = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]
-            columns = config.get("columns", default_columns)
-            available_cols = [c for c in columns if c in df.columns]
+        # Column handling
+        # User request: "The table should have the possiblity display all the issue details..."
+        # We generally avoid hard-dropping columns.
+    display_df = df.copy()
 
-            if not available_cols:
-                st.warning("No displayable columns available")
-                return None
-            
-            display_df = df[available_cols].copy()
-        else:
-            display_df = df.copy()
+    # Column Renames (Defined here for scope availability)
+    column_renames = {
+        "web_url": "IID",
+        "title": "Title",
+        "issue_type": "Type",
+        "stage": "Stage",
+        "assignee": "Assignee",
+        "priority": "Priority",
+        "milestone": "Milestone",
+        "age_days": "Age (Days)",
+        "days_in_stage": "Days in Stage",
+        "severity": "Severity",
+        "weight": "Weight",
+        "context": "Context",
+        "error_code": "Error",
+        "error_message": "Message",
+        "updated_at": "Last Update"
+    }
 
+    if is_styler:
+        # If Styler, underlying data is in data.data
+        # We cannot easily rename columns in a Styler object without reconstructing it or using specific pandas calls
+        # which might break existing styles. 
+        # However, users passing a Styler usually have already set up the display dataframe.
+        # But if we want to apply our standard column configs (which use renmaed global keys like 'IID'), 
+        # the styler data must match.
+        # Ideally, caller should rename BEFORE styling.
+        # For now, we assume Styler input has valid columns or we mapped them earlier in the View.
+        # IMPORTANT: 'column_renames' is mainly for raw DF handling. 
+        display_data = data
+    else:
         # Sort by hierarchy if available
         if "parent_id" in df.columns and "iid" in df.columns:
             display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
 
-        # Rename columns for display
-        column_renames = {
-            "web_url": "IID",
-            "title": "Title",
-            "issue_type": "Type",
-            "stage": "Stage",
-            "assignee": "Assignee",
-            "priority": "Priority",
-            "milestone": "Milestone",
-            "age_days": "Age (Days)",
-            "days_in_stage": "Days in Stage",
-            "severity": "Severity",
-        }
         display_df = display_df.rename(columns={k: v for k, v in column_renames.items() if k in display_df.columns})
         display_data = display_df
+
+    # Default configured columns (mapped to new names)
+    default_columns_raw = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]
+    
+    # Map raw config columns to display names
+    def map_col(c):
+        return column_renames.get(c, c)
+
+    defaults_mapped = [map_col(c) for c in default_columns_raw]
+    
+    # Get user config columns and map them
+    user_cols_raw = config.get("columns", default_columns_raw)
+    column_order = [map_col(c) for c in user_cols_raw if c in df.columns]
+
+    # If column_order is not passed explicitly in config['column_order'], use the mapped 'columns' list
+    final_column_order = config.get("column_order", column_order)
+
+    # Base Column Configuration
 
 
     # Base Column Configuration
@@ -151,6 +179,11 @@ def issue_detail_grid(
         "Milestone": st.column_config.TextColumn("Milestone", width="medium"),
         "Age (Days)": st.column_config.NumberColumn("Age (Days)", width="small"),
         "Days in Stage": st.column_config.NumberColumn("Days in Stage", width="small"),
+        "Weight": st.column_config.NumberColumn("Weight", width="small"),
+        "Context": st.column_config.TextColumn("Context", width="small"),
+        "Error": st.column_config.TextColumn("Error", width="medium"),
+        "Message": st.column_config.TextColumn("Message", width="large"),
+        "Last Update": st.column_config.TextColumn("Last Update", width="medium"),
     }
 
     # Merge with user config (user config takes precedence)
@@ -164,7 +197,7 @@ def issue_detail_grid(
         height=height,
         hide_index=True,
         column_config=final_col_config,
-        column_order=config.get("column_order"),
+        column_order=final_column_order,
         on_select="rerun",
         selection_mode=selection_mode,
         key=widget_key

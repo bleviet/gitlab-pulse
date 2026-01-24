@@ -17,7 +17,7 @@ from app.dashboard.widgets.charts import (
     quality_gauge, error_distribution
 )
 from app.dashboard.widgets.tables import (
-    issue_detail_grid, stale_issues_list, quality_action_table, capacity_grid
+    issue_detail_grid
 )
 
 # Type alias for widget render functions
@@ -46,9 +46,6 @@ class WidgetRegistry:
 
         # Tables
         "table_issue_detail_grid": issue_detail_grid,
-        "table_stale_issues_list": stale_issues_list,
-        "table_quality_action": quality_action_table,
-        "table_capacity_grid": capacity_grid,
     }
 
     @classmethod
