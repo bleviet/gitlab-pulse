@@ -86,7 +86,7 @@ def stage_distribution(
         fig,
         width="stretch",
         on_select="rerun",
-        key=config.get("key", "stage_distribution_chart"),
+        key=config.get("key", "stage_distribution_chart") if config else "stage_distribution_chart",
     )
 
     return selection

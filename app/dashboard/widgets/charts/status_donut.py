@@ -51,4 +51,4 @@ def status_donut(
         legend=dict(orientation="h", yanchor="bottom", y=-0.1),
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "status_donut_chart") if config else None)

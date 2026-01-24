@@ -1,81 +1,103 @@
-# **Technical Specification: Layer 3 - Dynamic Dashboard Engine**
+# Technical Specification: Layer 3 - Dynamic Dashboard Engine
 
-**Version:** 2.0
+**Version:** 2.1
 
-**Scope:** Design for the Dashboard Builder, Widget Registry, and Layout Persistence.
+**Status:** Implemented
 
-## **1. Tech Stack Additions**
+## 1. Overview
 
-* **Library:** streamlit-elements (Required for Drag & Drop Grid).
-* **Storage:** JSON files in data/config/layouts/.
+The Dashboard Builder enables users to create custom views by composing widgets from a registry. Layouts are persisted as JSON files.
 
-## **2. Component Design**
+## 2. Architecture
 
-### **2.1. The Widget Registry (app/dashboard/registry.py)**
+### 2.1. Widget Registry (`app/dashboard/registry.py`)
 
-A central dispatcher that maps string keys to render functions.
+Central dispatcher mapping widget IDs to render functions.
 
-```python
-from app.dashboard.widgets import kpis, charts, tables
+| Category | Widget ID | Function |
+|----------|-----------|----------|
+| KPI | `kpi_flow_metrics` | Flow metrics (WIP, Efficiency, Backlog) |
+| KPI | `kpi_stats` | Statistics KPIs |
+| KPI | `kpi_stale_count` | Stale issue count |
+| KPI | `kpi_quality_score` | Quality percentage |
+| Chart | `chart_stage_distribution` | Horizontal bar by stage |
+| Chart | `chart_aging_boxplot` | Age distribution boxplot |
+| Chart | `chart_burnup_velocity` | Burnup + velocity chart |
+| Chart | `chart_workload_distribution` | Assignee workload |
+| Chart | `chart_work_type_distribution` | Issue type breakdown |
+| Chart | `chart_status_donut` | Open/Closed donut |
+| Chart | `chart_quality_gauge` | Quality score gauge |
+| Chart | `chart_error_distribution` | Error code distribution |
+| Table | `table_issue_detail_grid` | Issue detail grid |
+| Table | `table_stale_issues_list` | Stale issues list |
+| Table | `table_quality_action` | Quality action items |
+| Table | `table_capacity_grid` | Capacity planning grid |
 
-def get_widget_renderer(widget_type: str):
-    mapping = {
-        "kpi_bugs": kpis.bug_count,
-        "burnup_chart": charts.burnup,
-        "aging_boxplot": charts.aging,
-        "hygiene_list": tables.hygiene
-    }
-    return mapping.get(widget_type)
+### 2.2. Layout Schema
+
+Layouts stored in `data/config/layouts/*.json`:
+
+```json
+{
+  "name": "My Dashboard",
+  "description": "Custom view",
+  "layout": [
+    {"i": "widget_1", "type": "kpi_flow_metrics", "x": 0, "y": 0, "w": 12, "h": 2},
+    {"i": "widget_2", "type": "chart_stage_distribution", "x": 0, "y": 2, "w": 6, "h": 4}
+  ]
+}
 ```
 
-### **2.2. The Layout Schema**
+### 2.3. Grid Engine (`app/dashboard/engine.py`)
 
-Each user view is a JSON file.
+Functions:
+- `load_layout(name)` - Load JSON layout
+- `save_layout(name, data)` - Persist layout
+- `delete_layout(name)` - Remove layout (protected: default)
+- `create_layout(name)` - Create new empty layout
+- `add_widget_to_layout(data, type)` - Add widget
+- `remove_widget_from_layout(data, id)` - Remove widget
 
-| Field | Type | Description |
-| :---- | :---- | :---- |
-| i | String | Unique Instance ID (e.g., "widget_a1") |
-| type | String | Key from Registry (e.g., "kpi_bugs") |
-| x | Int | Grid Column Start (0-11) |
-| y | Int | Grid Row Start |
-| w | Int | Width (in grid units) |
-| h | Int | Height (in grid units) |
+## 3. User Interface
 
-### **2.3. The Grid Renderer (app/dashboard/engine.py)**
+### 3.1. Sidebar Controls
 
-Uses streamlit-elements to render the Bento Grid.
+Located at top of sidebar (immediately visible):
+- **View dropdown** - Select layout
+- **➕ button** - Create new view
+- **🗑️ button** - Delete view (disabled for default)
+- **✏️ Edit Mode toggle** - Enable editing
 
-**Algorithm:**
+### 3.2. Widget Toolbox
 
-1. **Load Layout:** Read JSON based on selected View from Sidebar.
-2. **Initialize Grid:** Create a dashboard.Grid context.
-3. **Iterate Items:** For each item in Layout:
-   * Look up renderer in Registry.
-   * Create a mui.Card.
-   * Call the renderer inside the Card context.
-4. **Handle State:** If Edit Mode is active, sync layout changes back to st.session_state.
+Visible when Edit Mode is on:
+- **📊 KPIs** - 4 widgets
+- **📈 Charts** - 8 widgets
+- **📋 Tables** - 4 widgets
 
-## **3. UX Flow**
+### 3.3. Custom View Tab
 
-### **3.1. Creating a New Dashboard**
+Navigation: **🎨 Custom**
+- Renders widgets from selected layout
+- Edit mode: ✕ buttons to remove widgets
+- Save/Exit Edit buttons in header
 
-1. Click "+" in Sidebar.
-2. Name the View (e.g., "Release Status").
-3. App creates an empty JSON.
-4. User enters "Edit Mode".
-5. User selects "Burn Up Chart" from Toolbox.
-6. Widget appears on grid.
-7. User resizes it to 6x4 units.
-8. User clicks Save.
+## 4. Widget Contract
 
-### **3.2. Responsive Design**
+```python
+def widget_function(
+    df: pd.DataFrame,
+    config: dict[str, Any] | None = None
+) -> None:
+```
 
-* The React-Grid-Layout underlying this architecture automatically reflows to a single column on mobile devices, maintaining the "Bento" integrity without breaking UX.
+Config keys:
+- `key` - Unique Streamlit key (required for multiple instances)
+- `height` - Chart height in pixels
+- `title` - Override header
 
-## **4. Architecture Decision Record (ADR)**
+## 5. Implementation Notes
 
-**ADR: Configuration-Driven UI**
-
-* **Decision:** We move from code-defined layouts to data-defined layouts (JSON).
-* **Why:** Enables user customization without code changes. Decouples the "What" (Data) from the "Where" (Position).
-* **Trade-off:** Slightly higher complexity in the rendering loop (Layer 3) in exchange for massive flexibility. Layer 1 and 2 remain untouched.
+- Widgets use native Streamlit rendering (not streamlit-elements)
+- Quality widgets require both `valid_df` and `quality_df`
+- Chart keys derived from `config["key"]` to prevent conflicts

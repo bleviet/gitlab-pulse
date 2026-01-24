@@ -109,54 +109,61 @@ Layer 2 "explodes" the dataset. One physical issue becomes multiple logical rows
 
 ### **5.4. Architectural Evolution: Dynamic Layout Engine (Dashboard Builder)**
 
-**Status:** Planned  
-**Goal:** Enable a "No-Code" experience where users can drag, drop, and resize widgets (KPIs, Charts, Tables) on a grid canvas and save their custom views.
+**Status:** Implemented
 
-This is a significant pivot from a **Static Reporting Tool** (developer-defined layouts) to a **Dynamic Dashboard Platform** (user-defined layouts).
+**Goal:** Enable a "No-Code" experience where users can compose custom views from widgets and save their layouts.
+
+This is a pivot from a **Static Reporting Tool** (developer-defined layouts) to a **Dynamic Dashboard Platform** (user-defined layouts).
 
 **Core Concept:** Shift from **Imperative Layouts** (hardcoded `st.columns`) to **Declarative Layouts** (JSON configurations rendered by a layout engine).
 
-#### **5.4.1. New Architectural Components**
+#### **5.4.1. Architectural Components**
 
 | Component | Role | Location |
 | :-------- | :--- | :------- |
-| **Widget Registry** | Catalog of all available components (the "Toolbox"). Decouples rendering from layout. | `app/dashboard/widgets/registry.py` |
-| **Layout Store** | Persistence for user's custom designs (geometry + widget IDs). | `data/layouts/*.json` |
-| **Grid Engine** | Renders widgets from Registry into grid coordinates using `streamlit-elements`. | `app/dashboard/layout_engine.py` |
+| **Widget Registry** | Catalog of 16 widgets (KPIs, Charts, Tables). | `app/dashboard/registry.py` |
+| **Widget Library** | Individual widget files organized by type. | `app/dashboard/widgets/{kpis,charts,tables}/` |
+| **Layout Store** | JSON persistence for custom layouts. | `data/config/layouts/*.json` |
+| **Grid Engine** | Layout CRUD and widget rendering. | `app/dashboard/engine.py` |
 
-**Widget Registry Example:**
+**Widget Registry (16 widgets):**
 ```python
-WIDGET_REGISTRY = {
-    "kpi_total_bugs": widgets.kpi.render_total_bugs,
-    "chart_burnup": widgets.charts.render_burnup,
-    "list_critical": widgets.tables.render_critical_list,
+WidgetRegistry._registry = {
+    "kpi_flow_metrics": flow_metrics,
+    "kpi_stats": stats_kpis,
+    "chart_stage_distribution": stage_distribution,
+    "chart_aging_boxplot": aging_boxplot,
+    "table_issue_detail_grid": issue_detail_grid,
+    # ... 11 more
 }
 ```
 
 **Layout Store Schema (JSON):**
 ```json
 {
-  "view_name": "My Morning Briefing",
+  "name": "My Dashboard",
   "layout": [
-    {"i": "kpi_1", "x": 0, "y": 0, "w": 2, "h": 2, "type": "kpi_total_bugs"},
-    {"i": "chart_1", "x": 2, "y": 0, "w": 4, "h": 4, "type": "chart_burnup"}
+    {"i": "widget_1", "x": 0, "y": 0, "w": 12, "h": 2, "type": "kpi_flow_metrics"},
+    {"i": "widget_2", "x": 0, "y": 2, "w": 6, "h": 4, "type": "chart_burnup_velocity"}
   ]
 }
 ```
 
-#### **5.4.2. Implementation Strategy (Phased)**
+#### **5.4.2. Implementation Status**
 
-| Phase | Goal | Deliverable |
-| :---- | :--- | :---------- |
-| **Phase 1: Modularization** | Refactor all UI components into standalone, reusable widgets. | `app/dashboard/widgets/` directory |
-| **Phase 2: Edit Mode Toggle** | Add UI toggle for "Edit Layout" mode with drag/drop/resize. | Dual-mode rendering (View vs. Edit) |
-| **Phase 3: Toolbox** | Sidebar listing items from Widget Registry; "Add" inserts into layout. | User-driven dashboard composition |
+| Phase | Goal | Status |
+| :---- | :--- | :----- |
+| **Phase 1: Modularization** | Refactor UI into 16 reusable widgets. | ✅ Complete |
+| **Phase 2: Edit Mode Toggle** | Sidebar toggle, save/delete layouts. | ✅ Complete |
+| **Phase 3: Toolbox** | Widget Toolbox with add/remove buttons. | ✅ Complete |
 
-#### **5.4.3. ADR: Why `streamlit-elements`?**
+#### **5.4.3. ADR: Why Native Streamlit Rendering?**
 
-* **React Grid Layout:** Standard Streamlit columns cannot support drag-and-drop resizing. `streamlit-elements` wraps `React-Grid-Layout`, enabling this functionality.
-* **MUI Integration:** Provides Material UI components for a polished editing experience.
-* **Trade-off:** Adds complexity (React bridge) but is necessary for the "Builder" experience.
+* **Initial Plan:** Use `streamlit-elements` for drag-and-drop grid.
+* **Revised Decision:** Use native Streamlit columns with ordered widget rendering.
+* **Reason:** Streamlit widgets cannot render inside `streamlit-elements` MUI cards. Native rendering provides full widget functionality.
+* **Trade-off:** No drag-and-drop positioning, but full widget interactivity preserved.
+
 
 
 ## **6\. Testing & Validation Strategy**

@@ -1,0 +1,10 @@
+{
+  "name": "Default Overview",
+  "description": "Default layout for the Overview page",
+  "layout": [
+    {"i": "kpi_flow", "x": 0, "y": 0, "w": 12, "h": 2, "type": "kpi_flow_metrics"},
+    {"i": "chart_stage", "x": 0, "y": 2, "w": 6, "h": 4, "type": "chart_stage_distribution"},
+    {"i": "chart_aging", "x": 6, "y": 2, "w": 6, "h": 4, "type": "chart_aging_boxplot"},
+    {"i": "table_issues", "x": 0, "y": 6, "w": 12, "h": 6, "type": "table_issue_detail_grid"}
+  ]
+}

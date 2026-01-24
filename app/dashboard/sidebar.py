@@ -26,6 +26,124 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
         st.divider()
 
+        # --- Custom Views (Layout Builder) ---
+        from app.dashboard.engine import list_layouts, load_layout, save_layout, create_layout, delete_layout
+
+        available_layouts = list_layouts()
+        current_layout = st.session_state.get("current_layout", "default")
+        if current_layout not in available_layouts:
+            current_layout = available_layouts[0] if available_layouts else "default"
+
+        col_layout, col_add, col_del = st.columns([3, 1, 1])
+        with col_layout:
+            selected_layout = st.selectbox(
+                "📐 View",
+                options=available_layouts,
+                index=available_layouts.index(current_layout) if current_layout in available_layouts else 0,
+                key="layout_selector",
+                label_visibility="collapsed",
+            )
+        with col_add:
+            if st.button("➕", help="Create new view", use_container_width=True):
+                st.session_state["show_create_view"] = True
+        with col_del:
+            # Disable delete for default layout
+            if st.button("🗑️", help="Delete this view", disabled=selected_layout == "default", use_container_width=True):
+                st.session_state["show_delete_confirm"] = True
+
+        if selected_layout != st.session_state.get("current_layout"):
+            st.session_state["current_layout"] = selected_layout
+            st.session_state["layout_data"] = load_layout(selected_layout)
+
+        # Edit Mode toggle (compact, right under view selector)
+        st.toggle(
+            "✏️ Edit Mode",
+            value=st.session_state.get("edit_mode", False),
+            key="edit_mode_toggle",
+            help="Enable to add/remove/arrange widgets"
+        )
+        st.session_state["edit_mode"] = st.session_state.get("edit_mode_toggle", False)
+
+        # Delete confirmation dialog
+        if st.session_state.get("show_delete_confirm"):
+            st.warning(f"Delete view '{selected_layout}'?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Delete", type="primary", use_container_width=True):
+                    if delete_layout(selected_layout):
+                        st.session_state["current_layout"] = "default"
+                        st.session_state["layout_data"] = load_layout("default")
+                    st.session_state["show_delete_confirm"] = False
+                    st.rerun()
+            with col2:
+                if st.button("Cancel", use_container_width=True, key="cancel_delete"):
+                    st.session_state["show_delete_confirm"] = False
+                    st.rerun()
+
+            st.session_state["layout_data"] = load_layout(selected_layout)
+
+        # Create new view dialog
+        if st.session_state.get("show_create_view"):
+            new_name = st.text_input("New view name", key="new_view_name")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Create", disabled=not new_name, use_container_width=True):
+                    if new_name and new_name not in available_layouts:
+                        create_layout(new_name)
+                        st.session_state["current_layout"] = new_name
+                        st.session_state["layout_data"] = load_layout(new_name)
+                        st.session_state["show_create_view"] = False
+                        st.rerun()
+            with col2:
+                if st.button("Cancel", use_container_width=True):
+                    st.session_state["show_create_view"] = False
+                    st.rerun()
+
+        # --- Widget Toolbox (Edit Mode Only) ---
+        edit_mode = st.session_state.get("edit_mode", False)
+        if edit_mode:
+            with st.expander("🧰 Widget Toolbox", expanded=True):
+                from app.dashboard.registry import WidgetRegistry
+                from app.dashboard.engine import add_widget_to_layout
+
+                widget_info = WidgetRegistry.get_widget_info()
+
+                # Group by category
+                categories = {"kpi": [], "chart": [], "table": []}
+                for widget_id, info in widget_info.items():
+                    cat = info["category"]
+                    if cat in categories:
+                        categories[cat].append((widget_id, info["name"]))
+
+                # KPIs
+                st.markdown("**📊 KPIs**")
+                for widget_id, name in categories["kpi"]:
+                    if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
+                        layout_data = st.session_state.get("layout_data", {})
+                        layout_data = add_widget_to_layout(layout_data, widget_id)
+                        st.session_state["layout_data"] = layout_data
+                        st.rerun()
+
+                # Charts
+                st.markdown("**📈 Charts**")
+                for widget_id, name in categories["chart"]:
+                    if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
+                        layout_data = st.session_state.get("layout_data", {})
+                        layout_data = add_widget_to_layout(layout_data, widget_id)
+                        st.session_state["layout_data"] = layout_data
+                        st.rerun()
+
+                # Tables
+                st.markdown("**📋 Tables**")
+                for widget_id, name in categories["table"]:
+                    if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
+                        layout_data = st.session_state.get("layout_data", {})
+                        layout_data = add_widget_to_layout(layout_data, widget_id)
+                        st.session_state["layout_data"] = layout_data
+                        st.rerun()
+
+        st.divider()
+
         # Domain/Team selector
         teams = ["All"]
         if not df.empty and "team" in df.columns:
@@ -177,6 +295,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         sync_status = get_sync_status()
         st.caption(f"**Status:** {sync_status['status']}")
         st.caption(f"**Last Sync:** {sync_status['last_sync']}")
+
 
         # Version
         st.divider()

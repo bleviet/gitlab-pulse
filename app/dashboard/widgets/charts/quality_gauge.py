@@ -74,4 +74,4 @@ def quality_gauge(
         paper_bgcolor="rgba(0,0,0,0)",
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "quality_gauge_chart") if config else None)

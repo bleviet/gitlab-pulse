@@ -117,4 +117,4 @@ def burnup_velocity(
             row=i, col=1,
         )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "burnup_velocity_chart") if config else None)

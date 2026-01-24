@@ -63,4 +63,4 @@ def work_type_distribution(
         yaxis=dict(showgrid=False),
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "work_type_chart") if config else None)
