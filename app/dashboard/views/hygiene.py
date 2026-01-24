@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.widgets import charts
+from app.dashboard.widgets import charts, tables
 from app.dashboard.components import style_metric_cards
 
 # Semantic color palette
@@ -23,13 +23,7 @@ COLORS = {
 }
 
 # Error code severity mapping
-ERROR_SEVERITY = {
-    "MISSING_LABEL": "warning",
-    "CONFLICTING_LABELS": "error",
-    "STALE_WITHOUT_UPDATE": "warning",
-    "ORPHAN_TASK": "error",
-    "EXCEEDS_CYCLE_TIME": "info",
-}
+
 
 
 def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
@@ -80,58 +74,14 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
                 filtered_df = filtered_df[filtered_df["error_code"].isin(selected_errors)]
 
         with st.expander("⚡ Action Items", expanded=True):
-            _render_action_table(filtered_df)
+            # Sort hierarchy for better context
+            display_df = filtered_df.copy()
+            if "parent_id" in display_df.columns:
+                 display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+            
+            tables.quality_action_table(display_df, config={"key": "hygiene_action_table"})
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
 
 
-def _render_action_table(quality_df: pd.DataFrame) -> None:
-    """Render action table with failed issues (custom styling preserved)."""
-    # Select display columns
-    display_cols = ["web_url", "title", "error_code", "error_message", "assignee"]
-    available_cols = [c for c in display_cols if c in quality_df.columns]
 
-    display_df = quality_df[available_cols].copy()
-
-    if "parent_id" in display_df.columns:
-        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
-
-    # Rename for display
-    display_df = display_df.rename(columns={
-        "web_url": "IID",
-        "title": "Title",
-        "error_code": "Error",
-        "error_message": "Details",
-        "assignee": "Assignee"
-    })
-
-    # Style the error_code (now 'Error') column
-    def style_error_code(row: pd.Series) -> list[str]:
-        code = row.get("Error", "")
-        severity = ERROR_SEVERITY.get(code, "info")
-        bg_colors = {
-            "error": "background-color: rgba(239,68,68,0.2)",
-            "warning": "background-color: rgba(245,158,11,0.2)",
-            "info": "background-color: rgba(100,116,139,0.1)",
-        }
-        style = bg_colors.get(severity, "")
-        return [style if c == "Error" else "" for c in row.index]
-
-    st.dataframe(
-        display_df.style.apply(style_error_code, axis=1),
-        width="stretch",
-        height=800,
-        hide_index=True,
-        column_order=["IID", "Title", "Error", "Details", "Assignee"],
-        column_config={
-            "IID": st.column_config.LinkColumn(
-                "IID",
-                display_text=r"/(?:issues|work_items)/(\d+)$",
-                width="small"
-            ),
-            "Title": st.column_config.TextColumn("Title", width="large"),
-            "Error": st.column_config.TextColumn("Error", width="medium"),
-            "Details": st.column_config.TextColumn("Details", width="large"),
-            "Assignee": st.column_config.TextColumn("Assignee", width="medium"),
-        },
-    )

@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.widgets import kpis, charts
+from app.dashboard.widgets import kpis, charts, tables, features
 
 # Semantic color palette
 COLORS = {
@@ -23,7 +23,7 @@ COLORS = {
 
 
 def render_overview(
-    df: pd.DataFrame, 
+    df: pd.DataFrame,
     colors: dict[str, str] | None = None,
     stage_descriptions: dict[str, str] | None = None
 ) -> None:
@@ -59,21 +59,35 @@ def render_overview(
     # Charts (Collapsible)
     with st.expander("📊 Visual Analysis", expanded=True):
         chart_mode = st.radio(
-            "Chart Mode", 
-            ["📊 Work by Stage", "⏳ Days in Stage"], 
-            horizontal=True, 
+            "Chart Mode",
+            ["📊 Work by Stage", "⏳ Days in Stage"],
+            horizontal=True,
             label_visibility="collapsed",
             key="flow_chart_radio"
         )
-        
+
         if chart_mode == "📊 Work by Stage":
             # Use unique issues for stage distribution to show correct counts
-            stage_selection = _render_stage_distribution(unique_df, stage_descriptions)
+            # Use shared widget with overview-specific key
+            stage_selection = charts.stage_distribution(
+                unique_df,
+                config={
+                    "stage_descriptions": stage_descriptions,
+                    "key": "flow_chart_stage_dist"
+                }
+            )
             aging_selection = None
-            
+
         else:
             # Use unique issues for aging to show distinct items
-            aging_selection = _render_aging_chart(unique_df)
+            # Use shared widget with proper configuration
+            aging_selection = charts.aging_boxplot(
+                unique_df,
+                config={
+                    "key": "flow_chart_aging_box",
+                    "filter_closed": True
+                }
+            )
             stage_selection = None
 
     # Apply interactive filters (Apply to original DF which allows exploring contexts)
@@ -182,289 +196,6 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
     max_days = df["days_in_stage"].max() if not df.empty else 0
     with col4:
         st.metric("Max Idle Days", f"{max_days} days", help="Longest time in current stage")
-
-
-
-def _render_stage_distribution(
-    df: pd.DataFrame, 
-    stage_descriptions: dict[str, str] | None = None
-) -> dict | None:
-    """Render horizontal bar chart of issues per stage (Work by Stage).
-
-    Returns:
-        Selection state dictionary or None
-    """
-    total_issues = len(df)
-    help_text = (
-        "**Interaction Guide:**\n"
-        "- **Hover** to view stage descriptions.\n"
-        "- **Click** a bar segment to filter the Issue Drill-down below.\n"
-        "- **Shift+Click** to select multiple segments for combined filtering.\n"
-        "- **Double-Click** to reset selection."
-    )
-    st.subheader(f"Issues Total: {total_issues}", help=help_text)
-
-    # Check if severity column exists for stacked view
-    has_severity = "severity" in df.columns
-
-    # --- Stage Filter Control (Collapsible) ---
-    # Get all available stages sorted by order
-    stage_orders = df.groupby("stage")["stage_order"].min().sort_values()
-    all_stages = stage_orders.index.tolist()
-
-    with st.expander("🔍 Filters", expanded=False):
-        selected_stages = st.multiselect(
-            "Visible Stages",
-            options=all_stages,
-            default=all_stages,
-            help="Deselect stages (like 'Done') to rescale the chart."
-        )
-
-    if not selected_stages:
-        st.warning("Please select at least one stage.")
-        return None
-        
-    # Filter data for the chart
-    df = df[df["stage"].isin(selected_stages)].copy()
-
-    # Calculate totals per stage for the labels
-    # We want these to appear at the end of the bars
-    stage_totals = df.groupby("stage", observed=True).size().reset_index(name="total_count")
-
-    if has_severity:
-        # Fill NaN severity with "Unset" for display
-        # Convert to string first to handle Categorical dtype
-        df_chart = df.copy()
-
-        # Normalize severity: handle NaNs, convert to string, strip whitespace, and title case
-        # This fixes issues where "Critical" and "critical " might be treated as different
-        df_chart["severity"] = (
-            df_chart["severity"]
-            .astype(str)
-            .replace("nan", "Unset")
-            .replace("<NA>", "Unset")
-            .replace("None", "Unset")
-            .str.strip()
-            .str.title()
-        )
-        # Ensure "Unset" remains "Unset" (title() handles it, but just to be sure if lowercased)
-
-        # Consolidate stage_order: use the minimum order for each stage to prevent splitting
-        # This handles cases where different rules assign different orders to the same stage name
-        stage_order_map = df_chart.groupby("stage")["stage_order"].min()
-        df_chart["stage_order"] = df_chart["stage"].map(stage_order_map)
-
-        # Prepare stage order for plotting
-        stage_order_df = df_chart[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
-        sorted_stages = stage_order_df["stage"].tolist()
-
-        # Aggregation with severity breakdown
-        stage_stats = df_chart.groupby(["stage", "stage_order", "severity"]).size().reset_index(name="count")
-        
-        # Add description to stage_stats
-        if stage_descriptions:
-            stage_stats["description"] = stage_stats["stage"].map(stage_descriptions).fillna("")
-        else:
-            stage_stats["description"] = ""
-        
-        # Calculate severity counts for legend labels
-        severity_counts = df_chart["severity"].value_counts()
-        severity_label_map = {
-            sev: f"{sev} ({count})" 
-            for sev, count in severity_counts.items()
-        }
-        
-        # Add formatted label column
-        stage_stats["severity_label"] = stage_stats["severity"].map(severity_label_map)
-
-        # Sort by defined order
-        stage_stats = stage_stats.sort_values("stage_order")
-
-        if stage_stats.empty:
-            st.info("No stage data.")
-            return
-
-        # Define priority color palette (semantic)
-        priority_colors = {
-            "Critical": COLORS.get("critical", "#EF4444"),
-            "High": COLORS.get("high", "#F97316"),
-            "Medium": COLORS.get("medium", "#EAB308"),
-            "Low": COLORS.get("low", "#22C55E"),
-            "Unset": COLORS.get("unset", "#94A3B8"),
-        }
-        
-        # Construct color map and order for formatted labels
-        final_color_map = {}
-        ordered_severity_labels = []
-        base_severity_order = ["Critical", "High", "Medium", "Low", "Unset"]
-        
-        for sev in base_severity_order:
-            if sev in severity_label_map:
-                label = severity_label_map[sev]
-                ordered_severity_labels.append(label)
-                final_color_map[label] = priority_colors.get(sev, priority_colors["Unset"])
-                
-        # Handle any other severities
-        for sev, label in severity_label_map.items():
-            if label not in final_color_map:
-                ordered_severity_labels.append(label)
-                final_color_map[label] = priority_colors.get("Unset")
-
-        fig = px.bar(
-            stage_stats,
-            x="count",
-            y="stage",
-            color="severity_label", # Use formatted label for legend
-            orientation="h",
-            text="count",
-            title="",
-            color_discrete_map=final_color_map,
-            category_orders={
-                "severity_label": ordered_severity_labels,
-                "stage": sorted_stages
-            },
-            custom_data=["severity", "description"], # Include description
-        )
-
-        fig.update_traces(
-            textposition="inside", 
-            textangle=0,
-            hovertemplate="<b>%{y}</b><br>%{customdata[1]}<br>Severity: %{customdata[0]}<br>Count: %{x}<extra></extra>"
-        )
-        
-        # Update legend title
-        fig.update_layout(legend_title_text="Priority")
-    else:
-        # Fallback: simple aggregation without severity
-        stage_stats = df.groupby(["stage", "stage_order"]).size().reset_index(name="count")
-        stage_stats = stage_stats.sort_values("stage_order")
-
-        if stage_stats.empty:
-            st.info("No stage data.")
-            return None
-
-        # Sorted stages for fallback
-        stage_order_df = df[["stage", "stage_order"]].drop_duplicates().sort_values("stage_order")
-        sorted_stages = stage_order_df["stage"].tolist()
-
-        fig = px.bar(
-            stage_stats,
-            x="count",
-            y="stage",
-            orientation="h",
-            text="count",
-            title="",
-            category_orders={"stage": sorted_stages},
-        )
-        fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
-
-    # Add Total Labels (Scatter Trace)
-    # Filter stage_totals to only include stages present in sorted_stages (to avoid mismatch)
-    stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]
-
-    fig.add_trace(go.Scatter(
-        x=stage_totals["total_count"],
-        y=stage_totals["stage"],
-        mode="text",
-        text=stage_totals["total_count"].apply(lambda x: f"({x})"),
-        textposition="middle right",
-        hoverinfo="skip",
-        showlegend=False,
-        textfont=dict(), # Let Plotly/Streamlit handle theme adaptation
-    ))
-
-    # Calculate max range to fit the text label
-    max_count = stage_totals["total_count"].max() if not stage_totals.empty else 0
-
-    fig.update_layout(
-        height=400,
-        margin=dict(l=0, r=20, t=0, b=0), # Add right margin for labels
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        # yaxis=dict(autorange="reversed"),  # Removed reversal as requested
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(128, 128, 128, 0.2)",
-            range=[0, max_count * 1.15] # Extend range to fit labels
-        ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, title=None),
-        barmode="stack",
-    )
-
-    return st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=["points"]
-    )
-
-
-
-
-def _render_aging_chart(df: pd.DataFrame) -> dict | None:
-    """Render boxplot of days in stage.
-
-    Returns:
-        Selection state dictionary or None
-    """
-    st.subheader("⏳ Days in Stage")
-
-    # Filter out completed/closed items to focus on active work aging
-    # "Stickiness" implies items currently stuck in the flow.
-    df = df[
-        (df["stage_type"] != "completed") &
-        (df["state"] != "closed")
-    ].copy()
-
-    # Sort stages by order for x-axis
-    df_sorted = df.sort_values("stage_order")
-
-    if df_sorted.empty:
-        st.info("No data.")
-        return None
-
-    # Get sorted stages *after* filtering (Backlog might match but Done won't)
-    # Actually, we should use the global order if possible, but filtered set is fine.
-    # Note: df_sorted is already sorted by stage_order.
-    # We can extract the unique list preserving order.
-    # df_sorted["stage"].unique() returns in appearance order (which is sorted by stage_order)
-    sorted_stages_aging = df_sorted["stage"].unique().tolist()
-
-    fig = px.box(
-        df_sorted,
-        x="stage",
-        y="days_in_stage",
-        color="stage_type",
-        color_discrete_map={
-            "active": COLORS["active"],
-            "waiting": COLORS["waiting"],
-            "completed": COLORS["completed"],
-            "active": COLORS["active"], # Duplicate key? No, just ensuring
-        },
-        category_orders={"stage": sorted_stages_aging}, # Force correct order
-        points="outliers", # Show outliers
-    )
-
-    fig.update_layout(
-        height=400,
-        margin=dict(l=0, r=0, t=0, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)", title="Days in Stage"),
-        xaxis=dict(title=None),
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
-    )
-
-    return st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=["points"]
-    )
-
 
 def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     """Render unified issue detail grid with drill-down filters."""
@@ -662,8 +393,7 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # --- AI PANEL LOGIC ---
     # Check if a row is selected - if so, auto-show split view
-    from app.dashboard.views.overview_helpers import _render_drilldown_table, _render_ai_assistant
-
+    
     selection_state = st.session_state.get("issue_drilldown_table", {})
     if hasattr(selection_state, "selection"):
         selection_state = selection_state.selection
@@ -707,15 +437,30 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     # Layout Logic - use persisted selection to maintain AI panel visibility
     is_split_view = st.session_state.show_ai_panel and has_persisted_selection
 
+    # Helper for table rendering
+    def render_table(cols):
+        st.caption("Select an issue to view AI insights.")
+        tables.issue_detail_grid(
+            styler if styler is not None else display_df,
+            config={
+                "column_config": column_config,
+                "column_order": cols,
+                "height": 800,
+                "selection_mode": "single-row",
+                "key": "issue_drilldown_table",
+                "minimize_columns": False
+            }
+        )
+
     # Compact column order for split view (essential columns + Priority)
     if is_split_view:
         compact_column_order = ["ai_status", "web_url", "iid", "title", "stage", "severity", "days_in_stage"]
         # Split view: Side-by-side columns
         col_left, col_right = st.columns([1.5, 1], gap="medium")
         with col_left:
-            _render_drilldown_table(styler if styler is not None else display_df, column_config, compact_column_order)
+            render_table(compact_column_order)
         with col_right:
-            _render_ai_assistant(df, display_df)
+            features.ai_assistant(df, display_df)
     else:
         # Table only view - show all columns
-        _render_drilldown_table(styler if styler is not None else display_df, column_config, column_order)
+        render_table(column_order)

@@ -10,7 +10,7 @@ import plotly.express as px
 import streamlit as st
 
 from app.dashboard.utils import get_semantic_color
-from app.dashboard.widgets import tables
+from app.dashboard.widgets import tables, charts
 from app.dashboard.components import style_metric_cards
 
 
@@ -89,9 +89,24 @@ def render_capacity_view(
 
     if selected_view == "workload":
         with st.expander("📊 Workload Distribution", expanded=True):
-            sel = _render_workload_chart(work_df, colors, max_wip)
-        if sel:
-            active_filters.extend(sel)
+            sel = charts.workload_distribution(
+                work_df, 
+                config={
+                    "threshold": max_wip, 
+                    "key": "capacity_workload_chart"
+                }
+            )
+        
+        # Adapt selection
+        if sel and sel.get("selection", {}).get("points"):
+            points = sel["selection"]["points"]
+            for p in points:
+                # Horizontal bar: y is assignee
+                f = {"assignee": p.get("y")}
+                # Try to get stage from legendgroup (standard plotly express)
+                if "legendgroup" in p:
+                    f["stage"] = p["legendgroup"]
+                active_filters.append(f)
 
     elif selected_view == "context":
         sel = _render_context_matrix(work_df, max_contexts)
@@ -108,6 +123,10 @@ def render_capacity_view(
     if active_filters:
         mask = pd.Series(False, index=display_df.index)
         for f in active_filters:
+            # Handle potential missing assignee if bad click
+            if not f.get("assignee"):
+                continue
+                
             criteria_mask = (display_df["assignee"] == f["assignee"])
             if f.get("stage"):
                 criteria_mask &= (display_df["stage"] == f["stage"])
@@ -121,70 +140,10 @@ def render_capacity_view(
 
     # --- Detailed Grid ---
     with st.expander(f"📋 {grid_msg}", expanded=True):
-        _render_capacity_grid(grid_df)
+        tables.capacity_grid(grid_df, config={"height": 500})
 
 
-def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, threshold: int) -> list[dict] | None:
-    """Render Stacked Bar Chart of Assignee vs Issue Count.
 
-    Returns:
-        List of selected points [{'assignee': '...', 'stage': '...'}] if any.
-    """
-    stage_order_map = df.groupby("stage")["stage_order"].min()
-    df["stage_order"] = df["stage"].map(stage_order_map)
-    df = df.sort_values("stage_order")
-
-    load_counts = df.groupby(["assignee", "stage", "stage_type"]).size().reset_index(name="count")
-
-    total_load = load_counts.groupby("assignee")["count"].sum().sort_values(ascending=False)
-    sorted_assignees = total_load.index.tolist()
-
-    if load_counts.empty:
-        st.info("No active workload.")
-        return None
-
-    overloaded = total_load[total_load > threshold]
-    if not overloaded.empty:
-        st.warning(f"⚠️ High Load Detected: {len(overloaded)} people have > {threshold} items.")
-
-    fig = px.bar(
-        load_counts,
-        x="assignee",
-        y="count",
-        color="stage",
-        title="",
-        category_orders={"assignee": sorted_assignees},
-        custom_data=["stage"],
-    )
-
-    fig.add_hline(y=threshold, line_dash="dash", line_color="red", annotation_text=f"Limit ({threshold})")
-
-    fig.update_layout(
-        xaxis_title="Assignee",
-        yaxis_title="Item Count",
-        legend_title="Stage",
-        height=500,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif"),
-        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
-        xaxis=dict(showgrid=False),
-    )
-
-    event = st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=["points"]
-    )
-
-    if event and event.selection and event.selection.points:
-        return [
-            {"assignee": p["x"], "stage": p["customdata"][0]}
-            for p in event.selection.points
-        ]
-
-    return None
 
 
 def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | None:
@@ -258,94 +217,4 @@ def _render_unassigned_risk(df: pd.DataFrame) -> None:
         st.dataframe(breakdown, hide_index=True)
 
 
-def _render_capacity_grid(df: pd.DataFrame) -> None:
-    """Render filterable grid of active work."""
-    with st.expander("🔍 Filters", expanded=False):
-        title_search = st.text_input(
-            "Search Title",
-            placeholder="Type to search issue titles...",
-            key="cap_filter_title"
-        )
 
-        filter_cols = st.columns(3)
-
-        with filter_cols[0]:
-            if "assignee" in df.columns:
-                available_assignees = sorted(df["assignee"].dropna().unique().tolist())
-                selected_assignees = st.multiselect(
-                    "Assignee",
-                    options=available_assignees,
-                    default=[],
-                    key="cap_filter_assignee"
-                )
-            else:
-                selected_assignees = []
-
-        with filter_cols[1]:
-            if "priority" in df.columns:
-                available_priorities = sorted(df["priority"].dropna().unique().tolist())
-                selected_priorities = st.multiselect(
-                    "Priority",
-                    options=available_priorities,
-                    default=[],
-                    key="cap_filter_priority"
-                )
-            elif "severity" in df.columns:
-                available_priorities = sorted(df["severity"].dropna().unique().tolist())
-                selected_priorities = st.multiselect(
-                    "Priority (Severity)",
-                    options=available_priorities,
-                    default=[],
-                    key="cap_filter_priority"
-                )
-            else:
-                selected_priorities = []
-
-        with filter_cols[2]:
-            if "milestone" in df.columns:
-                available_milestones = sorted(df["milestone"].dropna().unique().tolist())
-                selected_milestones = st.multiselect(
-                    "Milestone",
-                    options=available_milestones,
-                    default=[],
-                    key="cap_filter_milestone"
-                )
-            else:
-                selected_milestones = []
-
-    display_df = df.copy()
-
-    if title_search:
-        display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
-    if selected_assignees:
-        display_df = display_df[display_df["assignee"].isin(selected_assignees)]
-    if selected_priorities:
-        priority_col = "priority" if "priority" in display_df.columns else "severity"
-        display_df = display_df[display_df[priority_col].isin(selected_priorities)]
-    if selected_milestones:
-        display_df = display_df[display_df["milestone"].isin(selected_milestones)]
-
-    cols_to_show = ["web_url", "assignee", "title", "stage", "priority", "milestone", "days_in_stage", "context", "weight"]
-    available_cols = [c for c in cols_to_show if c in display_df.columns]
-
-    display_df = display_df[available_cols].sort_values(["assignee", "days_in_stage"], ascending=[True, False])
-
-    st.dataframe(
-        display_df,
-        width="stretch",
-        height=800,
-        hide_index=True,
-        column_config={
-            "web_url": st.column_config.LinkColumn(
-                "IID",
-                display_text=r"/(?:issues|work_items)/(\d+)$",
-                width="small",
-                help="Click to open in GitLab"
-            ),
-            "assignee": st.column_config.TextColumn("Assignee"),
-            "days_in_stage": st.column_config.NumberColumn("Age (Days)", format="%d"),
-            "weight": st.column_config.NumberColumn("Weight"),
-            "priority": st.column_config.TextColumn("Priority"),
-            "milestone": st.column_config.TextColumn("Milestone"),
-        }
-    )

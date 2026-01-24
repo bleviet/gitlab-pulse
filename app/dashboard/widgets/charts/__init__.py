@@ -12,6 +12,9 @@ from app.dashboard.widgets.charts.status_donut import status_donut
 from app.dashboard.widgets.charts.quality_gauge import quality_gauge
 from app.dashboard.widgets.charts.error_distribution import error_distribution
 
+from app.dashboard.widgets.charts.milestone_timeline import milestone_timeline
+from app.dashboard.widgets.charts.milestone_burnup import milestone_burnup
+
 __all__ = [
     "stage_distribution",
     "aging_boxplot",
@@ -21,4 +24,6 @@ __all__ = [
     "status_donut",
     "quality_gauge",
     "error_distribution",
+    "milestone_timeline",
+    "milestone_burnup",
 ]

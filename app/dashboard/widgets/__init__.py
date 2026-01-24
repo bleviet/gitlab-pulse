@@ -10,6 +10,6 @@ Structure:
     └── tables/         # DataFrames and grids
 """
 
-from app.dashboard.widgets import kpis, charts, tables
+from app.dashboard.widgets import kpis, charts, tables, features
 
 __all__ = ["kpis", "charts", "tables"]
