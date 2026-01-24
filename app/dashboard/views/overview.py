@@ -1,6 +1,7 @@
 """Overview Page (Value Stream) for Layer 3 Dashboard.
 
 Visualizes flow efficiency, bottlenecks, and aging.
+Refactored to use Widget Registry where applicable.
 """
 
 import pandas as pd
@@ -9,6 +10,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
+from app.dashboard.widgets import kpis, charts
 
 # Semantic color palette
 COLORS = {
@@ -51,8 +53,8 @@ def render_overview(
     else:
         unique_df = df
 
-    # Top Row: Metrics (Use unique issues)
-    _render_flow_metrics(unique_df)
+    # Top Row: Metrics (Use unique issues) - via widget
+    kpis.flow_metrics(unique_df)
 
     # Charts (Collapsible)
     with st.expander("📊 Visual Analysis", expanded=True):

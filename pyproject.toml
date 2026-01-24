@@ -12,15 +12,14 @@ dependencies = [
   "pandas>=2.0",
   "pyarrow>=14.0",
   "pyyaml>=6.0",
-
   # GitLab API
   "python-gitlab>=4.0",
   "httpx>=0.25",
-
   # Dashboard
   "streamlit>=1.30",
   "plotly>=5.18",
   "python-dotenv>=1.0",
+  "streamlit-elements>=0.1.0",
 ]
 
 [project.optional-dependencies]

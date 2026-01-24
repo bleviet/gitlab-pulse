@@ -1,15 +1,18 @@
 """Capacity & Risk View for Layer 3 Dashboard.
 
 Visualizes workload distribution, context switching risks, and latent work.
+Refactored to use Widget Registry where applicable.
 """
 
 import hashlib
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-import numpy as np
 
 from app.dashboard.utils import get_semantic_color
+from app.dashboard.widgets import tables
+from app.dashboard.components import style_metric_cards
+
 
 def render_capacity_view(
     df: pd.DataFrame,
@@ -25,11 +28,10 @@ def render_capacity_view(
     """
     st.header("⚖️ Risk & Capacity")
     st.caption("Identify bottlenecks, overload, and context-switching risks.")
-    
+
     # Apply Bento Grid Style
-    from app.dashboard.components import style_metric_cards
     style_metric_cards()
-    
+
     if df.empty:
         st.warning("No data available.")
         return
@@ -42,14 +44,6 @@ def render_capacity_view(
     hidden_users = set(config.get("hidden_users", []))
 
     # --- Data Preparation ---
-
-    # 1. Filter for Active Work only (Inventory)
-    # We care about what is currently on plates, not what is done.
-    # Exclude 'completed' stage types.
-    # Also exclude Backlog? Depends. Usually "Capacity" is about "Committed" work.
-    # Let's keep Active and Waiting stages.
-    
-    # We use a copy to avoid mutating the global DF
     work_df = df[
         (df["stage_type"].isin(["active", "waiting"])) &
         (df["state"] == "opened")
@@ -59,37 +53,29 @@ def render_capacity_view(
         st.info("No active work found.")
         return
 
-    # 2. Normalize Assignee
-    # Fill NaN with "Unassigned"
+    # Normalize Assignee
     work_df["assignee"] = work_df["assignee"].fillna("Unassigned")
 
-    # 3. Filter Hidden Users
+    # Filter Hidden Users
     if hidden_users:
         work_df = work_df[~work_df["assignee"].isin(hidden_users)]
 
-    # 4. Anonymization Logic
-    real_names_map = {} # To map back if needed, though usually we filter on transformed
+    # Anonymization Logic
     if anonymize:
         def hash_user(name: str) -> str:
             if name == "Unassigned":
                 return name
-            # Simple consistent hash
             h = hashlib.md5(name.encode()).hexdigest()[:4]
             return f"User-{h}"
-        
-        # We need to apply this but maybe keep original for tooltip? 
-        # For privacy, better to replace completely.
         work_df["assignee"] = work_df["assignee"].apply(hash_user)
 
     # --- Visualizations ---
-
-    # Radio Buttons for different risk perspectives (State-Aware)
     risk_views = {
         "🏋️ Workload Balancer": "workload",
         "🔀 Context Switching": "context",
         "⚠️ Unassigned Risk": "unassigned"
     }
-    
+
     selected_view_label = st.radio(
         "Risk View",
         options=list(risk_views.keys()),
@@ -97,55 +83,37 @@ def render_capacity_view(
         label_visibility="collapsed",
         key="capacity_risk_view_radio"
     )
-    
-    selected_view = risk_views[selected_view_label]
 
-    # Store formatted filters: list of dicts {assignee: str, stage: str | None}
+    selected_view = risk_views[selected_view_label]
     active_filters = []
 
     if selected_view == "workload":
-        # Returns list of {assignee, stage}
         with st.expander("📊 Workload Distribution", expanded=True):
             sel = _render_workload_chart(work_df, colors, max_wip)
         if sel:
             active_filters.extend(sel)
-    
+
     elif selected_view == "context":
-        # Returns list of {assignee, context}
         sel = _render_context_matrix(work_df, max_contexts)
         if sel:
             active_filters.extend(sel)
-        
+
     elif selected_view == "unassigned":
         _render_unassigned_risk(work_df)
 
     # --- Filter Logic ---
-    
-    # Base DF for filtering (Charts use work_df directly)
     display_df = work_df
-
-    # 2. Chart Drill-down (Compound Filter)
     grid_msg = "Active Inventory"
-    
+
     if active_filters:
-        # Build a mask for the union of all filters
-        # start with all False
         mask = pd.Series(False, index=display_df.index)
-        
         for f in active_filters:
-            # Base match: Assignee is primary key for all our charts
             criteria_mask = (display_df["assignee"] == f["assignee"])
-            
-            # Refine by Stage if present
             if f.get("stage"):
                 criteria_mask &= (display_df["stage"] == f["stage"])
-            
-            # Refine by Context if present
             if f.get("context"):
                 criteria_mask &= (display_df["context"] == f["context"])
-                
             mask |= criteria_mask
-                
         grid_df = display_df[mask]
         grid_msg = f"Filtered ({len(grid_df)} items)"
     else:
@@ -158,31 +126,23 @@ def render_capacity_view(
 
 def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, threshold: int) -> list[dict] | None:
     """Render Stacked Bar Chart of Assignee vs Issue Count.
-    
+
     Returns:
         List of selected points [{'assignee': '...', 'stage': '...'}] if any.
     """
-    # st.subheader("Workload Distribution") - Removed as redundant with expander title
-    
-    # Aggregation: Assignee -> Stage -> Count
-    # We want to stack by Stage to see *where* they are stuck
-    
-    # Ensure stages are ordered correctly
     stage_order_map = df.groupby("stage")["stage_order"].min()
     df["stage_order"] = df["stage"].map(stage_order_map)
     df = df.sort_values("stage_order")
-    
+
     load_counts = df.groupby(["assignee", "stage", "stage_type"]).size().reset_index(name="count")
-    
-    # Order Assignees by total load (descending)
+
     total_load = load_counts.groupby("assignee")["count"].sum().sort_values(ascending=False)
     sorted_assignees = total_load.index.tolist()
-    
+
     if load_counts.empty:
         st.info("No active workload.")
         return None
 
-    # Alert for threshold
     overloaded = total_load[total_load > threshold]
     if not overloaded.empty:
         st.warning(f"⚠️ High Load Detected: {len(overloaded)} people have > {threshold} items.")
@@ -194,9 +154,9 @@ def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, thre
         color="stage",
         title="",
         category_orders={"assignee": sorted_assignees},
-        custom_data=["stage"], # Capture stage for selection
+        custom_data=["stage"],
     )
-    
+
     fig.add_hline(y=threshold, line_dash="dash", line_color="red", annotation_text=f"Limit ({threshold})")
 
     fig.update_layout(
@@ -210,48 +170,39 @@ def _render_workload_chart(df: pd.DataFrame, colors: dict[str, str] | None, thre
         yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
         xaxis=dict(showgrid=False),
     )
-    
-    # Interactive Selection
+
     event = st.plotly_chart(
-        fig, 
+        fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"]
     )
-    
+
     if event and event.selection and event.selection.points:
-        # Return list of {assignee, stage} dicts
         return [
-            {
-                "assignee": p["x"], 
-                "stage": p["customdata"][0]
-            } 
+            {"assignee": p["x"], "stage": p["customdata"][0]}
             for p in event.selection.points
         ]
-        
+
     return None
 
 
 def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | None:
     """Render Heatmap of Assignee vs Context.
-    
+
     Returns:
         List of selected points [{'assignee': '...', 'context': '...'}] if any.
     """
     st.subheader("Context Switching Matrix")
-    
+
     if "context" not in df.columns:
         st.info("No context data available.")
         return None
-        
-    # Pivot: Assignee x Context -> Count
+
     matrix = df.groupby(["assignee", "context"]).size().reset_index(name="count")
-    
-    # Calculate context count per person for sorting
     context_counts = df.groupby("assignee")["context"].nunique().sort_values(ascending=False)
     sorted_assignees = context_counts.index.tolist()
-    
-    # Check for risks
+
     risky_people = context_counts[context_counts > threshold]
     if not risky_people.empty:
         st.warning(f"⚠️ Fragmented Attention: {len(risky_people)} people match > {threshold} contexts.")
@@ -265,48 +216,43 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
         color_continuous_scale="Viridis",
         text_auto=True
     )
-    
+
     fig.update_layout(
-         xaxis_title="Context",
-         yaxis_title="Assignee",
-         height=500,
-         paper_bgcolor="rgba(0,0,0,0)",
-         plot_bgcolor="rgba(0,0,0,0)",
-         font=dict(family="Inter, sans-serif"),
+        xaxis_title="Context",
+        yaxis_title="Assignee",
+        height=500,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif"),
     )
-    
+
     event = st.plotly_chart(
-        fig, 
+        fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"]
     )
-    
+
     if event and event.selection and event.selection.points:
         return [
-            {
-                "assignee": p["y"],  # y-axis is assignee
-                "context": p["x"]    # x-axis is context
-            }
+            {"assignee": p["y"], "context": p["x"]}
             for p in event.selection.points
         ]
-        
+
     return None
 
 
 def _render_unassigned_risk(df: pd.DataFrame) -> None:
     """Render details about Unassigned work."""
     st.subheader("Latent Work (Unassigned)")
-    
+
     unassigned = df[df["assignee"] == "Unassigned"]
     count = len(unassigned)
-    
+
     st.metric("Unassigned Active Items", count)
-    
+
     if count > 0:
         st.markdown(f"**{count} items** are in active stages but have no owner. This creates hidden queues.")
-        
-        # Show breakdown by stage
         breakdown = unassigned["stage"].value_counts().reset_index()
         breakdown.columns = ["Stage", "Count"]
         st.dataframe(breakdown, hide_index=True)
@@ -314,11 +260,7 @@ def _render_unassigned_risk(df: pd.DataFrame) -> None:
 
 def _render_capacity_grid(df: pd.DataFrame) -> None:
     """Render filterable grid of active work."""
-    # Simplified grid focused on Assignment and Age
-    
-    # --- Column Filters (Expandable) ---
     with st.expander("🔍 Filters", expanded=False):
-        # Row 1: Title search (full width)
         title_search = st.text_input(
             "Search Title",
             placeholder="Type to search issue titles...",
@@ -327,7 +269,6 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
 
         filter_cols = st.columns(3)
 
-        # 1. Assignee Filter
         with filter_cols[0]:
             if "assignee" in df.columns:
                 available_assignees = sorted(df["assignee"].dropna().unique().tolist())
@@ -340,9 +281,7 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
             else:
                 selected_assignees = []
 
-        # 2. Priority Filter
         with filter_cols[1]:
-            # Check for priority column (it's in the grid config, so likely present)
             if "priority" in df.columns:
                 available_priorities = sorted(df["priority"].dropna().unique().tolist())
                 selected_priorities = st.multiselect(
@@ -351,9 +290,9 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
                     default=[],
                     key="cap_filter_priority"
                 )
-            elif "severity" in df.columns: # Fallback if mapped
-                 available_priorities = sorted(df["severity"].dropna().unique().tolist())
-                 selected_priorities = st.multiselect(
+            elif "severity" in df.columns:
+                available_priorities = sorted(df["severity"].dropna().unique().tolist())
+                selected_priorities = st.multiselect(
                     "Priority (Severity)",
                     options=available_priorities,
                     default=[],
@@ -362,7 +301,6 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
             else:
                 selected_priorities = []
 
-        # 3. Milestone Filter
         with filter_cols[2]:
             if "milestone" in df.columns:
                 available_milestones = sorted(df["milestone"].dropna().unique().tolist())
@@ -375,33 +313,23 @@ def _render_capacity_grid(df: pd.DataFrame) -> None:
             else:
                 selected_milestones = []
 
-    # --- Apply Filters ---
     display_df = df.copy()
 
-    # Title search (case-insensitive)
     if title_search:
         display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
-
     if selected_assignees:
         display_df = display_df[display_df["assignee"].isin(selected_assignees)]
-
     if selected_priorities:
-        # Handle both if priority or severity
-        if "priority" in display_df.columns:
-             display_df = display_df[display_df["priority"].isin(selected_priorities)]
-        elif "severity" in display_df.columns:
-             display_df = display_df[display_df["severity"].isin(selected_priorities)]
-
+        priority_col = "priority" if "priority" in display_df.columns else "severity"
+        display_df = display_df[display_df[priority_col].isin(selected_priorities)]
     if selected_milestones:
         display_df = display_df[display_df["milestone"].isin(selected_milestones)]
 
-    
     cols_to_show = ["web_url", "assignee", "title", "stage", "priority", "milestone", "days_in_stage", "context", "weight"]
     available_cols = [c for c in cols_to_show if c in display_df.columns]
-    
-    # Default Sort: Assignee then Age
+
     display_df = display_df[available_cols].sort_values(["assignee", "days_in_stage"], ascending=[True, False])
-    
+
     st.dataframe(
         display_df,
         width="stretch",

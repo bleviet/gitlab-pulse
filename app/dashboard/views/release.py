@@ -1,6 +1,7 @@
 """Release management dashboard view.
 
 Visualizes release readiness, burn-up charts, and scope management.
+Refactored to use Widget Registry where applicable.
 """
 
 import pandas as pd
@@ -11,6 +12,8 @@ import streamlit as st
 from app.shared.schemas import AnalyticsIssue
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.data_loader import load_milestones
+from app.dashboard.widgets import kpis
+from app.dashboard.components import style_metric_cards
 
 
 def render_release_view(df: pd.DataFrame) -> None:

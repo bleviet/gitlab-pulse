@@ -107,6 +107,58 @@ Layer 2 "explodes" the dataset. One physical issue becomes multiple logical rows
 * **Rapid Iteration:** Allows users to customize their own views directly in Python without needing web development expertise.  
 * **Native Pandas Support:** Since our data is already in Parquet/Pandas format, the integration is seamless, making it highly efficient for local or server-side hosting.
 
+### **5.4. Architectural Evolution: Dynamic Layout Engine (Dashboard Builder)**
+
+**Status:** Planned  
+**Goal:** Enable a "No-Code" experience where users can drag, drop, and resize widgets (KPIs, Charts, Tables) on a grid canvas and save their custom views.
+
+This is a significant pivot from a **Static Reporting Tool** (developer-defined layouts) to a **Dynamic Dashboard Platform** (user-defined layouts).
+
+**Core Concept:** Shift from **Imperative Layouts** (hardcoded `st.columns`) to **Declarative Layouts** (JSON configurations rendered by a layout engine).
+
+#### **5.4.1. New Architectural Components**
+
+| Component | Role | Location |
+| :-------- | :--- | :------- |
+| **Widget Registry** | Catalog of all available components (the "Toolbox"). Decouples rendering from layout. | `app/dashboard/widgets/registry.py` |
+| **Layout Store** | Persistence for user's custom designs (geometry + widget IDs). | `data/layouts/*.json` |
+| **Grid Engine** | Renders widgets from Registry into grid coordinates using `streamlit-elements`. | `app/dashboard/layout_engine.py` |
+
+**Widget Registry Example:**
+```python
+WIDGET_REGISTRY = {
+    "kpi_total_bugs": widgets.kpi.render_total_bugs,
+    "chart_burnup": widgets.charts.render_burnup,
+    "list_critical": widgets.tables.render_critical_list,
+}
+```
+
+**Layout Store Schema (JSON):**
+```json
+{
+  "view_name": "My Morning Briefing",
+  "layout": [
+    {"i": "kpi_1", "x": 0, "y": 0, "w": 2, "h": 2, "type": "kpi_total_bugs"},
+    {"i": "chart_1", "x": 2, "y": 0, "w": 4, "h": 4, "type": "chart_burnup"}
+  ]
+}
+```
+
+#### **5.4.2. Implementation Strategy (Phased)**
+
+| Phase | Goal | Deliverable |
+| :---- | :--- | :---------- |
+| **Phase 1: Modularization** | Refactor all UI components into standalone, reusable widgets. | `app/dashboard/widgets/` directory |
+| **Phase 2: Edit Mode Toggle** | Add UI toggle for "Edit Layout" mode with drag/drop/resize. | Dual-mode rendering (View vs. Edit) |
+| **Phase 3: Toolbox** | Sidebar listing items from Widget Registry; "Add" inserts into layout. | User-driven dashboard composition |
+
+#### **5.4.3. ADR: Why `streamlit-elements`?**
+
+* **React Grid Layout:** Standard Streamlit columns cannot support drag-and-drop resizing. `streamlit-elements` wraps `React-Grid-Layout`, enabling this functionality.
+* **MUI Integration:** Provides Material UI components for a polished editing experience.
+* **Trade-off:** Adds complexity (React bridge) but is necessary for the "Builder" experience.
+
+
 ## **6\. Testing & Validation Strategy**
 
 **Role:** Ensuring performance and logic correctness without API dependency.
