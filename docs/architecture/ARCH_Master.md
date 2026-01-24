@@ -25,10 +25,10 @@ The system uses a tiered storage approach, moving from high-volume raw files to 
 ### **2.2. ADR: Why persistent Raw storage?**
 
 * **Reliability:** In any data-driven environment, it is critical to have a "Source of Truth." The Raw layer preserves the original API response as evidence of the state at the time of sync.  
-### 3. Development Value Stream (Flow)
+### 3. Overview (Flow)
 Tracks the *efficiency* of the process (Cycle Time, Lead Time).
 - **Key Metric:** Days in Stage, Flow Efficiency.
-- **View:** "Flow" Dashboard (Funnel, Aging).
+- **View:** "Overview" Dashboard (Work by Stage, Aging).
 
 ### 4. Release Tracking (Scope)
 Tracks the *effectiveness* of delivering the plan (Milestones).

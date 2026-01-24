@@ -1,70 +1,91 @@
-Here is the precise **View Specification** for the Faceted Cumulative Flow Diagram in the Overview page. This description is intended for a frontend engineer or data visualization specialist using libraries like Matplotlib, Plotly, or D3.js.
+# **Technical Specification: Overview View (Value Stream)**
 
-### **1. Layout Architecture: Small Multiples**
+**Scope:** Specification for tracking the "Idea to Production" workflow, focusing on Inventory (WIP) and Flow Health.
 
-* **Grid Structure:** 3 Rows × 1 Column.
-* **Vertical Ordering:**
-1. **Top Panel:** Features (Business Value)
-2. **Middle Panel:** Bugs (Quality/Debt)
-3. **Bottom Panel:** Tasks (Operational Overhead)
+## **1. Concept: Value Stream Metrics**
 
+Moving monitoring from "Counting Bugs" to "Measuring Flow." Since the architecture captures the **current state snapshot**, we focus on metrics derived from the current status of the board.
 
-* **Alignment:** All three panels **must share the exact same X-Axis (Time)**.
-* *Why:* This allows the user to vertically scan and correlate events (e.g., "Did a spike in Bugs on week 4 cause the drop in Features on week 5?").
+### **1.1. Key Metrics**
+*   **WIP (Work in Progress):** Count of issues in each stage. Identifies bottlenecks (e.g., high "Review" count vs low "Test" count).
+*   **Stage Staleness:** Median days in current stage. Identifies where items get stuck (e.g., "Architecture" items rotting for 45 days).
+*   **Flow Efficiency Proxy:** Ratio of Active Stages (Implementation) vs. Waiting Stages (Ready for Review).
 
+## **2. Layer 2: Logic & Configuration**
 
-* **Sizing:** All panels should have equal height (1:1:1 ratio) to give equal visual weight to all types of work.
+### **2.1. Rule Configuration (`rules.yaml`)**
 
-### **2. Chart Type: Stacked Area / Filled Line**
+We extend the `DomainRule` to map labels to logical process stages.
 
-Each of the three panels follows the same internal plotting logic.
+```yaml
+workflow:
+  # Ordered list of stages. Priority is top-down.
+  stages:
+    - name: "Architecture"
+      labels: ["workflow::architecture", "status::design"]
+      type: "active"  # or "waiting"
+      description: "Initial design phase"
+    - name: "Implementation"
+      labels: ["workflow::implementation", "status::coding"]
+      type: "active"
+    - name: "Review"
+      labels: ["workflow::review", "status::mr_open"]
+      type: "waiting"
+    - name: "Testing"
+      labels: ["workflow::test", "status::validation"]
+      type: "active"
+    - name: "Done"
+      labels: ["workflow::done", "status::released"]
+      type: "completed"
+```
 
-* **X-Axis:** Time (Daily or Weekly buckets).
-* **Y-Axis:** Count of Issues (Integer).
-* **Scaling:** Y-Axes must be **independent** (unlinked).
-* *Why:* Feature counts might range from 0–100, while Bugs might range from 0–20. Forcing them to the same scale would flatten the Bug chart, hiding vital volatility patterns.
+### **2.2. Enrichment Logic (`enricher.py`)**
 
+The `enrich_workflow_stage` function determines the current stage of an issue.
 
-* **Plotting Layers (Z-Index Order):**
-1. **Background Layer (Total Scope):** A line plotting `Total Created`. The area below this line represents the total known scope.
-2. **Foreground Layer (Completed Work):** A filled area plotting `Total Closed`. This sits *on top* of the background layer.
-3. **The Resulting "Gap" (WIP):** The visible space between the "Total Created" line and the "Total Closed" filled area represents **Work In Progress (Inventory)**.
+1.  **Default:** `stage="Backlog"`, `stage_type="waiting"`.
+2.  **Priority Matching:** Iterate through configured stages in order.
+3.  **Label Match:** If issue has *any* of the stage's labels:
+    *   Assign `stage = stage_name`
+    *   Assign `stage_type = stage_type`
+    *   Stop (First match wins).
 
+## **3. Layer 3: Presentation (Dashboard)**
 
+The **"Overview"** view provides insights into process health.
 
-### **3. Semantic Color Palette**
+### **3.1. Work by Stage**
+*   **Type:** Horizontal Bar Chart.
+*   **Layout:** Full-width Tab ("Work by Stage").
+*   **Data:** Count of issues per `stage`.
+    *   **Deduplication:** Issues with multiple contexts are counted only once (Unique Issue ID).
+*   **Sorting:** By defined workflow order.
+*   **Features:**
+    *   **Grand Total:** Displayed in chart header.
+    *   **Stage Totals:** Displayed numerically at bar ends (e.g., `(25)`).
+    *   **Descriptions:** Tooltips show stage descriptions from config.
+    *   **Interaction:** Click to filter, Shift+Click to multi-select, Double-Click to reset.
 
-Use color to trigger immediate cognitive recognition of the work type.
+### **3.2. Days in Stage (Aging)**
+*   **Type:** Boxplot.
+*   **Layout:** Full-width Tab ("Days in Stage").
+*   **Data:** Unique issues (deduplicated).
+*   **X-Axis:** Stage.
+*   **Y-Axis:** `days_in_stage`.
+*   **Goal:** Highlight stages with high median age or extreme outliers.
 
-| Panel | Primary Theme | Fill Color (Closed) | Area Color (WIP/Open) | Rationale |
-| --- | --- | --- | --- | --- |
-| **FEATURES** | **Cool / Growth** | **Dark Green** (or Blue) | **Light Green** (or Light Blue) | Green associations with "Go", "Money", and "Growth." |
-| **BUGS** | **Warm / Alert** | **Dark Red** | **Light Red / Pink** | Red associations with "Stop", "Error", and "Heat." |
-| **TASKS** | **Neutral / Passive** | **Dark Grey** | **Light Grey** | Grey associations with "Background", "Concrete", and "Structure." |
+### **3.3. Stage Detail (Drill-down)**
+*   **Design:** Unified Data Grid (Table).
+*   **Interaction:** Filtered by interactive selection in Charts or multi-select dropdown.
+*   **Multi-Context:** Displays duplicate rows for issues with multiple contexts (one row per context-match) to allow complete slicing.
+*   **Why (UX):**
+    *   **Unified Grid:** Avoids the "Stack of Tables" vertical scroll fatigue.
+    *   **Cross-Stage Sorting:** Allows finding the "Oldest Active Item" regardless of specific stage (e.g. Architecture vs Implementation).
+*   **Columns:** `ID`, `Title`, `Stage`, `Age`, `Assignee`. Sorted by `Age` (descending) by default to highlight stuck items.
+*   **AI Assistant:** Integrated panel for summarizing selected issues.
 
-### **4. Axes & Labels**
+## **4. Architecture Decision Records (ADR)**
 
-* **Titles:** Left-aligned, bold.
-* `Features (Value Flow)`
-* `Bugs (Failure Demand)`
-* `Tasks (Maintenance)`
-
-
-* **X-Axis Ticks:** Show dates only on the **Bottom Panel** to reduce visual clutter (Edward Tufte's "Data-Ink Ratio").
-* **Gridlines:** Horizontal gridlines only (light opacity) to assist in reading volume levels. Vertical gridlines are optional/distracting.
-
-### **5. Interactive Elements (If using a web-based library like Plotly/D3)**
-
-* **Synced Hover:** Hovering over a specific week on the "Features" graph should display the vertical "crosshair" line on the "Bugs" and "Tasks" graphs simultaneously.
-* **Tooltip Content:**
-* Date: `[Week Start Date]`
-* Total Created: `[Integer]`
-* Total Closed: `[Integer]`
-* **Net WIP:** `[Created - Closed]` (Calculated field, vital for quick assessment).
-
-
-
-### **6. Visual "Smell Tests" (Quality Assurance for the View)**
-
-* **The "Wedge" Check:** In the Features graph, the "Closed" area should generally form an upward wedge. If the lines are parallel, velocity is zero.
-* **The "Jaws" Check:** In the Bug graph, if the "Total Created" line (top jaw) pulls away sharply from the "Total Closed" line (bottom jaw), the view effectively highlights a "Bug Explosion."
+### **4.1. Snapshot-based Workflow**
+*   **Decision:** Calculate flow metrics from the *current* snapshot state (labels) rather than reconstructing full history.
+*   **Why:** simpler to implement and provides immediate value for "Current Health". Future iterations can parse system notes for full cycle time analysis if needed.
