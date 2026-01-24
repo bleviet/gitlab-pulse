@@ -52,7 +52,6 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
         _render_scorecard(valid_df, quality_df)
 
     # Error Distribution and Action Table (Collapsible)
-    # Error Distribution and Action Table (Collapsible)
     if not quality_df.empty:
         selection = None
         with st.expander("📈 Error Distribution", expanded=True):
@@ -75,8 +74,6 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
 
 def _render_scorecard(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
     """Render radial gauge scorecard."""
-    st.subheader("📊 Quality Score")
-
     total_valid = len(valid_df)
     total_quality = len(quality_df)
     total = total_valid + total_quality
@@ -142,8 +139,6 @@ def _render_scorecard(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
 
 def _render_error_distribution(quality_df: pd.DataFrame) -> dict | None:
     """Render error code distribution."""
-    st.subheader("📋 Error Distribution")
-
     if "error_code" not in quality_df.columns:
         st.info("No error code data available")
         return
@@ -189,8 +184,6 @@ def _render_error_distribution(quality_df: pd.DataFrame) -> dict | None:
 
 def _render_action_table(quality_df: pd.DataFrame) -> None:
     """Render action table with failed issues."""
-    st.subheader("🔧 Action Required")
-
     # Select display columns
     display_cols = ["web_url", "title", "error_code", "error_message", "assignee"]
     available_cols = [c for c in display_cols if c in quality_df.columns]

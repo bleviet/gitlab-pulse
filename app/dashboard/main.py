@@ -79,9 +79,9 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
+        "🚀 Release": "release",
         "📈 Stats": "stats",
         "⚖️ Capacity": "capacity",
-        "🚀 Release": "release",
         "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
     }
