@@ -54,51 +54,52 @@ def issue_detail_grid(
 
         # Filters expander (Skip if explicitly disabled or if using Styler which implies external control)
         # We only show filters for raw DataFrames
-        with st.expander("🔍 Filters", expanded=False):
-            filter_cols = st.columns(3)
+        if config.get("enable_filters", True):
+            with st.expander("🔍 Filters", expanded=False):
+                filter_cols = st.columns(3)
 
-            # Stage filter
-            if "stage" in df.columns:
-                with filter_cols[0]:
-                    all_stages = sorted(df["stage"].dropna().unique().tolist())
-                    
-                    # Reset filter logic (simplified for shared widget)
-                    filter_key = f"{widget_key}_stage_filter"
-                    selected_stages = st.multiselect(
-                        "Stage",
-                        options=all_stages,
-                        default=all_stages,
-                        key=filter_key
-                    )
-                    if selected_stages:
-                        df = df[df["stage"].isin(selected_stages)]
+                # Stage filter
+                if "stage" in df.columns:
+                    with filter_cols[0]:
+                        all_stages = sorted(df["stage"].dropna().unique().tolist())
+                        
+                        # Reset filter logic (simplified for shared widget)
+                        filter_key = f"{widget_key}_stage_filter"
+                        selected_stages = st.multiselect(
+                            "Stage",
+                            options=all_stages,
+                            default=all_stages,
+                            key=filter_key
+                        )
+                        if selected_stages:
+                            df = df[df["stage"].isin(selected_stages)]
 
-            # Assignee filter
-            if "assignee" in df.columns:
-                with filter_cols[1]:
-                    all_assignees = ["All"] + sorted(df["assignee"].dropna().unique().tolist())
-                    key_assignee = f"{widget_key}_assignee_filter"
-                    selected_assignee = st.selectbox(
-                        "Assignee",
-                        options=all_assignees,
-                        key=key_assignee
-                    )
-                    if selected_assignee != "All":
-                        df = df[df["assignee"] == selected_assignee]
+                # Assignee filter
+                if "assignee" in df.columns:
+                    with filter_cols[1]:
+                        all_assignees = ["All"] + sorted(df["assignee"].dropna().unique().tolist())
+                        key_assignee = f"{widget_key}_assignee_filter"
+                        selected_assignee = st.selectbox(
+                            "Assignee",
+                            options=all_assignees,
+                            key=key_assignee
+                        )
+                        if selected_assignee != "All":
+                            df = df[df["assignee"] == selected_assignee]
 
-            # Type filter
-            if "issue_type" in df.columns:
-                with filter_cols[2]:
-                    all_types = sorted(df["issue_type"].dropna().unique().tolist())
-                    filter_key_type = f"{widget_key}_type_filter"
-                    selected_types = st.multiselect(
-                        "Type",
-                        options=all_types,
-                        default=all_types,
-                        key=filter_key_type
-                    )
-                    if selected_types:
-                        df = df[df["issue_type"].isin(selected_types)]
+                # Type filter
+                if "issue_type" in df.columns:
+                    with filter_cols[2]:
+                        all_types = sorted(df["issue_type"].dropna().unique().tolist())
+                        filter_key_type = f"{widget_key}_type_filter"
+                        selected_types = st.multiselect(
+                            "Type",
+                            options=all_types,
+                            default=all_types,
+                            key=filter_key_type
+                        )
+                        if selected_types:
+                            df = df[df["issue_type"].isin(selected_types)]
 
         # Column handling
         if config.get("minimize_columns", True):
