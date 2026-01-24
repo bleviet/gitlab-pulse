@@ -24,6 +24,7 @@ def issue_detail_grid(
     config = config or {}
     height = config.get("height", 600)
     title = config.get("title")
+    widget_key = config.get("key", "issue_detail_grid")
 
     if title:
         st.subheader(title)
@@ -31,6 +32,48 @@ def issue_detail_grid(
     if df.empty:
         st.info("No issues to display")
         return
+
+    # Filters expander
+    with st.expander("🔍 Filters", expanded=False):
+        filter_cols = st.columns(3)
+
+        # Stage filter
+        if "stage" in df.columns:
+            with filter_cols[0]:
+                all_stages = df["stage"].dropna().unique().tolist()
+                selected_stages = st.multiselect(
+                    "Stage",
+                    options=all_stages,
+                    default=all_stages,
+                    key=f"{widget_key}_stage_filter"
+                )
+                if selected_stages:
+                    df = df[df["stage"].isin(selected_stages)]
+
+        # Assignee filter
+        if "assignee" in df.columns:
+            with filter_cols[1]:
+                all_assignees = ["All"] + sorted(df["assignee"].dropna().unique().tolist())
+                selected_assignee = st.selectbox(
+                    "Assignee",
+                    options=all_assignees,
+                    key=f"{widget_key}_assignee_filter"
+                )
+                if selected_assignee != "All":
+                    df = df[df["assignee"] == selected_assignee]
+
+        # Type filter
+        if "issue_type" in df.columns:
+            with filter_cols[2]:
+                all_types = df["issue_type"].dropna().unique().tolist()
+                selected_types = st.multiselect(
+                    "Type",
+                    options=all_types,
+                    default=all_types,
+                    key=f"{widget_key}_type_filter"
+                )
+                if selected_types:
+                    df = df[df["issue_type"].isin(selected_types)]
 
     # Default columns
     default_columns = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]

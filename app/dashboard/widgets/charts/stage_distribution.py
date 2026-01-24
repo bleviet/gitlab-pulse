@@ -33,17 +33,39 @@ def stage_distribution(
     """
     config = config or {}
     height = config.get("height", 400)
+    widget_key = config.get("key", "stage_distribution")
 
     if df.empty or "stage" not in df.columns:
         st.info("No stage data available")
         return None
 
+    # Get all stages sorted by workflow order
+    stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+    all_stages = df["stage"].unique().tolist()
+    all_stages = sorted(all_stages, key=lambda x: stage_order.index(x) if x in stage_order else len(stage_order))
+
+    # Visible stages filter
+    with st.expander("🔍 Filters", expanded=False):
+        selected_stages = st.multiselect(
+            "Visible Stages",
+            options=all_stages,
+            default=all_stages,
+            help="Deselect stages (like 'Done') to rescale the chart.",
+            key=f"{widget_key}_stages_filter"
+        )
+
+    if not selected_stages:
+        st.warning("Please select at least one stage.")
+        return None
+
+    # Filter data to selected stages
+    df = df[df["stage"].isin(selected_stages)].copy()
+
     # Count by stage
     stage_counts = df["stage"].value_counts().reset_index()
     stage_counts.columns = ["Stage", "Count"]
 
-    # Sort by workflow order if available
-    stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+    # Sort by workflow order
     stage_counts["sort_key"] = stage_counts["Stage"].apply(
         lambda x: stage_order.index(x) if x in stage_order else len(stage_order)
     )

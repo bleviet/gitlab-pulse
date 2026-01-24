@@ -40,6 +40,40 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def _render_custom_widget(
+    widget_id: str,
+    widget_type: str,
+    filtered_df,
+    quality_df,
+    edit_mode: bool,
+    layout_data: dict,
+    WidgetRegistry,
+    remove_widget_from_layout
+) -> None:
+    """Helper function to render a widget in Custom view."""
+    if edit_mode:
+        col_content, col_remove = st.columns([11, 1])
+        with col_remove:
+            if st.button("✕", key=f"remove_{widget_id}", help="Remove widget"):
+                layout_data = remove_widget_from_layout(layout_data, widget_id)
+                st.session_state["layout_data"] = layout_data
+                st.rerun()
+    else:
+        col_content = st.container()
+
+    with col_content:
+        with st.container(border=True):
+            try:
+                renderer = WidgetRegistry.get_renderer(widget_type)
+                config = {"key": widget_id}
+                if widget_type in ["kpi_quality_score", "chart_quality_gauge"]:
+                    renderer(filtered_df, quality_df, config)
+                else:
+                    renderer(filtered_df, config)
+            except Exception as e:
+                st.error(f"Error rendering {widget_type}: {e}")
+
+
 def main() -> None:
     """Main dashboard entry point."""
     # Load data
@@ -176,12 +210,28 @@ def main() -> None:
             # Sort by y position (row), then x position
             sorted_items = sorted(layout_items, key=lambda x: (x.get("y", 0), x.get("x", 0)))
 
-            # Render each widget in an expander-like container
-            for item in sorted_items:
+            # Two-pass rendering for interactive filtering:
+            # Pass 1: Render charts first and capture selection state
+            # Pass 2: Render tables with filtered data
+
+            chart_widgets = [i for i in sorted_items if i.get("type", "").startswith("chart_")]
+            table_widgets = [i for i in sorted_items if i.get("type", "").startswith("table_")]
+            other_widgets = [i for i in sorted_items if not i.get("type", "").startswith(("chart_", "table_"))]
+
+            # Track selection state for cross-widget filtering
+            stage_filter = None
+
+            # Render KPIs and other widgets first
+            for item in other_widgets:
+                widget_id = item["i"]
+                widget_type = item.get("type", "unknown")
+                _render_custom_widget(widget_id, widget_type, filtered_df, quality_df, edit_mode, layout_data, WidgetRegistry, remove_widget_from_layout)
+
+            # Render charts and capture selections
+            for item in chart_widgets:
                 widget_id = item["i"]
                 widget_type = item.get("type", "unknown")
 
-                # Widget container with optional remove button
                 if edit_mode:
                     col_content, col_remove = st.columns([11, 1])
                     with col_remove:
@@ -196,24 +246,47 @@ def main() -> None:
                     with st.container(border=True):
                         try:
                             renderer = WidgetRegistry.get_renderer(widget_type)
-                            # Pass unique key in config to avoid Streamlit key conflicts
                             config = {"key": widget_id}
-                            # Some widgets need both valid_df and quality_df
-                            if widget_type in ["kpi_quality_score", "chart_quality_gauge"]:
-                                renderer(filtered_df, quality_df, config)
-                            else:
-                                renderer(filtered_df, config)
-                        except ValueError as e:
-                            st.error(f"Unknown widget: {widget_type}")
-                        except TypeError as e:
-                            # Fallback: try without config for widgets that don't accept it
-                            try:
-                                if widget_type in ["kpi_quality_score", "chart_quality_gauge"]:
-                                    renderer(filtered_df, quality_df)
-                                else:
-                                    renderer(filtered_df)
-                            except Exception as e2:
-                                st.error(f"Error rendering {widget_type}: {e2}")
+                            # Charts return selection state
+                            selection = renderer(filtered_df, config)
+
+                            # Capture stage filter from stage_distribution chart
+                            if widget_type == "chart_stage_distribution" and selection:
+                                points = selection.get("selection", {}).get("points", [])
+                                if points:
+                                    stages = [p.get("y") for p in points if p.get("y")]
+                                    if stages:
+                                        stage_filter = stages
+                        except Exception as e:
+                            st.error(f"Error rendering {widget_type}: {e}")
+
+            # Apply filter if chart selection was made
+            table_df = filtered_df.copy()
+            if stage_filter and "stage" in table_df.columns:
+                table_df = table_df[table_df["stage"].isin(stage_filter)]
+                st.caption(f"🔍 Filtered by stage: {', '.join(stage_filter)}")
+
+            # Render tables with potentially filtered data
+            for item in table_widgets:
+                widget_id = item["i"]
+                widget_type = item.get("type", "unknown")
+
+                if edit_mode:
+                    col_content, col_remove = st.columns([11, 1])
+                    with col_remove:
+                        if st.button("✕", key=f"remove_{widget_id}", help="Remove widget"):
+                            layout_data = remove_widget_from_layout(layout_data, widget_id)
+                            st.session_state["layout_data"] = layout_data
+                            st.rerun()
+                else:
+                    col_content = st.container()
+
+                with col_content:
+                    with st.container(border=True):
+                        try:
+                            renderer = WidgetRegistry.get_renderer(widget_type)
+                            config = {"key": widget_id}
+                            renderer(table_df, config)
                         except Exception as e:
                             st.error(f"Error rendering {widget_type}: {e}")
 
