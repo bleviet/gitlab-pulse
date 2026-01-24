@@ -121,7 +121,7 @@ A low efficiency (e.g., < 20%) indicates that work spends most of its time waiti
 **Q: What are "Backlog" items?**
 **A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
 
-**Q: How do I interpret the "Stage Stickiness (Aging)" graph?**
+**Q: How do I interpret the "Days in Stage (Aging)" graph?**
 **A:** This **Box Plot** visualizes the distribution of time (in days) that issues have spent in their *current* stage without an update.
 - **X-Axis:** Workflow Stages (e.g., *Implementation*, *Review*).
 - **Y-Axis:** Days in current stage.
@@ -131,21 +131,21 @@ Use this to identify **stalled work** or process bottlenecks.
 
 ### Interactive Flow Features
 **Q: How do I filter the Flow charts?**
-**A:** The **Project Funnel** and **Stage Stickiness** charts are interactive:
+**A:** The **Work by Stage** and **Days in Stage** charts are interactive:
 - **Click**: Select a single stage or segment to filter the Issue Drill-down table.
 - **Shift+Click**: Select multiple segments for combined analysis.
 - **Double-Click**: Reset the selection to show all data.
-- **Tabs**: Switch between "Project Funnel" (Full Width) and "Stage Stickiness" (Full Width) to delve into different aspects of the flow without visual clutter.
+- **Tabs**: Switch between "Work by Stage" (Full Width) and "Days in Stage" (Full Width) to delve into different aspects of the flow without visual clutter.
 
 ### Multi-Context Issues
 **Q: What if an issue belongs to multiple contexts (e.g., "R&D" and "Customer")?**
 **A:**
-- **Metrics & Charts**: The issue is counted **only once** (deduplicated) in global metrics like "Active WIP" and the "Project Funnel" to ensure accurate counts.
+- **Metrics & Charts**: The issue is counted **only once** (deduplicated) in global metrics like "Active WIP" and the "Work by Stage" to ensure accurate counts.
 - **Issue Table**: The issue appears **twice** (or more), once for each context, allowing you to see it in every relevant slice.
 
 ### Help & Descriptions
 **Q: Where can I find stage definitions?**
-**A:** Hover over the bars in the **Project Funnel** chart. The tooltips now display a detailed description of each stage (e.g., "Code review and merge request feedback") as configured in your `default.yaml`. A general help icon `(?)` in the chart header also provides usage instructions.
+**A:** Hover over the bars in the **Work by Stage** chart. The tooltips now display a detailed description of each stage (e.g., "Code review and merge request feedback") as configured in your `default.yaml`. A general help icon `(?)` in the chart header also provides usage instructions.
 
 ## License
 
