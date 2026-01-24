@@ -65,21 +65,21 @@ def render_overview(
         )
         
         if chart_mode == "📊 Work by Stage":
-            # Use unique issues for funnel to show correct counts
-            funnel_selection = _render_funnel_chart(unique_df, stage_descriptions)
+            # Use unique issues for stage distribution to show correct counts
+            stage_selection = _render_stage_distribution(unique_df, stage_descriptions)
             aging_selection = None
             
         else:
             # Use unique issues for aging to show distinct items
             aging_selection = _render_aging_chart(unique_df)
-            funnel_selection = None
+            stage_selection = None
 
     # Apply interactive filters (Apply to original DF which allows exploring contexts)
     filtered_df = df.copy()
 
-    # Filter by Funnel Selection
-    if funnel_selection and funnel_selection.get("selection", {}).get("points"):
-        selected_points = funnel_selection["selection"]["points"]
+    # Filter by Stage Distribution Selection
+    if stage_selection and stage_selection.get("selection", {}).get("points"):
+        selected_points = stage_selection["selection"]["points"]
         # Extract filters: stage and severity
         # We perform an OR filter for multiple selected points
         masks = []
@@ -113,7 +113,7 @@ def render_overview(
                 final_mask |= m
             filtered_df = filtered_df[final_mask]
 
-    # Filter by Aging Selection (Intersection with Funnel)
+    # Filter by Aging Selection (Intersection with Stage Distribution chart)
     if aging_selection and aging_selection.get("selection", {}).get("points"):
         selected_points = aging_selection["selection"]["points"]
         # Aging chart: x=stage, y=days_in_stage, color=stage_type
@@ -183,11 +183,11 @@ def _render_flow_metrics(df: pd.DataFrame) -> None:
 
 
 
-def _render_funnel_chart(
+def _render_stage_distribution(
     df: pd.DataFrame, 
     stage_descriptions: dict[str, str] | None = None
 ) -> dict | None:
-    """Render horizontal bar chart of issues per stage (The Funnel).
+    """Render horizontal bar chart of issues per stage (Work by Stage).
 
     Returns:
         Selection state dictionary or None
