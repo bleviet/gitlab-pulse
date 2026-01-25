@@ -8,14 +8,12 @@ import streamlit as st
 
 
 def milestone_timeline(
-    milestones_df: pd.DataFrame,
     issues_df: pd.DataFrame,
     config: dict[str, Any] | None = None
 ) -> dict | None:
     """Render milestone timeline as a scatter plot with markers.
 
     Args:
-        milestones_df: DataFrame with milestone details (id, title, due_date, start_date, state)
         issues_df: DataFrame with all issues (needed for completion stats)
         config: Optional configuration
             - key: widget key
@@ -28,11 +26,7 @@ def milestone_timeline(
 
     display_df = None
 
-    # Primary Source: Milestone DataFrame
-    if milestones_df is not None and not milestones_df.empty:
-        display_df = milestones_df.copy()
-
-    # Fallback Source: Extract from Issues (e.g. for Subprojects/Groups)
+    # Extract from Issues (e.g. for Subprojects/Groups)
     if (display_df is None or display_df.empty) and not issues_df.empty and "milestone_id" in issues_df.columns:
         # Group by milestone title/id to reconstruct milestone metadata
         # We need id, title, due_date, start_date, state

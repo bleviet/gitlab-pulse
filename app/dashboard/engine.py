@@ -112,7 +112,6 @@ def render_grid(
     edit_mode: bool = False,
     key: str = "dashboard_grid",
     quality_df: pd.DataFrame = None,
-    milestones_df: pd.DataFrame = None,
     widget_data_overrides: dict[str, pd.DataFrame] | None = None,
     key_suffix: str = "",
     global_config: dict[str, Any] | None = None
@@ -339,7 +338,7 @@ def render_grid(
         if len(row_items) == 1 and widths[0] >= 12:
             item = row_items[0]
             item_df = widget_data_overrides.get(item["i"], df) if widget_data_overrides else df
-            _render_single_widget(item, item_df, quality_df, milestones_df, key_suffix=key_suffix, global_config=global_config)
+            _render_single_widget(item, item_df, quality_df, key_suffix=key_suffix, global_config=global_config)
         else:
             # Multiple items in this row - create columns
             active_cols = st.columns(widths)
@@ -347,7 +346,7 @@ def render_grid(
             for col, item in zip(active_cols, row_items):
                 with col:
                     item_df = widget_data_overrides.get(item["i"], df) if widget_data_overrides else df
-                    _render_single_widget(item, item_df, quality_df, milestones_df, key_suffix=key_suffix, global_config=global_config)
+                    _render_single_widget(item, item_df, quality_df, key_suffix=key_suffix, global_config=global_config)
 
     return None
 
@@ -355,7 +354,6 @@ def _render_single_widget(
     item: dict,
     df: pd.DataFrame,
     quality_df: pd.DataFrame = None,
-    milestones_df: pd.DataFrame = None,
     show_delete: bool = False,
     key_suffix: str = "",
     global_config: dict[str, Any] | None = None
@@ -366,7 +364,6 @@ def _render_single_widget(
         item: Widget configuration dict
         df: Main dataframe
         quality_df: Quality dataframe (optional)
-        milestones_df: Milestones dataframe (optional)
         show_delete: Whether to show delete button (only in Edit Mode)
         key_suffix: Suffix to append to widget key (e.g. for resetting state)
         global_config: Config to apply to all widgets (merged)
@@ -395,11 +392,6 @@ def _render_single_widget(
                      renderer(df, quality_df, config)
                 else:
                      st.warning("Quality data not available for this widget")
-            elif widget_type == "chart_milestone_timeline":
-                if milestones_df is not None:
-                    renderer(milestones_df, df, config)
-                else:
-                    st.warning("Milestone data not available for this widget")
             else:
                 selection = renderer(df, config)
                 # Store selection if available (simplified for now, main.py logic was more complex)

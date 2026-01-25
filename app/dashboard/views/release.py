@@ -11,7 +11,6 @@ import streamlit as st
 
 from app.shared.schemas import AnalyticsIssue
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.data_loader import load_milestones
 from app.dashboard.widgets import kpis, charts, tables
 from app.dashboard.components import style_metric_cards
 
@@ -24,34 +23,10 @@ def render_release_view(df: pd.DataFrame) -> None:
     """
     st.header("Release Management")
 
-    # Build milestone data from issues (same source as dropdown)
-    # This ensures timeline shows all milestones that have issues
-    if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
-        milestone_df = df[df["milestone_id"].notna()].copy()
-        ms_agg = milestone_df.groupby("milestone").agg({
-            "milestone_id": "first",
-            "milestone_due_date": "first",
-            "milestone_start_date": "first",
-            "iid": "count",  # Use iid for count to avoid column name conflict
-            "state": lambda x: "closed" if (x == "closed").all() else "active"
-        }).reset_index()
-        ms_agg = ms_agg.rename(columns={
-            "milestone": "title",
-            "milestone_id": "id",
-            "milestone_due_date": "due_date",
-            "milestone_start_date": "start_date",
-            "iid": "issue_count",
-            "state": "milestone_state"
-        })
-        # Use milestone_state for timeline status
-        ms_agg["state"] = ms_agg["milestone_state"]
-    else:
-        ms_agg = pd.DataFrame()
-
     # Milestone Timeline Section (Collapsible, collapsed by default)
-    if not ms_agg.empty:
+    if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
         with st.expander("📅 Milestone Timeline", expanded=True):
-            timeline_selection = charts.milestone_timeline(ms_agg, df, config={"key": "release_timeline"})
+            timeline_selection = charts.milestone_timeline(df, config={"key": "release_timeline"})
 
             # Handle selection from timeline
             if timeline_selection and timeline_selection.get("selection", {}).get("points"):
