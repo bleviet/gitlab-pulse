@@ -184,6 +184,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             options=milestones,
             index=0,
             help="Filter specific milestone",
+            key="sidebar_milestone_selector"
         )
 
         st.divider()

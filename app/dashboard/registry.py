@@ -14,7 +14,7 @@ from app.dashboard.widgets.kpis import (
 from app.dashboard.widgets.charts import (
     stage_distribution, aging_boxplot, burnup_velocity,
     workload_distribution, work_type_distribution, status_donut,
-    quality_gauge, error_distribution
+    quality_gauge, error_distribution, milestone_timeline
 )
 from app.dashboard.widgets.tables import (
     issue_detail_grid
@@ -43,6 +43,7 @@ class WidgetRegistry:
         "chart_status_donut": status_donut,
         "chart_quality_gauge": quality_gauge,
         "chart_error_distribution": error_distribution,
+        "chart_milestone_timeline": milestone_timeline,
 
         # Tables
         "table_issue_detail_grid": issue_detail_grid,

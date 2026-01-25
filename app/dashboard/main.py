@@ -4,6 +4,7 @@ GitLabInsight Layer 3 Presentation Layer.
 """
 
 import streamlit as st
+import pandas as pd
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -16,6 +17,7 @@ from app.dashboard.data_loader import (
     filter_by_team,
     load_quality_issues,
     load_valid_issues,
+    load_milestones,
 )
 from app.dashboard.views.aging import render_aging
 from app.dashboard.views.overview import render_overview
@@ -84,6 +86,7 @@ def main() -> None:
     # Load data
     valid_df = load_valid_issues()
     quality_df = load_quality_issues()
+    milestones_df = load_milestones()
 
     # Load rules to get color overrides
     rule_loader = RuleLoader()
@@ -99,6 +102,53 @@ def main() -> None:
         default_rule = next(iter(rule_loader.rules.values()), rule_loader.get_default_rule())
 
     colors = default_rule.colors
+
+    # --- Early Bidirectional Sync Logic ---
+    # Must update sidebar state BEFORE render_sidebar instantiates the widget
+    if "timeline_reset_counter" not in st.session_state:
+        st.session_state.timeline_reset_counter = 0
+    
+    current_layout_name = st.session_state.get("current_layout", "default")
+    # Need to verify if we are in custom view or similar? 
+    # Just checking the active layout is safer.
+    
+    # Lazy load layout to check for timeline interactions
+    from app.dashboard.engine import load_layout
+    try:
+        # Avoid full load overhead if possible, but load_layout is cached/fast usually
+        pre_layout_data = st.session_state.get("layout_data") or load_layout(current_layout_name)
+    except Exception:
+        pre_layout_data = {}
+
+    if pre_layout_data and "layout" in pre_layout_data:
+        t_counter = st.session_state.timeline_reset_counter
+        t_suffix = f"_{t_counter}"
+        
+        for item in pre_layout_data["layout"]:
+            if item.get("type") == "chart_milestone_timeline":
+                w_key = f"{item['i']}{t_suffix}"
+                
+                # Check for new selection
+                if w_key in st.session_state:
+                    new_selection = st.session_state[w_key]
+                    last_selection = st.session_state.get(f"last_selection_{w_key}")
+                    
+                    # Detect change
+                    # Streamlit selection is a dict, comparison works if structurally same
+                    if new_selection != last_selection:
+                         st.session_state[f"last_selection_{w_key}"] = new_selection
+                         
+                         # Extract milestone details
+                         if new_selection and new_selection.get("selection", {}).get("points"):
+                             points = new_selection["selection"]["points"]
+                             if points:
+                                 try:
+                                     sel_ms = points[0]["customdata"][2]
+                                     # Update Sidebar State
+                                     st.session_state["sidebar_milestone_selector"] = sel_ms
+                                     # Note: We don't need to rerun here, as we are before render_sidebar
+                                 except (IndexError, KeyError):
+                                     pass
 
     # Render sidebar and get filters
     filters = render_sidebar(valid_df)
@@ -241,7 +291,96 @@ def main() -> None:
 
         # Render Grid Engine
         from app.dashboard.engine import render_grid
-        updated_layout = render_grid(filtered_df, layout_data, edit_mode, quality_df=quality_df)
+
+        # --- Bidirectional Sync Logic for Milestone Timeline ---
+        current_milestone_filter = filters["milestone"]
+        last_milestone_filter = st.session_state.get("last_milestone_filter")
+        
+        # Detect Sidebar Change -> Reset Timeline Selection
+        if current_milestone_filter != last_milestone_filter:
+            if last_milestone_filter is not None: # Skip initial load
+                st.session_state.timeline_reset_counter += 1
+            st.session_state.last_milestone_filter = current_milestone_filter
+
+        timeline_reset_counter = st.session_state.timeline_reset_counter
+        key_suffix = f"_{timeline_reset_counter}" 
+        
+        # Pass sidebar selection to highlighting
+        global_config = {"highlight_milestone": current_milestone_filter}
+
+        # Prepare overrides for filter source widgets
+        # They should see the data BEFORE the interactive filter they triggered
+        widget_overrides = {}
+        
+        # Check for interactive filters
+        if layout_data and "layout" in layout_data:
+            for item in layout_data["layout"]:
+                # Milestone Timeline Logic
+                if item.get("type") == "chart_milestone_timeline":
+                    widget_key = f"{item['i']}{key_suffix}" # Use suffixed key
+                    if widget_key in st.session_state:
+                         selection = st.session_state[widget_key]
+                         if selection and selection.get("selection", {}).get("points"):
+                             points = selection["selection"]["points"]
+                             if points:
+                                 try:
+                                     # customdata[2] is the milestone title
+                                     selected_milestone = points[0]["customdata"][2]
+                                     
+                                     filtered_df = filter_by_milestone(filtered_df, selected_milestone)
+                                     # Isolate the source widget to show original context
+                                     widget_overrides[item["i"]] = milestones_df # Use original ID for overrides (engine maps it)
+                                 except (IndexError, KeyError):
+                                     pass
+
+                # Stage Distribution Logic
+                elif item.get("type") == "chart_stage_distribution":
+                    # Stage distribution doesn't use the reset suffix mechanism yet, so use base key
+                    # Or should we apply suffix to all? engine applies suffix to all. 
+                    # So we must use suffixed key to check state.
+                    widget_key = f"{item['i']}{key_suffix}"
+                    if widget_key in st.session_state:
+                         selection = st.session_state[widget_key]
+                         if selection and selection.get("selection", {}).get("points"):
+                             selected_points = selection["selection"]["points"]
+                             masks = []
+                             for point in selected_points:
+                                 # px.bar horizontal: y is stage
+                                 stage = point.get("y")
+                                 # customdata[0] is severity
+                                 severity = point.get("customdata", [None])[0]
+
+                                 mask = (filtered_df["stage"] == stage)
+                                 if severity:
+                                      if severity == "Unset":
+                                          mask &= (
+                                              filtered_df["severity"].isna() |
+                                              (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
+                                          )
+                                      else:
+                                          mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
+                                 masks.append(mask)
+
+                             if masks:
+                                 # Store current DF state before applying this specific filter
+                                 # So the chart itself doesn't filter out its own bars
+                                 widget_overrides[item["i"]] = filtered_df.copy() # Use original ID
+                                 
+                                 final_mask = pd.Series(False, index=filtered_df.index)
+                                 for m in masks:
+                                     final_mask |= m
+                                 filtered_df = filtered_df[final_mask]
+
+        updated_layout = render_grid(
+            filtered_df, 
+            layout_data, 
+            edit_mode, 
+            quality_df=quality_df, 
+            milestones_df=milestones_df, 
+            widget_data_overrides=widget_overrides,
+            key_suffix=key_suffix,
+            global_config=global_config
+        )
         if updated_layout is not None:
             layout_data["layout"] = updated_layout
             st.session_state["layout_data"] = layout_data

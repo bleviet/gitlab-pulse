@@ -74,6 +74,10 @@ def milestone_timeline(
         stats = milestone_issue_stats.get(ms_id, {"total": 0, "closed": 0})
         all_issues_closed = stats["total"] > 0 and stats["closed"] == stats["total"]
 
+        # Highlight logic from config (e.g. linked to sidebar)
+        highlight_title = config.get("highlight_milestone")
+        is_highlighted = title == highlight_title
+
         if state == "closed":
             if all_issues_closed:
                 color = "#9333EA"  # Purple-600
@@ -90,6 +94,16 @@ def milestone_timeline(
                 color = "#16A34A"  # Green-600
                 status = "On Track"
 
+        # Apply highlight visual overrides
+        size = 16
+        line_width = 1
+        line_color = "white"
+        
+        if is_highlighted:
+            size = 22
+            line_width = 3
+            line_color = "#F59E0B" # Amber highlight border
+
         # Format date for display
         date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "No date"
 
@@ -100,6 +114,9 @@ def milestone_timeline(
             "status": status,
             "color": color,
             "issues": f"{stats['closed']}/{stats['total']}",
+            "size": size,
+            "line_width": line_width,
+            "line_color": line_color,
         })
 
     if not scatter_data:
@@ -148,10 +165,13 @@ def milestone_timeline(
                 mode="markers+text",
                 name=status,
                 marker=dict(
-                    size=16,
+                    size=status_df["size"],
                     color=color,
                     symbol="diamond",
-                    line=dict(width=1, color="white"),
+                    line=dict(
+                        width=status_df["line_width"],
+                        color=status_df["line_color"]
+                    ),
                 ),
                 text=status_df["title"],
                 textposition="top center",
