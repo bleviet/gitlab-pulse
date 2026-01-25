@@ -25,6 +25,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         st.caption("Analytics Dashboard")
 
         st.divider()
+        st.subheader("📐 Custom Views")
 
         # --- Custom Views (Layout Builder) ---
         from app.dashboard.engine import list_layouts, load_layout, save_layout, create_layout, delete_layout
