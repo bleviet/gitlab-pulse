@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
-from streamlit_elements import elements, dashboard, mui
+from streamlit_elements import elements, dashboard, mui, sync
 
 from app.dashboard.registry import WidgetRegistry
 
@@ -130,24 +130,24 @@ def render_grid(
         st.info("No widgets in this layout. Switch to Edit Mode to add widgets.")
         return None
 
-    # --- EDIT MODE: Streamlit Elements Grid ---
+    # --- EDIT MODE: Draggable Grid with Embedded Delete (Callback) ---
     if edit_mode:
         if not layout_items:
             st.warning("No widgets yet. Use the Widget Toolbox in the sidebar to add widgets.")
             return None
-        
-        st.caption(f"📐 Editing {len(layout_items)} widget(s) • 12-column grid • Drag to reposition • Resize from any corner")
-        
+
+        st.caption(f"📐 Editing {len(layout_items)} widget(s) • Drag to reposition • Resize from corners • Click ✕ to delete")
+
         # Inject CSS for grid visualization
         st.markdown("""
         <style>
         /* Grid background pattern for 12-column visualization */
         .stElementsFrame iframe {
-            background-image: 
+            background-image:
                 linear-gradient(to right, rgba(79, 70, 229, 0.1) 1px, transparent 1px);
             background-size: calc(100% / 12) 100%;
         }
-        
+
         /* Resize handles styling */
         .react-resizable-handle {
             background-color: #4F46E5 !important;
@@ -160,7 +160,7 @@ def render_grid(
         }
         </style>
         """, unsafe_allow_html=True)
-        
+
         # Build dashboard layout items with resize handles on all corners
         grid_layout = [
             dashboard.Item(
@@ -174,34 +174,54 @@ def render_grid(
             )
             for item in layout_items
         ]
-        
-        # Session state key for tracking changes
+
+        # Session state key for tracking layout changes
         layout_state_key = f"{key}_layout_state"
-        
+        delete_state_key_prefix = f"{key}_delete_widget"
+        last_delete_key = f"{key}_last_delete_widget"
+        elements_frame_key = f"streamlit_elements.core.frame.elements_frame.{key}"
+
+        def _find_delete_key(payload: object) -> str | None:
+            if isinstance(payload, dict):
+                for key_name, value in payload.items():
+                    if isinstance(key_name, str) and key_name.startswith(f"{delete_state_key_prefix}_"):
+                        return key_name
+                    nested = _find_delete_key(value)
+                    if nested:
+                        return nested
+            elif isinstance(payload, list):
+                for value in payload:
+                    nested = _find_delete_key(value)
+                    if nested:
+                        return nested
+            return None
+
         def handle_layout_change(updated_layout):
             """Callback when user drags/resizes items."""
             st.session_state[layout_state_key] = updated_layout
-        
+
         # Render the grid with explicit configuration
         with elements(key):
             with dashboard.Grid(
-                grid_layout, 
+                grid_layout,
                 onLayoutChange=handle_layout_change,
             ):
                 for item in layout_items:
                     widget_type = item.get("type", "unknown")
                     item_id = str(item["i"])
-                    
+
                     # Display position info for user feedback
                     pos_info = f"x:{item['x']} y:{item['y']} | {item['w']}×{item['h']}"
-                    
+
+                    delete_key = f"{delete_state_key_prefix}_{item_id}"
+
                     # Use mui.Paper as recommended in docs
                     mui.Paper(
-                        f"📦 {widget_type}\n({pos_info})",
                         key=item_id,
                         elevation=3,
                         sx={
                             "display": "flex",
+                            "flexDirection": "column",
                             "alignItems": "center",
                             "justifyContent": "center",
                             "height": "100%",
@@ -211,10 +231,57 @@ def render_grid(
                             "cursor": "move",
                             "textAlign": "center",
                             "p": 2,
-                            "fontSize": "0.85rem",
-                        }
+                            "position": "relative",
+                        },
+                        children=[
+                            mui.IconButton(
+                                mui.icon.Close(),
+                                onClick=sync(delete_key),
+                                className="draggable-cancel",
+                                key=f"delete_{item_id}",
+                                sx={
+                                    "position": "absolute",
+                                    "top": 2,
+                                    "right": 2,
+                                    "zIndex": 10,
+                                    "bgcolor": "rgba(255,255,255,0.7)",
+                                    "&:hover": { "bgcolor": "#ef4444", "color": "white" }
+                                }
+                            ),
+                            mui.Typography(f"📦 {widget_type}", sx={"fontWeight": "bold", "fontSize": "0.85rem"}),
+                            mui.Typography(f"({pos_info})", sx={"fontSize": "0.75rem", "color": "text.secondary"})
+                        ]
                     )
-        
+
+        # Check if delete was triggered
+        widget_to_delete = None
+        delete_key_seen = None
+        for item in layout_items:
+            item_id = str(item["i"])
+            delete_key = f"{delete_state_key_prefix}_{item_id}"
+            if delete_key in st.session_state:
+                delete_key_seen = delete_key
+                widget_to_delete = item_id
+                st.session_state.pop(delete_key, None)
+                break
+
+        if widget_to_delete is None:
+            frame_state = st.session_state.get(elements_frame_key)
+            if isinstance(frame_state, str):
+                try:
+                    frame_payload = json.loads(frame_state)
+                    delete_key_seen = _find_delete_key(frame_payload)
+                    if delete_key_seen:
+                        widget_to_delete = delete_key_seen.replace(f"{delete_state_key_prefix}_", "", 1)
+                except json.JSONDecodeError:
+                    delete_key_seen = None
+
+        if widget_to_delete is not None and delete_key_seen != st.session_state.get(last_delete_key):
+            # Remove widget from layout
+            new_layout = [item for item in layout_items if str(item["i"]) != str(widget_to_delete)]
+            st.session_state[last_delete_key] = delete_key_seen
+            return new_layout
+
         # Check if layout was changed
         if layout_state_key in st.session_state:
             updated = st.session_state[layout_state_key]
@@ -235,14 +302,14 @@ def render_grid(
                     })
             if new_layout != layout_items:
                 return new_layout
-        
+
         return None
 
     # --- VIEW MODE: Native Streamlit (Row-based Rendering) ---
-    
+
     # Sort items by Y, then X to process top-to-bottom, left-to-right
     sorted_items = sorted(layout_items, key=lambda x: (int(x["y"]), int(x["x"])))
-    
+
     # Group items by Y-coordinate for row-based rendering
     y_groups = {}
     for item in sorted_items:
@@ -250,41 +317,48 @@ def render_grid(
         if y not in y_groups:
             y_groups[y] = []
         y_groups[y].append(item)
-    
+
     # Process each row group independently
     for row_y in sorted(y_groups.keys()):
         row_items = y_groups[row_y]
-        
+
         if not row_items:
             continue
-        
+
         # Sort by X position
         row_items = sorted(row_items, key=lambda x: int(x["x"]))
-        
+
         # Create columns based on widths
         widths = [int(item["w"]) for item in row_items]
-        
+
         # If only one item with w>=12, render full width (no columns needed)
         if len(row_items) == 1 and widths[0] >= 12:
             _render_single_widget(row_items[0], df, quality_df)
         else:
             # Multiple items in this row - create columns
             active_cols = st.columns(widths)
-            
+
             for col, item in zip(active_cols, row_items):
                 with col:
                     _render_single_widget(item, df, quality_df)
 
     return None
 
-def _render_single_widget(item: dict, df: pd.DataFrame, quality_df: pd.DataFrame = None):
-    """Helper to render a widget inside a column container."""
+def _render_single_widget(item: dict, df: pd.DataFrame, quality_df: pd.DataFrame = None, show_delete: bool = False):
+    """Helper to render a widget inside a column container.
+
+    Args:
+        item: Widget configuration dict
+        df: Main dataframe
+        quality_df: Quality dataframe (optional)
+        show_delete: Whether to show delete button (only in Edit Mode)
+    """
     from app.dashboard.registry import WidgetRegistry
-    
+
     widget_type = item.get("type", "unknown")
     widget_id = item["i"]
     height_px = item.get("h", 2) * 100 # map grid units to pixels
-    
+
     # Container for visual separation
     with st.container(border=True):
         try:
@@ -294,7 +368,7 @@ def _render_single_widget(item: dict, df: pd.DataFrame, quality_df: pd.DataFrame
                 "key": widget_id,
                 "height": height_px,
             }
-            
+
             # Special handling for Quality widgets which need two dataframes
             if widget_type in ["kpi_quality_score", "chart_quality_gauge"]:
                 if quality_df is not None:
@@ -305,7 +379,7 @@ def _render_single_widget(item: dict, df: pd.DataFrame, quality_df: pd.DataFrame
                 selection = renderer(df, config)
                 # Store selection if available (simplified for now, main.py logic was more complex)
                 # Ideally we bubble this up, but for the grid refactor we focus on layout first.
-                
+
         except Exception as e:
             st.error(f"Error {widget_type}: {e}")
 

@@ -93,7 +93,7 @@ def main() -> None:
         if rule.team == "default":
             default_rule = rule
             break
-    
+
     if not default_rule:
         # Fallback: try first available rule, else empty default
         default_rule = next(iter(rule_loader.rules.values()), rule_loader.get_default_rule())
@@ -188,7 +188,7 @@ def main() -> None:
         current_layout = st.session_state.get("current_layout", "default")
         layout_data = st.session_state.get("layout_data") or load_layout(current_layout)
         edit_mode = st.session_state.get("edit_mode", False)
-        
+
         # Sync layout positions from streamlit-elements internal state
         internal_key = "streamlit_elements.core.frame.elements_frame.dashboard_grid"
         if edit_mode and internal_key in st.session_state:
@@ -238,10 +238,14 @@ def main() -> None:
 
         if edit_mode:
             st.info("🔧 Edit Mode: Drag widgets to rearrange. Resize using handles. Add new from sidebar.")
-        
+
         # Render Grid Engine
         from app.dashboard.engine import render_grid
-        render_grid(filtered_df, layout_data, edit_mode, quality_df=quality_df)
+        updated_layout = render_grid(filtered_df, layout_data, edit_mode, quality_df=quality_df)
+        if updated_layout is not None:
+            layout_data["layout"] = updated_layout
+            st.session_state["layout_data"] = layout_data
+            st.rerun()
 
 
     elif view_id == "admin":
