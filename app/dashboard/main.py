@@ -306,7 +306,10 @@ def main() -> None:
         key_suffix = f"_{timeline_reset_counter}" 
         
         # Pass sidebar selection to highlighting
-        global_config = {"highlight_milestone": current_milestone_filter}
+        global_config = {
+            "highlight_milestone": current_milestone_filter,
+            "colors": colors
+        }
 
         # Prepare overrides for filter source widgets
         # They should see the data BEFORE the interactive filter they triggered

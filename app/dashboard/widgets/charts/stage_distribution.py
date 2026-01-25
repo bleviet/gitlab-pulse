@@ -48,10 +48,12 @@ def stage_distribution(
     Returns:
         Selection state dictionary or None
     """
-    config = config or {}
     height = config.get("height", 400)
     widget_key = config.get("key", "stage_distribution")
     stage_descriptions = config.get("stage_descriptions", {})
+
+    # Use configured colors if available, else fallback to default
+    palette = config.get("colors", COLORS).copy() # Use copy to avoid mutating global default
 
     if df.empty or "stage" not in df.columns:
         st.info("No stage data available")
@@ -163,11 +165,11 @@ def stage_distribution(
 
         # Priority color palette
         priority_colors = {
-            "Critical": COLORS["critical"],
-            "High": COLORS["high"],
-            "Medium": COLORS["medium"],
-            "Low": COLORS["low"],
-            "Unset": COLORS["unset"],
+            "Critical": palette["critical"],
+            "High": palette["high"],
+            "Medium": palette["medium"],
+            "Low": palette["low"],
+            "Unset": palette["unset"],
         }
 
         # Build color map for formatted labels
@@ -232,7 +234,7 @@ def stage_distribution(
             title="",
             category_orders={"stage": sorted_stages},
         )
-        fig.update_traces(marker_color=COLORS["primary"], textposition="auto")
+        fig.update_traces(marker_color=palette["primary"], textposition="auto")
 
     # Add Total Labels at bar ends
     stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]

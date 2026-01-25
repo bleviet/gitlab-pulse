@@ -73,7 +73,8 @@ def render_overview(
                 unique_df,
                 config={
                     "stage_descriptions": stage_descriptions,
-                    "key": "flow_chart_stage_dist"
+                    "key": "flow_chart_stage_dist",
+                    "colors": colors
                 }
             )
             aging_selection = None
