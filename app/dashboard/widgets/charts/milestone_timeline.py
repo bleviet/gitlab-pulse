@@ -26,12 +26,58 @@ def milestone_timeline(
     config = config or {}
     widget_key = config.get("key", "milestone_timeline")
 
-    if milestones_df.empty:
+    display_df = None
+
+    # Primary Source: Milestone DataFrame
+    if milestones_df is not None and not milestones_df.empty:
+        display_df = milestones_df.copy()
+
+    # Fallback Source: Extract from Issues (e.g. for Subprojects/Groups)
+    if (display_df is None or display_df.empty) and not issues_df.empty and "milestone_id" in issues_df.columns:
+        # Group by milestone title/id to reconstruct milestone metadata
+        # We need id, title, due_date, start_date, state
+
+        # Ensure we have the necessary columns
+        available_cols = issues_df.columns
+        agg_dict = {
+            "milestone_id": "first",
+            "state": lambda x: "closed" if (x == "closed").all() else "active"
+        }
+
+        if "milestone_due_date" in available_cols:
+            agg_dict["milestone_due_date"] = "first"
+        if "milestone_start_date" in available_cols:
+            agg_dict["milestone_start_date"] = "first"
+
+        # Group by milestone title (as it's usually reliable)
+        if "milestone" in available_cols:
+            ms_agg = issues_df[issues_df["milestone"].notna()].groupby("milestone").agg(agg_dict).reset_index()
+
+            # Rename to match expected schema
+            rename_map = {
+                "milestone": "title",
+                "milestone_id": "id",
+            }
+            if "milestone_due_date" in available_cols:
+                rename_map["milestone_due_date"] = "due_date"
+            if "milestone_start_date" in available_cols:
+                rename_map["milestone_start_date"] = "start_date"
+
+            ms_agg = ms_agg.rename(columns=rename_map)
+
+            # Ensure required columns exist even if missing from source
+            if "due_date" not in ms_agg.columns:
+                ms_agg["due_date"] = pd.NaT
+            if "start_date" not in ms_agg.columns:
+                ms_agg["start_date"] = pd.NaT
+
+            display_df = ms_agg
+
+    if display_df is None or display_df.empty:
         st.info("No milestones to display.")
         return None
 
     now = pd.Timestamp.now(tz="UTC")
-    display_df = milestones_df.copy()
 
     # Calculate issue completion per milestone
     milestone_issue_stats = {}
@@ -98,7 +144,7 @@ def milestone_timeline(
         size = 16
         line_width = 1
         line_color = "white"
-        
+
         if is_highlighted:
             size = 22
             line_width = 3
