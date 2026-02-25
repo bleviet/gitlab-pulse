@@ -204,9 +204,9 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         # Quick range buttons
         # Track which range is active for highlighting
         if "date_range" not in st.session_state:
-            # Default to 1 year
+            # Default to All Time
             st.session_state.date_range = (max_date - timedelta(days=365), max_date)
-            st.session_state.active_range = "1 Year"
+            st.session_state.active_range = "All Time"
 
         # Helper to check if current range matches a preset
         def is_range_active(preset_days):
