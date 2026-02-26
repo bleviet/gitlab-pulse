@@ -68,7 +68,7 @@ def issue_detail_grid(
                         selected_stages = st.multiselect(
                             "Stage",
                             options=all_stages,
-                            default=all_stages,
+                            default=[],
                             key=filter_key
                         )
                         if selected_stages:
@@ -95,7 +95,7 @@ def issue_detail_grid(
                         selected_types = st.multiselect(
                             "Type",
                             options=all_types,
-                            default=all_types,
+                            default=[],
                             key=filter_key_type
                         )
                         if selected_types:
