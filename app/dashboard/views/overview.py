@@ -396,7 +396,6 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             config={
                 "column_config": column_config,
                 "column_order": cols,
-                "height": 800,
                 "selection_mode": "single-row",
                 "key": "issue_drilldown_table",
                 "minimize_columns": False,

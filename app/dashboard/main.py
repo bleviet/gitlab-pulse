@@ -167,6 +167,7 @@ def main() -> None:
     pages = {
         "📊 Overview": "overview",
         "🚀 Release": "release",
+        "📋 Daily": "daily",
         "⚖️ Capacity": "capacity",
         "📈 Stats": "stats",
         "⏱️ Aging": "aging",
@@ -224,6 +225,9 @@ def main() -> None:
     elif view_id == "release":
         from app.dashboard.views.release import render_release_view
         render_release_view(filtered_df)
+    elif view_id == "daily":
+        from app.dashboard.views.daily import render_daily_report
+        render_daily_report(filtered_df, colors=colors)
     elif view_id == "aging":
         render_aging(filtered_df, colors=colors)
     elif view_id == "hygiene":

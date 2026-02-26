@@ -9,12 +9,14 @@ from typing import Any, Callable, Optional
 import pandas as pd
 
 from app.dashboard.widgets.kpis import (
-    flow_metrics, stats_kpis, release_metrics, stale_count, quality_score
+    flow_metrics, stats_kpis, release_metrics, stale_count, quality_score,
+    daily_summary_kpi
 )
 from app.dashboard.widgets.charts import (
     stage_distribution, aging_boxplot, burnup_velocity,
     workload_distribution, work_type_distribution, status_donut,
-    quality_gauge, error_distribution, milestone_timeline
+    quality_gauge, error_distribution, milestone_timeline,
+    daily_activity_bar
 )
 from app.dashboard.widgets.tables import (
     issue_detail_grid
@@ -33,6 +35,7 @@ class WidgetRegistry:
         "kpi_stats": stats_kpis,
         "kpi_stale_count": stale_count,
         "kpi_quality_score": quality_score,
+        "kpi_daily_summary": daily_summary_kpi,
 
         # Charts
         "chart_stage_distribution": stage_distribution,
@@ -44,6 +47,7 @@ class WidgetRegistry:
         "chart_quality_gauge": quality_gauge,
         "chart_error_distribution": error_distribution,
         "chart_milestone_timeline": milestone_timeline,
+        "chart_daily_activity_bar": daily_activity_bar,
 
         # Tables
         "table_issue_detail_grid": issue_detail_grid,

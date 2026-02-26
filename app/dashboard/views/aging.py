@@ -66,7 +66,6 @@ def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None
             tables.issue_detail_grid(
                 stale_df,
                 config={
-                    "height": 400,
                     "columns": ["web_url", "title", "issue_type", "assignee", "age_days", "updated_at"],
                     "column_config": {
                         "Age (Days)": st.column_config.NumberColumn("Age (Days)", width="small"),

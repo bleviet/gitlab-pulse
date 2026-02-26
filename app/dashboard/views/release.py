@@ -138,7 +138,6 @@ def render_release_view(df: pd.DataFrame) -> None:
             ms_data,
             config={
                 "key": "release_scope_grid",
-                "height": 800,
                 "columns": ["web_url", "title", "issue_type", "state", "assignee", "priority"]
             }
         )

@@ -31,21 +31,21 @@ def issue_detail_grid(
         Selection object from st.dataframe
     """
     config = config or {}
-    height = config.get("height", 600)
     title = config.get("title")
     widget_key = config.get("key", "issue_detail_grid")
     selection_mode = config.get("selection_mode", "multi-row")
+    default_page_size = config.get("page_size", 25)
 
     if title:
         st.subheader(title)
 
     # Check if data is Styler
     is_styler = isinstance(data, Styler)
-    
+
     if is_styler:
         # If Styler, we assume pre-processing (filtering/sorting) is done by caller
         display_data = data
-        df = data.data # Access underlying dataframe for column checks if needed
+        df = data.data  # Access underlying dataframe for column checks if needed
     else:
         df = data
         if df.empty:
@@ -62,7 +62,7 @@ def issue_detail_grid(
                 if "stage" in df.columns:
                     with filter_cols[0]:
                         all_stages = sorted(df["stage"].dropna().unique().tolist())
-                        
+
                         # Reset filter logic (simplified for shared widget)
                         filter_key = f"{widget_key}_stage_filter"
                         selected_stages = st.multiselect(
@@ -102,7 +102,6 @@ def issue_detail_grid(
                             df = df[df["issue_type"].isin(selected_types)]
 
         # Column handling
-        # Column handling
         # User request: "The table should have the possiblity display all the issue details..."
         # We generally avoid hard-dropping columns.
     display_df = df.copy()
@@ -128,14 +127,15 @@ def issue_detail_grid(
 
     if is_styler:
         # If Styler, underlying data is in data.data
-        # We cannot easily rename columns in a Styler object without reconstructing it or using specific pandas calls
-        # which might break existing styles. 
+        # We cannot easily rename columns in a Styler object without reconstructing it
+        # or using specific pandas calls which might break existing styles.
         # However, users passing a Styler usually have already set up the display dataframe.
-        # But if we want to apply our standard column configs (which use renmaed global keys like 'IID'), 
-        # the styler data must match.
+        # But if we want to apply our standard column configs (which use renamed global
+        # keys like 'IID'), the styler data must match.
         # Ideally, caller should rename BEFORE styling.
-        # For now, we assume Styler input has valid columns or we mapped them earlier in the View.
-        # IMPORTANT: 'column_renames' is mainly for raw DF handling. 
+        # For now, we assume Styler input has valid columns or we mapped them earlier
+        # in the View.
+        # IMPORTANT: 'column_renames' is mainly for raw DF handling.
         display_data = data
     else:
         # Sort by hierarchy if available
@@ -147,22 +147,19 @@ def issue_detail_grid(
 
     # Default configured columns (mapped to new names)
     default_columns_raw = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]
-    
+
     # Map raw config columns to display names
-    def map_col(c):
+    def map_col(c: str) -> str:
         return column_renames.get(c, c)
 
     defaults_mapped = [map_col(c) for c in default_columns_raw]
-    
+
     # Get user config columns and map them
     user_cols_raw = config.get("columns", default_columns_raw)
     column_order = [map_col(c) for c in user_cols_raw if c in df.columns]
 
     # If column_order is not passed explicitly in config['column_order'], use the mapped 'columns' list
     final_column_order = config.get("column_order", column_order)
-
-    # Base Column Configuration
-
 
     # Base Column Configuration
     base_config = {
@@ -190,15 +187,68 @@ def issue_detail_grid(
     user_col_config = config.get("column_config", {})
     final_col_config = {**base_config, **user_col_config}
 
+    # --- Pagination ---
+    total_rows = len(display_data.data) if is_styler else len(display_data)
+    page_size_options = [25, 50, 100]
+    show_all_label = f"All ({total_rows})"
+
+    page_size_choice = st.selectbox(
+        "Rows per page",
+        options=page_size_options + [show_all_label],
+        index=page_size_options.index(default_page_size) if default_page_size in page_size_options else 1,
+        key=f"{widget_key}_page_size",
+        help="Number of rows to display",
+    )
+
+    show_all = isinstance(page_size_choice, str) and page_size_choice.startswith("All")
+
+    if show_all:
+        page_display = display_data
+        computed_height = config.get("height", 35 * total_rows + 45)
+    else:
+        page_size = int(page_size_choice)
+        total_pages = max(1, -(-total_rows // page_size))  # ceil division
+        page_key = f"{widget_key}_page"
+        current_page = st.session_state.get(page_key, 0)
+        current_page = min(current_page, total_pages - 1)
+
+        nav_cols = st.columns([1, 3, 1])
+        with nav_cols[0]:
+            if st.button("◀ Prev", key=f"{widget_key}_prev", disabled=current_page == 0):
+                current_page = max(0, current_page - 1)
+                st.session_state[page_key] = current_page
+                st.rerun()
+        with nav_cols[2]:
+            if st.button("Next ▶", key=f"{widget_key}_next", disabled=current_page >= total_pages - 1):
+                current_page = min(total_pages - 1, current_page + 1)
+                st.session_state[page_key] = current_page
+                st.rerun()
+        with nav_cols[1]:
+            start_row = current_page * page_size + 1
+            end_row = min((current_page + 1) * page_size, total_rows)
+            st.caption(f"Showing {start_row}–{end_row} of {total_rows}")
+
+        row_start = current_page * page_size
+        row_end = row_start + page_size
+
+        if is_styler:
+            page_data = display_data.data.iloc[row_start:row_end]
+            page_display = page_data.style
+        else:
+            page_display = display_data.iloc[row_start:row_end]
+
+        visible_rows = min(page_size, total_rows - row_start)
+        computed_height = config.get("height", min(35 * visible_rows + 45, 1800))
+
     # Render
     return st.dataframe(
-        display_data,
+        page_display,
         width="stretch",
-        height=height,
+        height=computed_height,
         hide_index=True,
         column_config=final_col_config,
         column_order=final_column_order,
         on_select="rerun",
         selection_mode=selection_mode,
-        key=widget_key
+        key=widget_key,
     )

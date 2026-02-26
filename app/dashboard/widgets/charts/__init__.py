@@ -14,6 +14,7 @@ from app.dashboard.widgets.charts.error_distribution import error_distribution
 
 from app.dashboard.widgets.charts.milestone_timeline import milestone_timeline
 from app.dashboard.widgets.charts.milestone_burnup import milestone_burnup
+from app.dashboard.widgets.charts.daily_activity_bar import daily_activity_bar
 
 __all__ = [
     "stage_distribution",
@@ -26,4 +27,5 @@ __all__ = [
     "error_distribution",
     "milestone_timeline",
     "milestone_burnup",
+    "daily_activity_bar",
 ]
