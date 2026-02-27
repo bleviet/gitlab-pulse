@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.theme import PALETTE as COLORS
-from app.dashboard.theme import plotly_layout, plotly_bar_trace_style
+from app.dashboard.theme import plotly_layout, plotly_bar_trace_style, get_active_theme
 
 
 def stage_distribution(
@@ -235,7 +235,7 @@ def stage_distribution(
         textposition="middle right",
         hoverinfo="skip",
         showlegend=False,
-        textfont=dict(),
+        textfont=dict(color=get_active_theme()["plotly_font"]),
     ))
 
     # Calculate max range to fit labels

@@ -351,12 +351,16 @@ def plotly_layout(
             "gridcolor": grid_color if show_xgrid else None,
             "zeroline": False,
             "color": font_color,
+            "tickfont": {"color": font_color},
+            "title": {"font": {"color": font_color}},
         },
         "yaxis": {
             "showgrid": show_ygrid,
             "gridcolor": grid_color if show_ygrid else None,
             "zeroline": False,
             "color": font_color,
+            "tickfont": {"color": font_color},
+            "title": {"font": {"color": font_color}},
         },
     }
 
@@ -368,10 +372,13 @@ def plotly_layout(
             "xanchor": "left",
             "x": 0,
             "title": None,
-            "font": {"size": 11},
+            "font": {"size": 11, "color": font_color},
         }
     elif legend_pos == "none":
         layout["showlegend"] = False
+    else:
+        # Any other legend position: still enforce font color
+        layout.setdefault("legend", {})["font"] = {"color": font_color}
 
     layout.update(overrides)
     return layout
@@ -381,11 +388,14 @@ def plotly_bar_trace_style() -> dict[str, Any]:
     """Shared trace styling for bar charts.
 
     Returns dict to spread into ``fig.update_traces(**result)``.
+    Theme-aware: forces text labels to use the active theme's font color.
     """
+    t = get_active_theme()
     return {
         "marker_line_width": 0,
         "textposition": "inside",
         "textangle": 0,
+        "textfont": {"color": t["plotly_font"]},
     }
 
 

@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from app.dashboard.theme import PALETTE, FONT_FAMILY
+from app.dashboard.theme import PALETTE, FONT_FAMILY, get_active_theme
 
 
 def burnup_velocity(
@@ -100,7 +100,7 @@ def burnup_velocity(
     fig.update_layout(
         height=height,
         margin=dict(l=0, r=0, t=50, b=0),
-        font=dict(family=FONT_FAMILY, color="#334155"),
+        font=dict(family=FONT_FAMILY, color=get_active_theme()["plotly_font"]),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         hovermode="x unified",
