@@ -21,7 +21,7 @@ def render_release_view(df: pd.DataFrame) -> None:
     Args:
         df: DataFrame containing all issues
     """
-    st.header("Release Management")
+
 
     # Milestone Timeline Section (Collapsible, collapsed by default)
     if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():

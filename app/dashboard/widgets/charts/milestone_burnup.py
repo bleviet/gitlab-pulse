@@ -6,6 +6,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.theme import PALETTE, FONT_FAMILY
+
 
 def milestone_burnup(
     df: pd.DataFrame,
@@ -96,7 +98,7 @@ def milestone_burnup(
         y=chart_df["Total Scope"],
         mode='lines',
         name='Total Scope',
-        line=dict(shape='hv', color='gray', dash='dash')
+        line=dict(shape='hv', color=PALETTE["scope_line"], dash='dash')
     ))
 
     fig.add_trace(go.Scatter(
@@ -105,7 +107,7 @@ def milestone_burnup(
         mode='lines',
         name='Completed',
         fill='tozeroy',
-        line=dict(color='#3B82F6')
+        line=dict(color=PALETTE["primary"])
     ))
 
     # Add vertical line for Today
@@ -123,9 +125,9 @@ def milestone_burnup(
         legend=dict(orientation="h", y=1.1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family=FONT_FAMILY, color="#334155"),
         xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(128, 128, 128, 0.2)"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.18)"),
     )
 
     st.plotly_chart(fig, width="stretch", key=widget_key)

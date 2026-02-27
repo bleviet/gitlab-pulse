@@ -6,6 +6,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.theme import PALETTE, FONT_FAMILY
+
 
 def milestone_timeline(
     issues_df: pd.DataFrame,
@@ -120,18 +122,17 @@ def milestone_timeline(
 
         if state == "closed":
             if all_issues_closed:
-                color = "#9333EA"  # Purple-600
+                color = PALETTE["ms_complete"]
                 status = "Complete"
             else:
-                color = "#DC2626"  # Red-600
+                color = PALETTE["ms_incomplete"]
                 status = "Incomplete"
         else:
             if pd.notna(due_date) and due_date < now:
-                color = "#EA580C"  # Orange-600
+                color = PALETTE["ms_overdue"]
                 status = "Overdue"
             else:
-                # Check for "At Risk"? For now strictly On Track or Overdue
-                color = "#16A34A"  # Green-600
+                color = PALETTE["ms_on_track"]
                 status = "On Track"
 
         # Apply highlight visual overrides
@@ -142,7 +143,7 @@ def milestone_timeline(
         if is_highlighted:
             size = 22
             line_width = 3
-            line_color = "#F59E0B" # Amber highlight border
+            line_color = PALETTE["ms_highlight"]
 
         # Format date for display
         date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "No date"
@@ -190,10 +191,10 @@ def milestone_timeline(
 
     # Add traces for each status (for legend)
     status_colors = {
-        "Complete": "#9333EA",
-        "Incomplete": "#DC2626",
-        "On Track": "#16A34A",
-        "Overdue": "#EA580C",
+        "Complete": PALETTE["ms_complete"],
+        "Incomplete": PALETTE["ms_incomplete"],
+        "On Track": PALETTE["ms_on_track"],
+        "Overdue": PALETTE["ms_overdue"],
     }
 
     for status, color in status_colors.items():
@@ -247,14 +248,14 @@ def milestone_timeline(
 
     # Style for dark/light mode compatibility
     fig.update_layout(
-        height=200,  # Fixed compact height
+        height=200,
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family=FONT_FAMILY, color="#334155"),
         xaxis=dict(
             showgrid=True,
-            gridcolor="rgba(128, 128, 128, 0.2)",
+            gridcolor="rgba(148, 163, 184, 0.18)",
             title="",
             type="date",
             # Default view: 9 months before, 3 months after today

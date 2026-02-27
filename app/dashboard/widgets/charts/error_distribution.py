@@ -6,6 +6,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from app.dashboard.theme import PALETTE, plotly_layout
+
 
 def error_distribution(
     quality_df: pd.DataFrame,
@@ -35,16 +37,17 @@ def error_distribution(
         color="Error Code",
     )
 
+    fig.update_traces(marker_line_width=0)
+
     fig.update_layout(
-        height=300,
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=False,
-        xaxis=dict(gridcolor="rgba(128, 128, 128, 0.2)"),
-        yaxis=dict(showgrid=False),
+        **plotly_layout(
+            height=300,
+            show_xgrid=False,
+            show_ygrid=False,
+            legend_pos="none",
+        ),
     )
+    fig.update_yaxes(showgrid=False)
 
     selection = st.plotly_chart(
         fig,

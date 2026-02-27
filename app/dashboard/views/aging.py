@@ -10,18 +10,7 @@ import streamlit as st
 from app.dashboard.widgets import tables, charts
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
-
-
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "bug": "#EF4444",
-    "feature": "#3B82F6",
-    "task": "#10B981",
-    "stale": "#F59E0B",
-    "neutral": "#64748B",
-    "epic": "#8B5CF6",
-}
+from app.dashboard.theme import PALETTE as COLORS
 
 
 def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
@@ -34,7 +23,6 @@ def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None
     if colors:
         COLORS.update(colors)
 
-    st.header("⏱️ Aging Analysis")
     st.caption("Operational view for identifying bottlenecks")
 
     if df.empty:

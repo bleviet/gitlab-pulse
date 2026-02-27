@@ -6,13 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "bug": "#EF4444",
-    "feature": "#3B82F6",
-    "task": "#10B981",
-    "epic": "#8B5CF6",
-}
+from app.dashboard.theme import ISSUE_TYPE_COLORS, plotly_layout
 
 
 def work_type_distribution(
@@ -36,12 +30,7 @@ def work_type_distribution(
     type_counts = df["issue_type"].value_counts().reset_index()
     type_counts.columns = ["Type", "Count"]
 
-    color_map = {
-        "Bug": COLORS["bug"],
-        "Feature": COLORS["feature"],
-        "Task": COLORS["task"],
-        "Epic": COLORS["epic"],
-    }
+    color_map = ISSUE_TYPE_COLORS
 
     fig = px.bar(
         type_counts,
@@ -52,15 +41,16 @@ def work_type_distribution(
         color_discrete_map=color_map,
     )
 
+    fig.update_traces(marker_line_width=0)
+
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=False,
-        xaxis=dict(gridcolor="rgba(128, 128, 128, 0.2)"),
-        yaxis=dict(showgrid=False),
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=False,
+            legend_pos="none",
+        ),
     )
+    fig.update_yaxes(showgrid=False)
 
     st.plotly_chart(fig, width="stretch", key=config.get("key", "work_type_chart") if config else None)

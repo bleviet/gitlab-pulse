@@ -12,16 +12,7 @@ from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
-
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "bug": "#EF4444",
-    "feature": "#3B82F6",
-    "task": "#10B981",
-    "stale": "#F59E0B",
-    "neutral": "#64748B",
-}
+from app.dashboard.theme import PALETTE as COLORS
 
 # Error code severity mapping
 
@@ -38,7 +29,7 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dic
     if colors:
         COLORS.update(colors)
 
-    st.header("🧹 Data Hygiene")
+
     st.caption("Quality view for metadata cleanup and validation")
 
     # Apply Bento Grid Style

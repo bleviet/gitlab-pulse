@@ -145,149 +145,145 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
         st.divider()
 
-        # Domain/Team selector
-        teams = ["All"]
-        if not df.empty and "team" in df.columns:
-            unique_teams = df["team"].dropna().unique().tolist()
-            teams.extend(sorted(unique_teams))
+        # --- Filters (grouped in an expander) ---
+        with st.expander("🔎 Filters", expanded=True):
+            # Domain/Team selector
+            teams = ["All"]
+            if not df.empty and "team" in df.columns:
+                unique_teams = df["team"].dropna().unique().tolist()
+                teams.extend(sorted(unique_teams))
 
-        selected_team = st.selectbox(
-            "Domain / Team",
-            options=teams,
-            index=0,
-            help="Filter issues by team or domain",
-        )
+            selected_team = st.selectbox(
+                "Domain / Team",
+                options=teams,
+                index=0,
+                help="Filter issues by team or domain",
+            )
 
-        # Context selector (for Data Explosion / sub-project filtering)
-        contexts = ["All"]
-        if not df.empty and "context" in df.columns:
-            unique_contexts = df["context"].dropna().unique().tolist()
-            contexts.extend(sorted(unique_contexts))
+            # Context selector (for Data Explosion / sub-project filtering)
+            contexts = ["All"]
+            if not df.empty and "context" in df.columns:
+                unique_contexts = df["context"].dropna().unique().tolist()
+                contexts.extend(sorted(unique_contexts))
 
-        selected_context = st.selectbox(
-            "Context / Sub-Project",
-            options=contexts,
-            index=0,
-            help="Filter by context (R&D project, Customer, etc.)",
-        )
+            selected_context = st.selectbox(
+                "Context / Sub-Project",
+                options=contexts,
+                index=0,
+                help="Filter by context (R&D project, Customer, etc.)",
+            )
 
-        st.divider()
+            # Milestone selector
+            milestones = ["All"]
+            if not df.empty and "milestone" in df.columns:
+                unique_milestones = df["milestone"].dropna().unique().tolist()
+                milestones.extend(sorted(unique_milestones))
 
-        # Milestone selector
-        milestones = ["All"]
-        if not df.empty and "milestone" in df.columns:
-            # Drop None/NaN and sort
-            unique_milestones = df["milestone"].dropna().unique().tolist()
-            milestones.extend(sorted(unique_milestones))
+            selected_milestone = st.selectbox(
+                "Milestone",
+                options=milestones,
+                index=0,
+                help="Filter specific milestone",
+                key="sidebar_milestone_selector"
+            )
 
-        selected_milestone = st.selectbox(
-            "Milestone",
-            options=milestones,
-            index=0,
-            help="Filter specific milestone",
-            key="sidebar_milestone_selector"
-        )
-
-        st.divider()
-
-        # Time range picker
-        st.subheader("📅 Time Range")
-
-        # Calculate date bounds from data
-        if not df.empty and "created_at" in df.columns:
-            min_date = df["created_at"].min().date()
-            max_date = df["created_at"].max().date()
-        else:
-            max_date = datetime.now().date()
-            min_date = max_date - timedelta(days=365)
-
-        # Quick range buttons
-        # Track which range is active for highlighting
-        if "date_range" not in st.session_state:
-            # Default to All Time
-            st.session_state.date_range = (max_date - timedelta(days=365), max_date)
-            st.session_state.active_range = "All Time"
-
-        # Helper to check if current range matches a preset
-        def is_range_active(preset_days):
-            if "date_range" not in st.session_state:
-                return False
-            start, end = st.session_state.date_range
-            expected_start = max_date - timedelta(days=preset_days)
-            return start == expected_start and end == max_date
-
-        # Determine active button
-        active_btn = st.session_state.get("active_range", "1 Year")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            btn_type = "primary" if active_btn == "30 Days" else "secondary"
-            if st.button("30 Days", width="stretch", type=btn_type):
-                st.session_state.date_range = (
-                    max_date - timedelta(days=30),
-                    max_date,
-                )
-                st.session_state.active_range = "30 Days"
-                st.rerun()
-        with col2:
-            btn_type = "primary" if active_btn == "90 Days" else "secondary"
-            if st.button("90 Days", width="stretch", type=btn_type):
-                st.session_state.date_range = (
-                    max_date - timedelta(days=90),
-                    max_date,
-                )
-                st.session_state.active_range = "90 Days"
-                st.rerun()
-
-        col3, col4 = st.columns(2)
-        with col3:
-            btn_type = "primary" if active_btn == "1 Year" else "secondary"
-            if st.button("1 Year", width="stretch", type=btn_type):
-                st.session_state.date_range = (
-                    max_date - timedelta(days=365),
-                    max_date,
-                )
-                st.session_state.active_range = "1 Year"
-                st.rerun()
-        with col4:
-            btn_type = "primary" if active_btn == "All Time" else "secondary"
-            if st.button("All Time", width="stretch", type=btn_type):
-                st.session_state.date_range = (min_date, max_date)
-                st.session_state.active_range = "All Time"
-                st.rerun()
-
-        # Date range slider
-        # Ensure stored date_range is within valid bounds
-        stored_range = st.session_state.get("date_range", (max_date - timedelta(days=365), max_date))
-        if isinstance(stored_range, tuple) and len(stored_range) == 2:
-            # Clamp to valid bounds
-            start_val = max(stored_range[0], min_date)
-            end_val = min(stored_range[1], max_date)
-            if start_val > end_val:
-                start_val = max_date - timedelta(days=365)
-                end_val = max_date
-            valid_range = (start_val, end_val)
-        else:
-            valid_range = (max_date - timedelta(days=365), max_date)
-
-        date_range = st.date_input(
-            "Custom Range",
-            value=valid_range,
-            min_value=min_date,
-            max_value=max_date,
-            help="Select start and end dates",
-        )
-
-        # Handle single date selection (st.date_input can return single date or tuple)
-        if isinstance(date_range, tuple):
-            if len(date_range) == 2:
-                start_date, end_date = date_range
-            elif len(date_range) == 1:
-                start_date = end_date = date_range[0]
+        # --- Time Range (separate expander) ---
+        with st.expander("📅 Time Range", expanded=False):
+            # Calculate date bounds from data
+            if not df.empty and "created_at" in df.columns:
+                min_date = df["created_at"].min().date()
+                max_date = df["created_at"].max().date()
             else:
-                start_date = end_date = min_date
-        else:
-            start_date = end_date = date_range
+                max_date = datetime.now().date()
+                min_date = max_date - timedelta(days=365)
+
+            # Quick range buttons
+            # Track which range is active for highlighting
+            if "date_range" not in st.session_state:
+                # Default to All Time
+                st.session_state.date_range = (max_date - timedelta(days=365), max_date)
+                st.session_state.active_range = "All Time"
+
+            # Helper to check if current range matches a preset
+            def is_range_active(preset_days):
+                if "date_range" not in st.session_state:
+                    return False
+                start, end = st.session_state.date_range
+                expected_start = max_date - timedelta(days=preset_days)
+                return start == expected_start and end == max_date
+
+            # Determine active button
+            active_btn = st.session_state.get("active_range", "1 Year")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                btn_type = "primary" if active_btn == "30 Days" else "secondary"
+                if st.button("30 Days", width="stretch", type=btn_type):
+                    st.session_state.date_range = (
+                        max_date - timedelta(days=30),
+                        max_date,
+                    )
+                    st.session_state.active_range = "30 Days"
+                    st.rerun()
+            with col2:
+                btn_type = "primary" if active_btn == "90 Days" else "secondary"
+                if st.button("90 Days", width="stretch", type=btn_type):
+                    st.session_state.date_range = (
+                        max_date - timedelta(days=90),
+                        max_date,
+                    )
+                    st.session_state.active_range = "90 Days"
+                    st.rerun()
+
+            col3, col4 = st.columns(2)
+            with col3:
+                btn_type = "primary" if active_btn == "1 Year" else "secondary"
+                if st.button("1 Year", width="stretch", type=btn_type):
+                    st.session_state.date_range = (
+                        max_date - timedelta(days=365),
+                        max_date,
+                    )
+                    st.session_state.active_range = "1 Year"
+                    st.rerun()
+            with col4:
+                btn_type = "primary" if active_btn == "All Time" else "secondary"
+                if st.button("All Time", width="stretch", type=btn_type):
+                    st.session_state.date_range = (min_date, max_date)
+                    st.session_state.active_range = "All Time"
+                    st.rerun()
+
+            # Date range slider
+            # Ensure stored date_range is within valid bounds
+            stored_range = st.session_state.get("date_range", (max_date - timedelta(days=365), max_date))
+            if isinstance(stored_range, tuple) and len(stored_range) == 2:
+                # Clamp to valid bounds
+                start_val = max(stored_range[0], min_date)
+                end_val = min(stored_range[1], max_date)
+                if start_val > end_val:
+                    start_val = max_date - timedelta(days=365)
+                    end_val = max_date
+                valid_range = (start_val, end_val)
+            else:
+                valid_range = (max_date - timedelta(days=365), max_date)
+
+            date_range = st.date_input(
+                "Custom Range",
+                value=valid_range,
+                min_value=min_date,
+                max_value=max_date,
+                help="Select start and end dates",
+            )
+
+            # Handle single date selection (st.date_input can return single date or tuple)
+            if isinstance(date_range, tuple):
+                if len(date_range) == 2:
+                    start_date, end_date = date_range
+                elif len(date_range) == 1:
+                    start_date = end_date = date_range[0]
+                else:
+                    start_date = end_date = min_date
+            else:
+                start_date = end_date = date_range
 
         st.divider()
 

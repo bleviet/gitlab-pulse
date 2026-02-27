@@ -24,6 +24,7 @@ from app.dashboard.views.hygiene import render_hygiene
 from app.dashboard.views.stats import render_stats_view
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
+from app.dashboard.theme import get_global_css
 
 # Page configuration
 st.set_page_config(
@@ -33,12 +34,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for consistent styling
-st.markdown("""
-<style>
-    /* Metric styling moved to app/dashboard/components.py */
-</style>
-""", unsafe_allow_html=True)
+# Global CSS: typography, sidebar dark mode, card styling, nav tabs
+st.markdown(get_global_css(), unsafe_allow_html=True)
 
 
 def _exit_edit_mode():

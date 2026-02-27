@@ -1,5 +1,8 @@
 import pandas as pd
 
+from app.dashboard.theme import PALETTE
+
+
 def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str = "id", title_col: str = "title") -> pd.DataFrame:
     """Sort DataFrame hierarchically: Parent followed by Children.
 
@@ -84,14 +87,13 @@ def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str 
 def get_semantic_color(key: str, default: str = "#64748B") -> str:
     """Get a semantic color for the dashboard.
 
-    This is a placeholder. In a real app, this might read from st.session_state
-    if loaded from config, or just return defaults.
+    Uses the centralized theme palette as the single source of truth.
+
+    Args:
+        key: Color key name (e.g., "active", "waiting").
+        default: Fallback color hex string.
+
+    Returns:
+        Hex color string.
     """
-    # Simple hardcoded fallback or read from a global if accessible
-    COLORS = {
-        "active": "#3B82F6",
-        "waiting": "#F59E0B",
-        "completed": "#10B981",
-        "Unassigned": "#94A3B8",
-    }
-    return COLORS.get(key, default)
+    return PALETTE.get(key, default)

@@ -6,12 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "bug": "#EF4444",
-    "stale": "#F59E0B",
-    "task": "#10B981",
-}
+from app.dashboard.theme import PALETTE, plotly_layout
 
 
 def quality_gauge(
@@ -38,11 +33,11 @@ def quality_gauge(
 
     # Determine color based on score
     if score >= 90:
-        color = COLORS["task"]
+        color = PALETTE["task"]
     elif score >= 70:
-        color = COLORS["stale"]
+        color = PALETTE["medium"]
     else:
-        color = COLORS["bug"]
+        color = PALETTE["bug"]
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
@@ -55,12 +50,12 @@ def quality_gauge(
             "bgcolor": "rgba(0,0,0,0)",
             "borderwidth": 0,
             "steps": [
-                {"range": [0, 70], "color": "rgba(239, 68, 68, 0.2)"},
-                {"range": [70, 90], "color": "rgba(245, 158, 11, 0.2)"},
-                {"range": [90, 100], "color": "rgba(16, 185, 129, 0.2)"},
+                {"range": [0, 70], "color": "rgba(220, 38, 38, 0.15)"},
+                {"range": [70, 90], "color": "rgba(202, 138, 4, 0.15)"},
+                {"range": [90, 100], "color": "rgba(16, 163, 74, 0.15)"},
             ],
             "threshold": {
-                "line": {"color": COLORS["task"], "width": 2},
+                "line": {"color": PALETTE["task"], "width": 2},
                 "thickness": 0.75,
                 "value": 90,
             },
@@ -68,10 +63,11 @@ def quality_gauge(
     ))
 
     fig.update_layout(
-        height=250,
-        margin=dict(l=20, r=20, t=20, b=20),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
+        **plotly_layout(
+            height=250,
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+            legend_pos="none",
+        ),
     )
 
     st.plotly_chart(fig, width="stretch", key=config.get("key", "quality_gauge_chart") if config else None)

@@ -26,7 +26,7 @@ def render_capacity_view(
         colors: Optional dictionary of semantic colors to override defaults
         capacity_config: Configuration dictionary for capacity limits and privacy
     """
-    st.header("⚖️ Risk & Capacity")
+
     st.caption("Identify bottlenecks, overload, and context-switching risks.")
 
     # Apply Bento Grid Style

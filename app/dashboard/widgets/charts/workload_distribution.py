@@ -6,15 +6,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "active": "#3B82F6",
-    "waiting": "#F59E0B",
-    "completed": "#10B981",
-    "neutral": "#64748B",
-    "stale": "#F59E0B",
-}
+from app.dashboard.theme import PALETTE as COLORS
+from app.dashboard.theme import plotly_layout
 
 
 def workload_distribution(
@@ -64,16 +57,17 @@ def workload_distribution(
         },
     )
 
+    fig.update_traces(marker_line_width=0)
+
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(gridcolor="rgba(128, 128, 128, 0.2)", title="Issue Count"),
-        yaxis=dict(showgrid=False, title=""),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=False,
+        ),
     )
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(148, 163, 184, 0.18)", title="Issue Count")
+    fig.update_yaxes(showgrid=False, title="")
 
     # Add threshold line
     fig.add_vline(x=threshold, line_dash="dash", line_color=COLORS["stale"])

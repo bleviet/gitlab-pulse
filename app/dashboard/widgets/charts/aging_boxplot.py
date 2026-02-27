@@ -12,14 +12,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "active": "#3B82F6",
-    "waiting": "#F59E0B",
-    "completed": "#10B981",
-    "neutral": "#64748B",
-}
+from app.dashboard.theme import PALETTE as COLORS
+from app.dashboard.theme import STAGE_TYPE_COLORS, plotly_layout
 
 
 def aging_boxplot(
@@ -92,14 +86,7 @@ def aging_boxplot(
     
     if "stage_type" in df_plot.columns and group_col == "stage":
         color_col = "stage_type"
-        color_map = {
-            "active": COLORS["active"],
-            "waiting": COLORS["waiting"],
-            "completed": COLORS["completed"],
-            # Fallback for others
-            "backlog": COLORS["neutral"],
-            "triage": COLORS["neutral"],
-        }
+        color_map = STAGE_TYPE_COLORS.copy()
         # Ensure we don't have missing keys that cause errors
         unique_types = df_plot["stage_type"].astype(str).unique()
         for t in unique_types:
@@ -117,17 +104,18 @@ def aging_boxplot(
         category_orders=category_orders
     )
 
+    show_legend = color_col != group_col
+
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=True if color_col != group_col else False,
-        xaxis=dict(showgrid=False, title=""),
-        yaxis=dict(gridcolor="rgba(100,116,139,0.2)", title="Days in Stage"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, title=None)
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=True,
+        ),
     )
+    fig.update_layout(showlegend=show_legend)
+    fig.update_xaxes(showgrid=False, title="")
+    fig.update_yaxes(gridcolor="rgba(148, 163, 184, 0.18)", title="Days in Stage")
 
     selection = st.plotly_chart(
         fig,

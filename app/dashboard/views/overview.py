@@ -11,15 +11,7 @@ import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import kpis, charts, tables, features
-
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "active": "#3B82F6",
-    "waiting": "#F59E0B",
-    "completed": "#10B981",
-    "neutral": "#64748B",
-}
+from app.dashboard.theme import PALETTE as COLORS
 
 
 def render_overview(
@@ -36,8 +28,6 @@ def render_overview(
     """
     if colors:
         COLORS.update(colors)
-
-    st.header("📊 Overview")
 
     # Filter out empty stages or irrelevant data if needed
     # But for flow, we usually want to see everything
@@ -57,16 +47,16 @@ def render_overview(
     kpis.flow_metrics(unique_df)
 
     # Charts (Collapsible)
-    with st.expander("📊 Visual Analysis", expanded=True):
+    with st.expander("Visual Analysis", expanded=True):
         chart_mode = st.radio(
             "Chart Mode",
-            ["📊 Work by Stage", "⏳ Days in Stage"],
+            ["Work by Stage", "Days in Stage"],
             horizontal=True,
             label_visibility="collapsed",
             key="flow_chart_radio"
         )
 
-        if chart_mode == "📊 Work by Stage":
+        if chart_mode == "Work by Stage":
             # Use unique issues for stage distribution to show correct counts
             # Use shared widget with overview-specific key
             stage_selection = charts.stage_distribution(

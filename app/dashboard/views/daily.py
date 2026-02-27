@@ -10,15 +10,7 @@ import streamlit as st
 from app.dashboard.components import style_metric_cards
 from app.dashboard.widgets import charts, kpis
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
-
-
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "active": "#3B82F6",
-    "completed": "#10B981",
-    "neutral": "#64748B",
-}
+from app.dashboard.theme import PALETTE as COLORS
 
 
 def render_daily_report(
@@ -37,8 +29,6 @@ def render_daily_report(
     """
     if colors:
         COLORS.update(colors)
-
-    st.header("📋 Daily Report")
 
     # --- Day navigation ---
     if "daily_day_offset" not in st.session_state:

@@ -6,6 +6,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.theme import PALETTE, plotly_layout
+
 
 def daily_activity_bar(
     df: pd.DataFrame,
@@ -59,7 +61,8 @@ def daily_activity_bar(
         x=[int(new_counts.get(t, 0)) for t in all_types],
         name="Opened",
         orientation="h",
-        marker_color="#3B82F6",
+        marker_color=PALETTE["opened"],
+        marker_line_width=0,
         text=[int(new_counts.get(t, 0)) for t in all_types],
         textposition="auto",
     ))
@@ -69,31 +72,21 @@ def daily_activity_bar(
         x=[int(closed_counts.get(t, 0)) for t in all_types],
         name="Closed",
         orientation="h",
-        marker_color="#10B981",
+        marker_color=PALETTE["closed"],
+        marker_line_width=0,
         text=[int(closed_counts.get(t, 0)) for t in all_types],
         textposition="auto",
     ))
 
     fig.update_layout(
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=False,
+        ),
         barmode="group",
-        height=height,
-        margin=dict(l=0, r=20, t=0, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(128, 128, 128, 0.2)",
-            title="Count",
-        ),
-        yaxis=dict(title=""),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-        ),
     )
+    fig.update_xaxes(showgrid=False, title="Count")
+    fig.update_yaxes(title="")
 
     st.plotly_chart(fig, width="stretch", key=widget_key)

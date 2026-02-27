@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+from app.dashboard.theme import PALETTE, FONT_FAMILY
+
 
 def burnup_velocity(
     df: pd.DataFrame,
@@ -32,9 +34,9 @@ def burnup_velocity(
 
     # Panel configuration
     panels = [
-        {"type": "Feature", "title": "Features (Value Flow)", "fill": "#166534", "area": "#BBF7D0"},
-        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": "#991B1B", "area": "#FCA5A5"},
-        {"type": "Task", "title": "Tasks (Maintenance)", "fill": "#374151", "area": "#D1D5DB"},
+        {"type": "Feature", "title": "Features (Value Flow)", "fill": PALETTE["burnup_feature_fill"], "area": PALETTE["burnup_feature_area"]},
+        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": PALETTE["burnup_bug_fill"], "area": PALETTE["burnup_bug_area"]},
+        {"type": "Task", "title": "Tasks (Maintenance)", "fill": PALETTE["burnup_task_fill"], "area": PALETTE["burnup_task_area"]},
     ]
 
     fig = make_subplots(
@@ -98,7 +100,7 @@ def burnup_velocity(
     fig.update_layout(
         height=height,
         margin=dict(l=0, r=0, t=50, b=0),
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family=FONT_FAMILY, color="#334155"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         hovermode="x unified",
@@ -107,7 +109,7 @@ def burnup_velocity(
     for i in range(1, 4):
         fig.update_yaxes(
             showgrid=True,
-            gridcolor="rgba(128, 128, 128, 0.2)",
+            gridcolor="rgba(148, 163, 184, 0.18)",
             zeroline=False,
             row=i, col=1,
         )

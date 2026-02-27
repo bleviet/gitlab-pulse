@@ -18,7 +18,7 @@ def render_stats_view(df: pd.DataFrame, colors: dict[str, str] | None = None) ->
         df: Filtered DataFrame with valid issues
         colors: Optional dictionary of semantic colors to override defaults
     """
-    st.header("📈 Project Statistics")
+
     st.caption("Strategic view of project velocity and distribution")
 
     if df.empty:

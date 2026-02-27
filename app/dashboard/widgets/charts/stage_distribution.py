@@ -10,19 +10,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "primary": "#4F46E5",
-    "active": "#3B82F6",
-    "waiting": "#F59E0B",
-    "completed": "#10B981",
-    "neutral": "#64748B",
-    "critical": "#EF4444",
-    "high": "#F97316",
-    "medium": "#EAB308",
-    "low": "#22C55E",
-    "unset": "#94A3B8",
-}
+from app.dashboard.theme import PALETTE as COLORS
+from app.dashboard.theme import plotly_layout, plotly_bar_trace_style
 
 
 def stage_distribution(
@@ -205,8 +194,7 @@ def stage_distribution(
         )
 
         fig.update_traces(
-            textposition="inside",
-            textangle=0,
+            **plotly_bar_trace_style(),
             hovertemplate="<b>%{y}</b><br>%{customdata[1]}<br>Severity: %{customdata[0]}<br>Count: %{x}<extra></extra>"
         )
         fig.update_layout(legend_title_text="Priority")
@@ -234,7 +222,7 @@ def stage_distribution(
             title="",
             category_orders={"stage": sorted_stages},
         )
-        fig.update_traces(marker_color=palette["primary"], textposition="auto")
+        fig.update_traces(marker_color=palette["primary"], marker_line_width=0, textposition="auto")
 
     # Add Total Labels at bar ends
     stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]
@@ -254,19 +242,14 @@ def stage_distribution(
     max_count = stage_totals["total_count"].max() if not stage_totals.empty else 0
 
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=20, t=0, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(128, 128, 128, 0.2)",
-            range=[0, max_count * 1.15]
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=False,
         ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, title=None),
         barmode="stack",
     )
+    fig.update_xaxes(showgrid=False, range=[0, max_count * 1.15])
 
     selection = st.plotly_chart(
         fig,

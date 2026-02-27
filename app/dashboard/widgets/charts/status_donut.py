@@ -6,11 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Semantic color palette
-COLORS = {
-    "stale": "#F59E0B",
-    "task": "#10B981",
-}
+from app.dashboard.theme import PALETTE, plotly_layout
 
 
 def status_donut(
@@ -30,8 +26,8 @@ def status_donut(
     status_counts.columns = ["State", "Count"]
 
     color_map = {
-        "opened": COLORS["stale"],
-        "closed": COLORS["task"],
+        "opened": PALETTE["opened"],
+        "closed": PALETTE["closed"],
     }
 
     fig = px.pie(
@@ -44,9 +40,13 @@ def status_donut(
     )
 
     fig.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
-        font=dict(family="Inter, sans-serif"),
-        paper_bgcolor="rgba(0,0,0,0)",
+        **plotly_layout(
+            height=300,
+            margin={"l": 0, "r": 0, "t": 10, "b": 0},
+            legend_pos="none",
+        ),
+    )
+    fig.update_layout(
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=-0.1),
     )
