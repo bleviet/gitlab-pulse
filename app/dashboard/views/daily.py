@@ -52,10 +52,6 @@ def render_daily_report(
     # KPI Row
     kpis.daily_summary_kpi(df, {"cutoff": cutoff})
 
-    # Activity Bar Chart
-    with st.expander("📊 Activity by Type", expanded=True):
-        charts.daily_activity_bar(df, {"cutoff": cutoff, "key": "daily_activity_chart"})
-
     # New Issues Table
     new_df = pd.DataFrame()
     if "created_at" in df.columns:
