@@ -212,21 +212,31 @@ def issue_detail_grid(
         current_page = st.session_state.get(page_key, 0)
         current_page = min(current_page, total_pages - 1)
 
-        nav_cols = st.columns([1, 3, 1])
-        with nav_cols[0]:
-            if st.button("◀ Prev", key=f"{widget_key}_prev", disabled=current_page == 0):
+        button_cols = st.columns([1, 1])
+        with button_cols[0]:
+            if st.button(
+                "◀ Prev",
+                use_container_width=True,
+                key=f"{widget_key}_prev",
+                disabled=current_page == 0,
+            ):
                 current_page = max(0, current_page - 1)
                 st.session_state[page_key] = current_page
                 st.rerun()
-        with nav_cols[2]:
-            if st.button("Next ▶", key=f"{widget_key}_next", disabled=current_page >= total_pages - 1):
+        with button_cols[1]:
+            if st.button(
+                "Next ▶",
+                use_container_width=True,
+                key=f"{widget_key}_next",
+                disabled=current_page >= total_pages - 1,
+            ):
                 current_page = min(total_pages - 1, current_page + 1)
                 st.session_state[page_key] = current_page
                 st.rerun()
-        with nav_cols[1]:
-            start_row = current_page * page_size + 1
-            end_row = min((current_page + 1) * page_size, total_rows)
-            st.caption(f"Showing {start_row}–{end_row} of {total_rows}")
+
+        start_row = current_page * page_size + 1
+        end_row = min((current_page + 1) * page_size, total_rows)
+        st.caption(f"Showing {start_row}–{end_row} of {total_rows}")
 
         row_start = current_page * page_size
         row_end = row_start + page_size

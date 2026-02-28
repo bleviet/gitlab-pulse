@@ -5,8 +5,6 @@ Refactored to use Widget Registry where applicable.
 """
 
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
@@ -48,38 +46,16 @@ def render_overview(
 
     # Charts (Collapsible)
     with st.expander("Visual Analysis", expanded=True):
-        chart_mode = st.radio(
-            "Chart Mode",
-            ["Work by Stage", "Days in Stage"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="flow_chart_radio"
+        # Use unique issues for stage distribution to show correct counts
+        # Use shared widget with overview-specific key
+        stage_selection = charts.stage_distribution(
+            unique_df,
+            config={
+                "stage_descriptions": stage_descriptions,
+                "key": "flow_chart_stage_dist",
+                "colors": colors
+            }
         )
-
-        if chart_mode == "Work by Stage":
-            # Use unique issues for stage distribution to show correct counts
-            # Use shared widget with overview-specific key
-            stage_selection = charts.stage_distribution(
-                unique_df,
-                config={
-                    "stage_descriptions": stage_descriptions,
-                    "key": "flow_chart_stage_dist",
-                    "colors": colors
-                }
-            )
-            aging_selection = None
-
-        else:
-            # Use unique issues for aging to show distinct items
-            # Use shared widget with proper configuration
-            aging_selection = charts.aging_boxplot(
-                unique_df,
-                config={
-                    "key": "flow_chart_aging_box",
-                    "filter_closed": True
-                }
-            )
-            stage_selection = None
 
     # Apply interactive filters (Apply to original DF which allows exploring contexts)
     filtered_df = df.copy()
@@ -119,17 +95,6 @@ def render_overview(
             for m in masks:
                 final_mask |= m
             filtered_df = filtered_df[final_mask]
-
-    # Filter by Aging Selection (Intersection with Stage Distribution chart)
-    if aging_selection and aging_selection.get("selection", {}).get("points"):
-        selected_points = aging_selection["selection"]["points"]
-        # Aging chart: x=stage, y=days_in_stage, color=stage_type
-        # We filter by stage (x). Days is continuous, so selecting a point usually implies interest in that item or stage.
-        # But boxplots selection might be selecting outliers?
-        # Let's assume selecting points filters by Stage of those points.
-        selected_stages = {p.get("x") for p in selected_points}
-        if selected_stages:
-            filtered_df = filtered_df[filtered_df["stage"].isin(selected_stages)]
 
     # Detail grid (Collapsible)
     with st.expander("📋 Issue List", expanded=True):

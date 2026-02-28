@@ -165,7 +165,30 @@ enableXsrfProtection = false
 
 > ⚠️ **Production Warning:** `enableCORS = false` is acceptable for local development but **should not be used in production**. For production deployments, use a reverse proxy (nginx, Caddy, Traefik) that handles CORS properly.
 
-### **9.2. Timezone-Aware Date Arithmetic**
+### **9.2. Native Theming (Required)**
+
+The dashboard uses Streamlit's official theme configuration in `.streamlit/config.toml`.
+
+**Rule:** Define visual theme tokens in config, not in Python session-state toggles.
+
+```toml
+[theme]
+base = "light"
+font = "Inter, sans-serif"
+
+[theme.light]
+primaryColor = "#00A8E8"
+
+[theme.dark]
+primaryColor = "#B9A7FF"
+```
+
+**Guidelines:**
+- Use `[theme.light]` / `[theme.dark]` and matching `[theme.light.sidebar]` / `[theme.dark.sidebar]` tables for dual-mode support.
+- Let users switch mode through Streamlit settings (⋮ → Settings → Theme), not custom sidebar toggles.
+- Keep CSS injection minimal and limited to effects not expressible through `config.toml` (for example metric card gradients).
+
+### **9.3. Timezone-Aware Date Arithmetic**
 
 When performing date arithmetic with Pandas timestamps, ensure timezone consistency:
 

@@ -34,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Global CSS: typography, sidebar dark mode, card styling, nav tabs
+# Global CSS: only residual styling not covered by config.toml theming
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 

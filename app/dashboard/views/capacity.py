@@ -5,19 +5,21 @@ Refactored to use Widget Registry where applicable.
 """
 
 import hashlib
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.utils import get_semantic_color
-from app.dashboard.widgets import tables, charts
 from app.dashboard.components import style_metric_cards
+from app.dashboard.theme import FONT_FAMILY, get_plotly_font_color
+from app.dashboard.utils import get_semantic_color
+from app.dashboard.widgets import charts, tables
 
 
 def render_capacity_view(
     df: pd.DataFrame,
     colors: dict[str, str] | None = None,
-    capacity_config: dict | None = None
+    capacity_config: dict | None = None,
 ) -> None:
     """Render the Capacity & Risk page.
 
@@ -45,8 +47,7 @@ def render_capacity_view(
 
     # --- Data Preparation ---
     work_df = df[
-        (df["stage_type"].isin(["active", "waiting"])) &
-        (df["state"] == "opened")
+        (df["stage_type"].isin(["active", "waiting"])) & (df["state"] == "opened")
     ].copy()
 
     if work_df.empty:
@@ -62,18 +63,20 @@ def render_capacity_view(
 
     # Anonymization Logic
     if anonymize:
+
         def hash_user(name: str) -> str:
             if name == "Unassigned":
                 return name
             h = hashlib.md5(name.encode()).hexdigest()[:4]
             return f"User-{h}"
+
         work_df["assignee"] = work_df["assignee"].apply(hash_user)
 
     # --- Visualizations ---
     risk_views = {
         "🏋️ Workload Balancer": "workload",
         "🔀 Context Switching": "context",
-        "⚠️ Unassigned Risk": "unassigned"
+        "⚠️ Unassigned Risk": "unassigned",
     }
 
     selected_view_label = st.radio(
@@ -81,7 +84,7 @@ def render_capacity_view(
         options=list(risk_views.keys()),
         horizontal=True,
         label_visibility="collapsed",
-        key="capacity_risk_view_radio"
+        key="capacity_risk_view_radio",
     )
 
     selected_view = risk_views[selected_view_label]
@@ -90,13 +93,9 @@ def render_capacity_view(
     if selected_view == "workload":
         with st.expander("📊 Workload Distribution", expanded=True):
             sel = charts.workload_distribution(
-                work_df, 
-                config={
-                    "threshold": max_wip, 
-                    "key": "capacity_workload_chart"
-                }
+                work_df, config={"threshold": max_wip, "key": "capacity_workload_chart"}
             )
-        
+
         # Adapt selection
         if sel and sel.get("selection", {}).get("points"):
             points = sel["selection"]["points"]
@@ -126,12 +125,12 @@ def render_capacity_view(
             # Handle potential missing assignee if bad click
             if not f.get("assignee"):
                 continue
-                
-            criteria_mask = (display_df["assignee"] == f["assignee"])
+
+            criteria_mask = display_df["assignee"] == f["assignee"]
             if f.get("stage"):
-                criteria_mask &= (display_df["stage"] == f["stage"])
+                criteria_mask &= display_df["stage"] == f["stage"]
             if f.get("context"):
-                criteria_mask &= (display_df["context"] == f["context"])
+                criteria_mask &= display_df["context"] == f["context"]
             mask |= criteria_mask
         grid_df = display_df[mask]
         grid_msg = f"Filtered ({len(grid_df)} items)"
@@ -140,17 +139,24 @@ def render_capacity_view(
 
     with st.expander(f"📋 {grid_msg}", expanded=True):
         tables.issue_detail_grid(
-            grid_df, 
+            grid_df,
             config={
-                "columns": ["web_url", "title", "assignee", "stage", "days_in_stage", "context", "weight"],
+                "columns": [
+                    "web_url",
+                    "title",
+                    "assignee",
+                    "stage",
+                    "days_in_stage",
+                    "context",
+                    "weight",
+                ],
                 "column_config": {
-                    "Age (Days)": st.column_config.NumberColumn("Age", format="%d days"),
-                }
-            }
+                    "Age (Days)": st.column_config.NumberColumn(
+                        "Age", format="%d days"
+                    ),
+                },
+            },
         )
-
-
-
 
 
 def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | None:
@@ -166,12 +172,16 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
         return None
 
     matrix = df.groupby(["assignee", "context"]).size().reset_index(name="count")
-    context_counts = df.groupby("assignee")["context"].nunique().sort_values(ascending=False)
+    context_counts = (
+        df.groupby("assignee")["context"].nunique().sort_values(ascending=False)
+    )
     sorted_assignees = context_counts.index.tolist()
 
     risky_people = context_counts[context_counts > threshold]
     if not risky_people.empty:
-        st.warning(f"⚠️ Fragmented Attention: {len(risky_people)} people match > {threshold} contexts.")
+        st.warning(
+            f"⚠️ Fragmented Attention: {len(risky_people)} people match > {threshold} contexts."
+        )
 
     fig = px.density_heatmap(
         matrix,
@@ -180,7 +190,7 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
         z="count",
         category_orders={"assignee": sorted_assignees},
         color_continuous_scale="Viridis",
-        text_auto=True
+        text_auto=True,
     )
 
     fig.update_layout(
@@ -189,21 +199,15 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
         height=500,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
     )
 
     event = st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=["points"]
+        fig, width="stretch", on_select="rerun", selection_mode=["points"]
     )
 
     if event and event.selection and event.selection.points:
-        return [
-            {"assignee": p["y"], "context": p["x"]}
-            for p in event.selection.points
-        ]
+        return [{"assignee": p["y"], "context": p["x"]} for p in event.selection.points]
 
     return None
 
@@ -218,10 +222,9 @@ def _render_unassigned_risk(df: pd.DataFrame) -> None:
     st.metric("Unassigned Active Items", count)
 
     if count > 0:
-        st.markdown(f"**{count} items** are in active stages but have no owner. This creates hidden queues.")
+        st.markdown(
+            f"**{count} items** are in active stages but have no owner. This creates hidden queues."
+        )
         breakdown = unassigned["stage"].value_counts().reset_index()
         breakdown.columns = ["Stage", "Count"]
         st.dataframe(breakdown, hide_index=True)
-
-
-

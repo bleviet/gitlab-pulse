@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, FONT_FAMILY, get_active_theme
+from app.dashboard.theme import PALETTE, FONT_FAMILY, get_plotly_font_color
 
 
 def milestone_timeline(
@@ -252,7 +252,7 @@ def milestone_timeline(
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT_FAMILY, color=get_active_theme()["plotly_font"]),
+        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
         xaxis=dict(
             showgrid=True,
             gridcolor="rgba(148, 163, 184, 0.18)",

@@ -9,8 +9,6 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.dashboard.theme import THEMES, DEFAULT_THEME
-
 
 def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
     """Render the global sidebar with filters.
@@ -25,38 +23,6 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         # Header
         st.title("🔍 GitLabInsight")
         st.caption("Analytics Dashboard")
-
-        # ── Theme Switcher ─────────────────────────────────────────────────
-        # Initialise session state
-        if "ui_theme" not in st.session_state:
-            st.session_state["ui_theme"] = DEFAULT_THEME
-
-        active_theme = st.session_state["ui_theme"]
-
-        # Build ordered list: 3 light then 3 dark
-        _theme_order = [
-            "Cloud Dancer", "Soft Stone", "Eco-Minimal",
-            "Deep Charcoal", "Night Plum", "Neon Minimal",
-        ]
-
-        st.caption("🎨 Theme")
-        _rows = [_theme_order[:3], _theme_order[3:]]
-        for _row in _rows:
-            _cols = st.columns(3)
-            for _col, _name in zip(_cols, _row):
-                _t = THEMES[_name]
-                _label = f"{_t['icon']} {_name.split()[0] if ' ' in _name else _name}"
-                _kind = "primary" if _name == active_theme else "secondary"
-                with _col:
-                    if st.button(
-                        _label,
-                        key=f"theme_btn_{_name}",
-                        type=_kind,
-                        use_container_width=True,
-                        help=_name,
-                    ):
-                        st.session_state["ui_theme"] = _name
-                        st.rerun()
 
         st.divider()
         st.subheader("📐 Custom Views")
