@@ -9,6 +9,18 @@ import streamlit as st
 from app.dashboard.utils import sort_hierarchy
 
 
+def _apply_zebra_stripes(styler: Styler, stripe_color: str) -> Styler:
+    """Apply zebra-striping styles to a Styler object."""
+    dataframe = styler.data
+
+    def _zebra(_: pd.DataFrame) -> pd.DataFrame:
+        styles = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
+        styles.iloc[1::2, :] = f"background-color: {stripe_color}"
+        return styles
+
+    return styler.apply(_zebra, axis=None)
+
+
 def issue_detail_grid(
     data: Union[pd.DataFrame, Styler],
     config: dict[str, Any] | None = None
@@ -25,6 +37,8 @@ def issue_detail_grid(
             - column_config: dict of column configurations to merge/override
             - column_order: list of column names for ordering
             - selection_mode: "single-row", "multi-row" (default "multi-row")
+            - zebra_stripes: bool (default True)
+            - zebra_color: CSS color for zebra rows
             - key: widget key
 
     Returns:
@@ -35,6 +49,8 @@ def issue_detail_grid(
     widget_key = config.get("key", "issue_detail_grid")
     selection_mode = config.get("selection_mode", "multi-row")
     default_page_size = config.get("page_size", 25)
+    zebra_stripes = config.get("zebra_stripes", True)
+    zebra_color = config.get("zebra_color") or st.get_option("theme.secondaryBackgroundColor") or "#ecebe3"
 
     if title:
         st.subheader(title)
@@ -249,6 +265,12 @@ def issue_detail_grid(
 
         visible_rows = min(page_size, total_rows - row_start)
         computed_height = config.get("height", min(35 * visible_rows + 45, 1800))
+
+    if zebra_stripes:
+        if isinstance(page_display, Styler):
+            page_display = _apply_zebra_stripes(page_display, zebra_color)
+        else:
+            page_display = _apply_zebra_stripes(page_display.style, zebra_color)
 
     # Render
     return st.dataframe(
