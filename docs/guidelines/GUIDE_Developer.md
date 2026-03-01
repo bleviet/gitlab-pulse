@@ -189,11 +189,11 @@ backgroundColor = "#ffffff"
 ```python
 from app.dashboard.theme import get_palette, plotly_layout
 
-# For Dataframes/CSS
+# For semantic domain colors (issue types, severities, stages, etc.)
 palette = get_palette()
-bg_color = palette["surface"]
+stripe_color = palette["surface_hover"]  # zebra-stripe mid-tone for data grids
 
-# For Plotly Charts
+# For Plotly Charts — always use plotly_layout() instead of manual font/color dicts
 fig.update_layout(
     **plotly_layout(
         height=300,

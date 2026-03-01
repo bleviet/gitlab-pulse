@@ -12,7 +12,6 @@ import streamlit as st
 
 from app.dashboard.theme import (
     get_palette,
-    get_plotly_font_color,
     plotly_bar_trace_style,
     plotly_layout,
 )
@@ -81,8 +80,6 @@ def stage_distribution(
     height = config.get("height", 400)
     widget_key = config.get("key", "stage_distribution")
     stage_descriptions = config.get("stage_descriptions", {})
-    chart_text_color = get_plotly_font_color()
-
     # Use configured colors if available, else fallback to default
     palette = config.get("colors")
     if palette is None:
@@ -92,6 +89,14 @@ def stage_distribution(
     if df.empty or "stage" not in df.columns:
         st.info("No stage data available")
         return None
+
+    # Pre-compute layout and font color so both chart paths can use it.
+    chart_layout = plotly_layout(
+        height=height,
+        show_xgrid=False,
+        show_ygrid=False,
+    )
+    chart_text_color: str = chart_layout["font"]["color"]
 
     total_issues = len(df)
     help_text = (
@@ -338,11 +343,7 @@ def stage_distribution(
     max_count = stage_totals["total_count"].max() if not stage_totals.empty else 0
 
     fig.update_layout(
-        **plotly_layout(
-            height=height,
-            show_xgrid=False,
-            show_ygrid=False,
-        ),
+        **chart_layout,
         barmode="stack",
         uniformtext_minsize=10,
         uniformtext_mode="hide",

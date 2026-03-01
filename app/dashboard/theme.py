@@ -16,8 +16,6 @@ import collections.abc
 import re
 from typing import Any
 
-FONT_FAMILY = "'SpaceGrotesk', 'Poppins', sans-serif"
-
 
 # --- Color Parsing Utilities ---
 
@@ -146,51 +144,51 @@ _SEMANTIC_LIGHT: dict[str, str] = {
 
 _SEMANTIC_DARK: dict[str, str] = {
     # Issue Types
-    "bug": "#EF4444",
-    "feature": "#1ed760",
-    "task": "#10B981",
-    "epic": "#8B5CF6",
+    "bug": "#f87171",
+    "feature": "#4ade80",
+    "task": "#67e8f9",
+    "epic": "#c084fc",
 
     # Status/Flow Stages
-    "active": "#1ed760",
-    "waiting": "#cb785c",
-    "completed": "#4D217A",
-    "stale": "#D62728",
-    "opened": "#6366F1",
-    "closed": "#10B981",
+    "active": "#4ade80",
+    "waiting": "#e8a87c",
+    "completed": "#7c3aed",
+    "stale": "#f87171",
+    "opened": "#818cf8",
+    "closed": "#4ade80",
 
     # UI/Domain Shared
-    "primary": "#4F46E5",
-    "neutral": "#64748B",
+    "primary": "#c084fc",
+    "neutral": "#8b7fa6",
 
     # Severity
-    "critical": "#cb785c",
-    "high": "#FB923C",
-    "medium": "#FBBF24",
-    "low": "#34D399",
-    "unset": "#94A3B8",
+    "critical": "#f87171",
+    "high": "#fb923c",
+    "medium": "#fbbf24",
+    "low": "#4ade80",
+    "unset": "#8b7fa6",
 
     # Priority
-    "p1": "#cb785c",
-    "p2": "#FBBF24",
-    "p3": "#34D399",
+    "p1": "#f87171",
+    "p2": "#fbbf24",
+    "p3": "#4ade80",
 
     # Chart Series specific
-    "scope_line": "#94A3B8",
+    "scope_line": "#8b7fa6",
     "burnup_feature_fill": "#166534",
-    "burnup_feature_area": "#BBF7D0",
-    "burnup_bug_fill": "#991B1B",
-    "burnup_bug_area": "#FECACA",
-    "burnup_task_fill": "#374151",
-    "burnup_task_area": "#E5E7EB",
-    "ms_complete": "#7C3AED",
-    "ms_incomplete": "#DC2626",
-    "ms_on_track": "#16A34A",
-    "ms_overdue": "#EA580C",
-    "ms_highlight": "#F59E0B",
+    "burnup_feature_area": "#bbf7d0",
+    "burnup_bug_fill": "#991b1b",
+    "burnup_bug_area": "#fecaca",
+    "burnup_task_fill": "#3d2b52",
+    "burnup_task_area": "#c4b5d4",
+    "ms_complete": "#c084fc",
+    "ms_incomplete": "#f87171",
+    "ms_on_track": "#4ade80",
+    "ms_overdue": "#fb923c",
+    "ms_highlight": "#fbbf24",
 
     # Grid details (zebra stripes etc.)
-    "surface_hover": "#2a2a2a",
+    "surface_hover": "#231540",
 }
 
 def get_palette() -> dict[str, str]:
@@ -282,15 +280,15 @@ def apply_rule_color_overrides(overrides: dict[str, Any] | None) -> None:
 def get_plotly_font_color() -> str:
     """Return a Plotly-valid font color derived from Streamlit theme."""
     mode = get_active_theme_mode()
-    fallback = "#ffffff" if mode == "dark" else "#3d3a2a"
+    fallback = "#ede9f5" if mode == "dark" else "#3d3a2a"
     return get_streamlit_theme_color("textColor", fallback)
 
 def get_plotly_grid_color() -> str:
     """Return Plotly grid color derived from active Streamlit theme."""
     mode = get_active_theme_mode()
-    fallback_border = "#7c7c7c" if mode == "dark" else "#d3d2ca"
-    fallback_grid = "rgba(124,124,124,0.30)" if mode == "dark" else "rgba(211,210,202,0.50)"
-    
+    fallback_border = "#3d2b52" if mode == "dark" else "#d3d2ca"
+    fallback_grid = "rgba(61,43,82,0.30)" if mode == "dark" else "rgba(211,210,202,0.50)"
+
     border_color = get_streamlit_theme_color("borderColor", fallback_border)
     return _with_alpha(border_color, alpha=0.22, fallback=fallback_grid)
 
@@ -308,12 +306,15 @@ def plotly_layout(
 
     font_color = get_plotly_font_color()
     grid_color = get_plotly_grid_color()
+    font_family = get_streamlit_theme_color(
+        "font", "'SpaceGrotesk', 'Poppins', sans-serif"
+    )
 
     layout: dict[str, Any] = {
         "height": height,
         "margin": margin,
         "font": {
-            "family": FONT_FAMILY,
+            "family": font_family,
             "color": font_color,
         },
         "paper_bgcolor": "rgba(0,0,0,0)",
@@ -375,13 +376,13 @@ def get_global_css() -> str:
     mode = get_active_theme_mode()
 
     # Read from the active client theme (respects light/dark toggle)
-    bg = get_streamlit_theme_color("backgroundColor", "#2a2a2a" if mode == "dark" else "#fdfdf8")
-    secondary_bg = get_streamlit_theme_color("secondaryBackgroundColor", "#121212" if mode == "dark" else "#f0f0ec")
-    text_color = get_streamlit_theme_color("textColor", "#ffffff" if mode == "dark" else "#3d3a2a")
-    primary = get_streamlit_theme_color("primaryColor", "#1ed760" if mode == "dark" else "#cb785c")
-    border = get_streamlit_theme_color("borderColor", "#7c7c7c" if mode == "dark" else "#d3d2ca")
-    
-    text_muted = _with_alpha(text_color, 0.7, "#b3b3b3" if mode == "dark" else "#6b695e")
+    bg = get_streamlit_theme_color("backgroundColor", "#1a0e2e" if mode == "dark" else "#fdfdf8")
+    secondary_bg = get_streamlit_theme_color("secondaryBackgroundColor", "#120b1d" if mode == "dark" else "#f0f0ec")
+    text_color = get_streamlit_theme_color("textColor", "#ede9f5" if mode == "dark" else "#3d3a2a")
+    primary = get_streamlit_theme_color("primaryColor", "#c084fc" if mode == "dark" else "#cb785c")
+    border = get_streamlit_theme_color("borderColor", "#3d2b52" if mode == "dark" else "#d3d2ca")
+
+    text_muted = _with_alpha(text_color, 0.7, "#a89ec0" if mode == "dark" else "#6b695e")
     primary_light = _with_alpha(primary, 0.15, "transparent")
     primary_border = _with_alpha(primary, 0.40, primary)
     shadow = "rgba(0,0,0,0.50)" if mode == "dark" else "rgba(61,58,42,0.05)"
