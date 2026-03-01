@@ -12,8 +12,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import PALETTE as COLORS
-from app.dashboard.theme import STAGE_TYPE_COLORS, plotly_layout
+from app.dashboard.theme import get_palette, get_stage_colors, plotly_layout
 
 
 def aging_boxplot(
@@ -83,15 +82,17 @@ def aging_boxplot(
     # Coloring logic
     color_col = group_col
     color_map = None
+    palette = get_palette()
+    stage_colors = get_stage_colors()
     
     if "stage_type" in df_plot.columns and group_col == "stage":
         color_col = "stage_type"
-        color_map = STAGE_TYPE_COLORS.copy()
+        color_map = stage_colors.copy()
         # Ensure we don't have missing keys that cause errors
         unique_types = df_plot["stage_type"].astype(str).unique()
         for t in unique_types:
             if t not in color_map:
-                color_map[t] = COLORS["neutral"]
+                color_map[t] = palette["neutral"]
 
     fig = px.box(
         df_plot,

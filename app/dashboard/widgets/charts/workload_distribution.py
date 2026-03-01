@@ -6,8 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import PALETTE as COLORS
-from app.dashboard.theme import plotly_layout
+from app.dashboard.theme import get_palette, get_stage_colors, plotly_layout
 
 
 def workload_distribution(
@@ -42,6 +41,9 @@ def workload_distribution(
 
     agg_df = work_df.groupby(["assignee", "stage"]).size().reset_index(name="count")
 
+    palette = get_palette()
+    stage_colors = get_stage_colors()
+
     fig = px.bar(
         agg_df,
         x="count",
@@ -49,11 +51,11 @@ def workload_distribution(
         color="stage",
         orientation="h",
         color_discrete_map={
-            "Backlog": COLORS["neutral"],
-            "To Do": COLORS["waiting"],
-            "In Progress": COLORS["active"],
-            "Review": COLORS["primary"],
-            "Done": COLORS["completed"],
+            "Backlog": stage_colors.get("backlog", palette["neutral"]),
+            "To Do": stage_colors.get("waiting", palette["waiting"]),
+            "In Progress": stage_colors.get("active", palette["active"]),
+            "Review": stage_colors.get("review", palette["primary"]),
+            "Done": stage_colors.get("completed", palette["completed"]),
         },
     )
 
@@ -70,7 +72,7 @@ def workload_distribution(
     fig.update_yaxes(showgrid=False, title="")
 
     # Add threshold line
-    fig.add_vline(x=threshold, line_dash="dash", line_color=COLORS["stale"])
+    fig.add_vline(x=threshold, line_dash="dash", line_color=palette["stale"])
 
     selection = st.plotly_chart(
         fig,

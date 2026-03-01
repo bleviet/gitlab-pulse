@@ -10,19 +10,14 @@ import streamlit as st
 from app.dashboard.widgets import tables, charts
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
-from app.dashboard.theme import PALETTE as COLORS
 
 
-def render_aging(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
+def render_aging(df: pd.DataFrame) -> None:
     """Render the Aging (Operational) page.
 
     Args:
         df: Filtered DataFrame with valid issues
-        colors: Optional dictionary of semantic colors to override defaults
     """
-    if colors:
-        COLORS.update(colors)
-
     st.caption("Operational view for identifying bottlenecks")
 
     if df.empty:

@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, plotly_layout
+from app.dashboard.theme import plotly_layout
 
 
 def error_distribution(

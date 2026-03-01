@@ -167,26 +167,41 @@ enableXsrfProtection = false
 
 ### **9.2. Native Theming (Required)**
 
-The dashboard uses Streamlit's official theme configuration in `.streamlit/config.toml`.
+The dashboard uses Streamlit's official theme configuration in `.streamlit/config.toml` for UI chrome (backgrounds, text, secondary text, primary buttons).
 
-**Rule:** Define visual theme tokens in config, not in Python session-state toggles.
+**Rule:** UI colors (like backgrounds) belong in `config.toml`. Semantic data colors (like "bug severity red" or "staging server yellow") belong in `app/dashboard/theme.py`.
 
 ```toml
 [theme]
 base = "light"
 font = "Inter, sans-serif"
 
-[theme.light]
+# Example of UI Chrome (Do this here)
 primaryColor = "#00A8E8"
-
-[theme.dark]
-primaryColor = "#B9A7FF"
+backgroundColor = "#ffffff"
 ```
 
 **Guidelines:**
-- Use `[theme.light]` / `[theme.dark]` and matching `[theme.light.sidebar]` / `[theme.dark.sidebar]` tables for dual-mode support.
-- Let users switch mode through Streamlit settings (⋮ → Settings → Theme), not custom sidebar toggles.
-- Keep CSS injection minimal and limited to effects not expressible through `config.toml` (for example metric card gradients).
+- Let users switch mode through Streamlit settings (⋮ → Settings → Theme).
+- Keep CSS injection minimal and limited to effects not expressible through `config.toml`.
+- When accessing colors for Plotly charts or Pandas DataFrames, **never** hardcode colors. Always use the central theme API:
+
+```python
+from app.dashboard.theme import get_palette, plotly_layout
+
+# For Dataframes/CSS
+palette = get_palette()
+bg_color = palette["surface"]
+
+# For Plotly Charts
+fig.update_layout(
+    **plotly_layout(
+        height=300,
+        show_xgrid=False,
+        show_ygrid=True,
+    )
+)
+```
 
 ### **9.3. Timezone-Aware Date Arithmetic**
 

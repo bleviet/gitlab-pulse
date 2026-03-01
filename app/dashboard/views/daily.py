@@ -10,12 +10,10 @@ import streamlit as st
 from app.dashboard.components import style_metric_cards
 from app.dashboard.widgets import charts, kpis
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
-from app.dashboard.theme import PALETTE as COLORS
 
 
 def render_daily_report(
     df: pd.DataFrame,
-    colors: dict[str, str] | None = None,
 ) -> None:
     """Render the Daily Report page.
 
@@ -25,11 +23,7 @@ def render_daily_report(
 
     Args:
         df: Filtered DataFrame with valid issues
-        colors: Optional dictionary of semantic colors to override defaults
     """
-    if colors:
-        COLORS.update(colors)
-
     # --- Day navigation ---
     if "daily_day_offset" not in st.session_state:
         st.session_state.daily_day_offset = 0

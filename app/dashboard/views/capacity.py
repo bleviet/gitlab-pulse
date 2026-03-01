@@ -11,21 +11,18 @@ import plotly.express as px
 import streamlit as st
 
 from app.dashboard.components import style_metric_cards
-from app.dashboard.theme import FONT_FAMILY, get_plotly_font_color
-from app.dashboard.utils import get_semantic_color
+from app.dashboard.theme import plotly_layout
 from app.dashboard.widgets import charts, tables
 
 
 def render_capacity_view(
     df: pd.DataFrame,
-    colors: dict[str, str] | None = None,
     capacity_config: dict | None = None,
 ) -> None:
     """Render the Capacity & Risk page.
 
     Args:
         df: Filtered DataFrame with valid issues
-        colors: Optional dictionary of semantic colors to override defaults
         capacity_config: Configuration dictionary for capacity limits and privacy
     """
 
@@ -194,12 +191,13 @@ def _render_context_matrix(df: pd.DataFrame, threshold: int) -> list[dict] | Non
     )
 
     fig.update_layout(
-        xaxis_title="Context",
-        yaxis_title="Assignee",
-        height=500,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
+        **plotly_layout(
+            height=500,
+            show_xgrid=False,
+            show_ygrid=False,
+            xaxis_title="Context",
+            yaxis_title="Assignee"
+        )
     )
 
     event = st.plotly_chart(

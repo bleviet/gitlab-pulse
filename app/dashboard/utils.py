@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.dashboard.theme import PALETTE
+from app.dashboard.theme import get_palette
 
 
 def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str = "id", title_col: str = "title") -> pd.DataFrame:
@@ -96,4 +96,4 @@ def get_semantic_color(key: str, default: str = "#64748B") -> str:
     Returns:
         Hex color string.
     """
-    return PALETTE.get(key, default)
+    return get_palette().get(key, default)

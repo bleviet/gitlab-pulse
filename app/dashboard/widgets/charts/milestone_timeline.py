@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, FONT_FAMILY, get_plotly_font_color
+from app.dashboard.theme import get_palette, plotly_layout
 
 
 def milestone_timeline(
@@ -120,19 +120,20 @@ def milestone_timeline(
         highlight_title = config.get("highlight_milestone")
         is_highlighted = title == highlight_title
 
+        palette = get_palette()
         if state == "closed":
             if all_issues_closed:
-                color = PALETTE["ms_complete"]
+                color = palette["ms_complete"]
                 status = "Complete"
             else:
-                color = PALETTE["ms_incomplete"]
+                color = palette["ms_incomplete"]
                 status = "Incomplete"
         else:
             if pd.notna(due_date) and due_date < now:
-                color = PALETTE["ms_overdue"]
+                color = palette["ms_overdue"]
                 status = "Overdue"
             else:
-                color = PALETTE["ms_on_track"]
+                color = palette["ms_on_track"]
                 status = "On Track"
 
         # Apply highlight visual overrides
@@ -143,7 +144,7 @@ def milestone_timeline(
         if is_highlighted:
             size = 22
             line_width = 3
-            line_color = PALETTE["ms_highlight"]
+            line_color = palette["ms_highlight"]
 
         # Format date for display
         date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "No date"
@@ -190,11 +191,12 @@ def milestone_timeline(
     fig = go.Figure()
 
     # Add traces for each status (for legend)
+    palette = get_palette()
     status_colors = {
-        "Complete": PALETTE["ms_complete"],
-        "Incomplete": PALETTE["ms_incomplete"],
-        "On Track": PALETTE["ms_on_track"],
-        "Overdue": PALETTE["ms_overdue"],
+        "Complete": palette["ms_complete"],
+        "Incomplete": palette["ms_incomplete"],
+        "On Track": palette["ms_on_track"],
+        "Overdue": palette["ms_overdue"],
     }
 
     for status, color in status_colors.items():
@@ -225,7 +227,7 @@ def milestone_timeline(
                     "<extra></extra>"
                 ),
                 # Add title to customdata[2] for selection
-                customdata=list(zip(status_df["date_str"], status_df["issues"], status_df["title"])),
+                customdata=list(zip(status_df["date_str"], status_df["issues"], status_df["title"], strict=False)),
             ))
 
     # Add vertical line for today using shape (avoids annotation arithmetic issues)
@@ -246,37 +248,26 @@ def milestone_timeline(
         font=dict(size=10),
     )
 
-    # Style for dark/light mode compatibility
     fig.update_layout(
-        height=200,
-        margin=dict(l=20, r=20, t=40, b=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(148, 163, 184, 0.18)",
-            title="",
-            type="date",
-            # Default view: 9 months before, 3 months after today
-            range=[
-                (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
-                (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
-            ],
-        ),
-        yaxis=dict(
-            showgrid=False,
-            showticklabels=False,
-            title="",
-            range=[-0.5, 2.5],  # Fixed range for 3 rows
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-        ),
+        **plotly_layout(
+            height=200,
+            show_xgrid=True,
+            show_ygrid=False,
+            legend_pos="top",
+            margin=dict(l=20, r=20, t=40, b=20),
+        )
+    )
+    
+    fig.update_xaxes(
+        type="date",
+        range=[
+            (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
+            (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
+        ],
+    )
+    fig.update_yaxes(
+        showticklabels=False,
+        range=[-0.5, 2.5],  # Fixed range for 3 rows
     )
 
     selection = st.plotly_chart(

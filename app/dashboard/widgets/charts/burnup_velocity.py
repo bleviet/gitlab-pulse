@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from app.dashboard.theme import PALETTE, FONT_FAMILY, get_plotly_font_color
+from app.dashboard.theme import get_palette, plotly_layout
 
 
 def burnup_velocity(
@@ -33,10 +33,11 @@ def burnup_velocity(
     df_copy["created_week"] = df_copy["created_at"].dt.tz_localize(None).dt.to_period("W").dt.start_time
 
     # Panel configuration
+    palette = get_palette()
     panels = [
-        {"type": "Feature", "title": "Features (Value Flow)", "fill": PALETTE["burnup_feature_fill"], "area": PALETTE["burnup_feature_area"]},
-        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": PALETTE["burnup_bug_fill"], "area": PALETTE["burnup_bug_area"]},
-        {"type": "Task", "title": "Tasks (Maintenance)", "fill": PALETTE["burnup_task_fill"], "area": PALETTE["burnup_task_area"]},
+        {"type": "Feature", "title": "Features (Value Flow)", "fill": palette["burnup_feature_fill"], "area": palette["burnup_feature_area"]},
+        {"type": "Bug", "title": "Bugs (Failure Demand)", "fill": palette["burnup_bug_fill"], "area": palette["burnup_bug_area"]},
+        {"type": "Task", "title": "Tasks (Maintenance)", "fill": palette["burnup_task_fill"], "area": palette["burnup_task_area"]},
     ]
 
     fig = make_subplots(
@@ -98,12 +99,11 @@ def burnup_velocity(
         ), row=i, col=1)
 
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=50, b=0),
-        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified",
+        **plotly_layout(
+            height=height,
+            margin=dict(l=0, r=0, t=50, b=0),
+            hovermode="x unified"
+        )
     )
 
     for i in range(1, 4):

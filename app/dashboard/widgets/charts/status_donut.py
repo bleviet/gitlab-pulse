@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, plotly_layout
+from app.dashboard.theme import get_palette, plotly_layout
 
 
 def status_donut(
@@ -25,9 +25,10 @@ def status_donut(
     status_counts = df["state"].value_counts().reset_index()
     status_counts.columns = ["State", "Count"]
 
+    palette = get_palette()
     color_map = {
-        "opened": PALETTE["opened"],
-        "closed": PALETTE["closed"],
+        "opened": palette["opened"],
+        "closed": palette["closed"],
     }
 
     fig = px.pie(

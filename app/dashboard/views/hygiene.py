@@ -12,24 +12,18 @@ from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
-from app.dashboard.theme import PALETTE as COLORS
 
 # Error code severity mapping
 
 
 
-def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
+def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
     """Render the Hygiene (Quality) page.
 
     Args:
         valid_df: DataFrame with valid issues
         quality_df: DataFrame with quality (failed) issues
-        colors: Optional dictionary of semantic colors to override defaults
     """
-    if colors:
-        COLORS.update(colors)
-
-
     st.caption("Quality view for metadata cleanup and validation")
 
     # Apply Bento Grid Style

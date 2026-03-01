@@ -11,12 +11,11 @@ from app.dashboard.registry import WidgetRegistry
 from app.dashboard.widgets import kpis, charts
 
 
-def render_stats_view(df: pd.DataFrame, colors: dict[str, str] | None = None) -> None:
+def render_stats_view(df: pd.DataFrame) -> None:
     """Render the Stats (Metrics) page.
 
     Args:
         df: Filtered DataFrame with valid issues
-        colors: Optional dictionary of semantic colors to override defaults
     """
 
     st.caption("Strategic view of project velocity and distribution")

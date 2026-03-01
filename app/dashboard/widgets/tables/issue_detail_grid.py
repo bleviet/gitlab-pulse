@@ -1,11 +1,12 @@
 """Issue Detail Grid Table Widget."""
 
-from typing import Any, Union
+from typing import Any
 
 import pandas as pd
-from pandas.io.formats.style import Styler
 import streamlit as st
+from pandas.io.formats.style import Styler
 
+from app.dashboard.theme import get_palette
 from app.dashboard.utils import sort_hierarchy
 
 
@@ -22,7 +23,7 @@ def _apply_zebra_stripes(styler: Styler, stripe_color: str) -> Styler:
 
 
 def issue_detail_grid(
-    data: Union[pd.DataFrame, Styler],
+    data: pd.DataFrame | Styler,
     config: dict[str, Any] | None = None
 ) -> Any:
     """Render unified issue detail grid with configurable columns.
@@ -50,7 +51,7 @@ def issue_detail_grid(
     selection_mode = config.get("selection_mode", "multi-row")
     default_page_size = config.get("page_size", 25)
     zebra_stripes = config.get("zebra_stripes", True)
-    zebra_color = config.get("zebra_color") or st.get_option("theme.secondaryBackgroundColor") or "#ecebe3"
+    zebra_color = config.get("zebra_color") or get_palette()["surface_hover"]
 
     if title:
         st.subheader(title)
@@ -167,8 +168,6 @@ def issue_detail_grid(
     # Map raw config columns to display names
     def map_col(c: str) -> str:
         return column_renames.get(c, c)
-
-    defaults_mapped = [map_col(c) for c in default_columns_raw]
 
     # Get user config columns and map them
     user_cols_raw = config.get("columns", default_columns_raw)

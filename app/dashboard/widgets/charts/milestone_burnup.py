@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, FONT_FAMILY, get_plotly_font_color
+from app.dashboard.theme import get_palette, plotly_layout
 
 
 def milestone_burnup(
@@ -93,12 +93,13 @@ def milestone_burnup(
     # Plot
     fig = go.Figure()
 
+    palette = get_palette()
     fig.add_trace(go.Scatter(
         x=chart_df["Date"],
         y=chart_df["Total Scope"],
         mode='lines',
         name='Total Scope',
-        line=dict(shape='hv', color=PALETTE["scope_line"], dash='dash')
+        line=dict(shape='hv', color=palette["scope_line"], dash='dash')
     ))
 
     fig.add_trace(go.Scatter(
@@ -107,7 +108,7 @@ def milestone_burnup(
         mode='lines',
         name='Completed',
         fill='tozeroy',
-        line=dict(color=PALETTE["primary"])
+        line=dict(color=palette["primary"])
     ))
 
     # Add vertical line for Today
@@ -118,16 +119,15 @@ def milestone_burnup(
         fig.add_vline(x=pd.to_datetime(milestone_meta["milestone_due_date"]).timestamp() * 1000, line_width=2, line_color="green", annotation_text="Due Date")
 
     fig.update_layout(
-        height=height,
-        xaxis_title="Date",
-        yaxis_title="Issues",
-        margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(orientation="h", y=1.1),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT_FAMILY, color=get_plotly_font_color()),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.18)"),
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=True,
+            legend_pos="top",
+            xaxis_title="Date",
+            yaxis_title="Issues",
+            margin=dict(l=0, r=0, t=10, b=0),
+        )
     )
 
     st.plotly_chart(fig, width="stretch", key=widget_key)

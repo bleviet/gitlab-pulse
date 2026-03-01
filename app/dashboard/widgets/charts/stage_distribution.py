@@ -10,10 +10,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import FONT_FAMILY
-from app.dashboard.theme import PALETTE as COLORS
-from app.dashboard.theme import (get_plotly_font_color, plotly_bar_trace_style,
-                                 plotly_layout)
+from app.dashboard.theme import (
+    get_palette,
+    get_plotly_font_color,
+    plotly_bar_trace_style,
+    plotly_layout,
+)
 
 
 def _contrast_text_color(color_value: str) -> str:
@@ -82,9 +84,10 @@ def stage_distribution(
     chart_text_color = get_plotly_font_color()
 
     # Use configured colors if available, else fallback to default
-    palette = config.get(
-        "colors", COLORS
-    ).copy()  # Use copy to avoid mutating global default
+    palette = config.get("colors")
+    if palette is None:
+        palette = get_palette()
+    palette = palette.copy()  # Use copy to avoid mutating global default
 
     if df.empty or "stage" not in df.columns:
         st.info("No stage data available")
@@ -273,7 +276,6 @@ def stage_distribution(
             trace.update(
                 textfont={
                     "color": _contrast_text_color(marker_color or ""),
-                    "family": FONT_FAMILY,
                 },
                 insidetextanchor="middle",
             )
@@ -313,7 +315,7 @@ def stage_distribution(
             marker_color=palette["primary"],
             marker_line_width=0,
             textposition="auto",
-            textfont={"color": chart_text_color, "family": FONT_FAMILY},
+            textfont={"color": chart_text_color},
         )
 
     # Add Total Labels at bar ends
@@ -328,7 +330,7 @@ def stage_distribution(
             textposition="middle right",
             hoverinfo="skip",
             showlegend=False,
-            textfont=dict(color=chart_text_color, family=FONT_FAMILY),
+            textfont=dict(color=chart_text_color),
         )
     )
 

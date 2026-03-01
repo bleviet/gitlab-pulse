@@ -9,24 +9,18 @@ import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import kpis, charts, tables, features
-from app.dashboard.theme import PALETTE as COLORS
 
 
 def render_overview(
     df: pd.DataFrame,
-    colors: dict[str, str] | None = None,
     stage_descriptions: dict[str, str] | None = None
 ) -> None:
     """Render the Overview (Flow) page.
 
     Args:
         df: Filtered DataFrame with valid issues
-        colors: Optional dictionary of semantic colors to override defaults
         stage_descriptions: Optional mapping of stage names to description strings
     """
-    if colors:
-        COLORS.update(colors)
-
     # Filter out empty stages or irrelevant data if needed
     # But for flow, we usually want to see everything
     if df.empty:
@@ -52,8 +46,7 @@ def render_overview(
             unique_df,
             config={
                 "stage_descriptions": stage_descriptions,
-                "key": "flow_chart_stage_dist",
-                "colors": colors
+                "key": "flow_chart_stage_dist"
             }
         )
 

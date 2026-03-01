@@ -24,7 +24,7 @@ from app.dashboard.views.hygiene import render_hygiene
 from app.dashboard.views.stats import render_stats_view
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
-from app.dashboard.theme import get_global_css
+from app.dashboard.theme import apply_rule_color_overrides, get_global_css
 
 # Page configuration
 st.set_page_config(
@@ -36,6 +36,8 @@ st.set_page_config(
 
 # Global CSS: only residual styling not covered by config.toml theming
 st.markdown(get_global_css(), unsafe_allow_html=True)
+from app.dashboard.theme import inject_theme_watcher
+inject_theme_watcher()
 
 
 def _exit_edit_mode():
@@ -96,7 +98,7 @@ def main() -> None:
         # Fallback: try first available rule, else empty default
         default_rule = next(iter(rule_loader.rules.values()), rule_loader.get_default_rule())
 
-    colors = default_rule.colors
+    apply_rule_color_overrides(default_rule.colors)
 
     # --- Early Bidirectional Sync Logic ---
     # Must update sidebar state BEFORE render_sidebar instantiates the widget
@@ -210,25 +212,25 @@ def main() -> None:
             for stage in default_rule.workflow.stages
             if hasattr(stage, "description")
         }
-        render_overview(filtered_df, colors=colors, stage_descriptions=stage_descriptions)
+        render_overview(filtered_df, stage_descriptions=stage_descriptions)
     elif view_id == "stats":
         # Stats is the old overview (KPIs, Burnup)
-        render_stats_view(filtered_df, colors=colors)
+        render_stats_view(filtered_df)
     elif view_id == "capacity":
         # Pass capacity config
         capacity_config = default_rule.capacity.model_dump()
         from app.dashboard.views.capacity import render_capacity_view
-        render_capacity_view(filtered_df, colors=colors, capacity_config=capacity_config)
+        render_capacity_view(filtered_df, capacity_config=capacity_config)
     elif view_id == "release":
         from app.dashboard.views.release import render_release_view
         render_release_view(filtered_df)
     elif view_id == "daily":
         from app.dashboard.views.daily import render_daily_report
-        render_daily_report(filtered_df, colors=colors)
+        render_daily_report(filtered_df)
     elif view_id == "aging":
-        render_aging(filtered_df, colors=colors)
+        render_aging(filtered_df)
     elif view_id == "hygiene":
-        render_hygiene(filtered_df, quality_df, colors=colors)
+        render_hygiene(filtered_df, quality_df)
     elif view_id == "custom":
         # Custom view using layout-based widget rendering
         from app.dashboard.engine import load_layout, save_layout, remove_widget_from_layout
@@ -307,7 +309,6 @@ def main() -> None:
         # Pass sidebar selection to highlighting
         global_config = {
             "highlight_milestone": current_milestone_filter,
-            "colors": colors
         }
 
         # Prepare overrides for filter source widgets

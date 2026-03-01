@@ -134,7 +134,7 @@ class DomainRule(BaseModel):
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     capacity: CapacityConfig = Field(default_factory=CapacityConfig)
-    colors: dict[str, str] = Field(default_factory=dict)
+    colors: dict[str, Any] = Field(default_factory=dict)
 
     def model_post_init(self, __context: Any) -> None:
         """Migrate legacy mappings to classification."""

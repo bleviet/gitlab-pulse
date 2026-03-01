@@ -1,10 +1,13 @@
 """Centralized Dashboard Theme Module.
 
-This module now follows Streamlit's official theming model via
-`.streamlit/config.toml` (`[theme]`, `[theme.light]`, `[theme.dark]`).
+UI chrome colors (backgroundColor, textColor, borderColor) are owned by
+Streamlit's native theming config in`.streamlit/config.toml`. 
 
-Only non-native visual polish remains in injected CSS (metric cards,
-radio-tab presentation, and custom scrollbar).
+This module provides:
+  - Semantic domain color palettes (issue types, severities, stages)
+  - Plotly layout helpers that adapt to the active Streamlit theme
+  - Minimal CSS injection for custom visual components (metric cards, etc.)
+  - Rule-based color overrides loaded from YAML configuration
 """
 
 from __future__ import annotations
@@ -14,8 +17,9 @@ import re
 from typing import Any
 
 FONT_FAMILY = "'SpaceGrotesk', 'Poppins', sans-serif"
-FONT_IMPORT_URL = ""
 
+
+# --- Color Parsing Utilities ---
 
 def _parse_rgb_from_color(value: str) -> tuple[int, int, int] | None:
     if not value:
@@ -50,79 +54,79 @@ def _is_dark_color(value: str) -> bool:
     return luminance < 0.5
 
 
+def _with_alpha(color: str, alpha: float, fallback: str) -> str:
+    rgb = _parse_rgb_from_color(color)
+    if rgb is None:
+        return fallback
+    red, green, blue = rgb
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+# --- Mode Detection ---
+
 def get_active_theme_mode() -> str:
     """Return active Streamlit mode: ``"light"`` or ``"dark"``.
 
-    Mode detection is based on resolved ``theme.backgroundColor`` from the
-    currently active Streamlit theme.
+    Uses ``st.context.theme`` (dict-like) which reflects the client's active
+    theme selection, unlike ``st.get_option()`` which returns server-side config.
     """
     try:
         import streamlit as st
-
-        bg = str(st.get_option("theme.backgroundColor") or "")
-        return "dark" if _is_dark_color(bg) else "light"
+        return str(st.context.theme.get("type", "light"))
     except Exception:
         return "light"
 
 
-class ThemeAwareDict(collections.abc.MutableMapping):
-    """A dictionary wrapper that dynamically swaps light/dark palettes
-    based on the currently active Streamlit theme mode.
+def get_streamlit_theme_color(option_name: str, fallback: str) -> str:
+    """Return a resolved Streamlit theme color from the active client theme.
+
+    Reads from ``st.context.theme`` (dict-like) which reflects the resolved
+    theme the client is actually using (respects light/dark toggle).
     """
-
-    def __init__(self, light_dict: dict[str, str], dark_dict: dict[str, str]):
-        self.light_dict = light_dict
-        self.dark_dict = dark_dict
-
-    def _get_active_dict(self) -> dict[str, str]:
-        mode = get_active_theme_mode()
-        return self.dark_dict if mode == "dark" else self.light_dict
-
-    def __getitem__(self, key: str) -> str:
-        return self._get_active_dict()[key]
-
-    def __setitem__(self, key: str, value: str) -> None:
-        self.light_dict[key] = value
-        self.dark_dict[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.light_dict[key]
-        del self.dark_dict[key]
-
-    def __iter__(self):
-        return iter(self._get_active_dict())
-
-    def __len__(self) -> int:
-        return len(self._get_active_dict())
-
-    def copy(self) -> dict[str, str]:
-        """Return a deep copy of the active dictionary (not a ThemeAwareDict)."""
-        return self._get_active_dict().copy()
+    try:
+        import streamlit as st
+        value = st.context.theme.get(option_name)
+        if isinstance(value, str) and value.strip():
+            return value
+    except Exception:
+        pass
+    return fallback
 
 
-_PALETTE_LIGHT: dict[str, str] = {
-    "primary": "#cb785c",
-    "primary_light": "#d79a84",
-    "primary_dark": "#a45f46",
-    "neutral": "#6b695e",
-    "active": "#059669",
-    "waiting": "#cb785c",
-    "completed": "#3d3a2a",
-    "stale": "#cb785c",
+# --- Semantic Domain Palettes ---
+
+_SEMANTIC_LIGHT: dict[str, str] = {
+    # Issue Types
     "bug": "#EF4444",
     "feature": "#059669",
     "task": "#10B981",
     "epic": "#8B5CF6",
+
+    # Status/Flow Stages
+    "active": "#059669",
+    "waiting": "#cb785c",
+    "completed": "#3d3a2a",
+    "stale": "#cb785c",
+    "opened": "#0ea5e9",
+    "closed": "#10B981",
+
+    # UI/Domain Shared
+    "primary": "#cb785c",
+    "neutral": "#6b695e",
+
+    # Severity
     "critical": "#F43F5E",
     "high": "#FB923C",
     "medium": "#FBBF24",
     "low": "#34D399",
     "unset": "#9b998d",
+
+    # Priority
     "p1": "#F43F5E",
     "p2": "#FBBF24",
     "p3": "#34D399",
-    "opened": "#0ea5e9",
-    "closed": "#10B981",
+
+    # Chart Series specific
     "scope_line": "#9b998d",
     "burnup_feature_fill": "#166534",
     "burnup_feature_area": "#BBF7D0",
@@ -135,42 +139,43 @@ _PALETTE_LIGHT: dict[str, str] = {
     "ms_on_track": "#16A34A",
     "ms_overdue": "#EA580C",
     "ms_highlight": "#F59E0B",
-    "surface": "#fdfdf8",
+
+    # Grid details (zebra stripes etc.)
     "surface_hover": "#f0f0ec",
-    "border": "rgba(211, 210, 202, 0.65)",
-    "shadow": "rgba(61, 58, 42, 0.05)",
-    "shadow_hover": "rgba(61, 58, 42, 0.12)",
-    "sidebar_bg": "#f0f0ec",
-    "sidebar_bg_alt": "#ecebe3",
-    "sidebar_text": "#3d3a2a",
-    "sidebar_text_muted": "#6b695e",
-    "sidebar_border": "rgba(211, 210, 202, 0.70)",
-    "sidebar_accent": "#cb785c",
 }
 
-_PALETTE_DARK: dict[str, str] = {
-    "primary": "#4F46E5",
-    "primary_light": "#818CF8",
-    "primary_dark": "#3730A3",
-    "neutral": "#64748B",
-    "active": "#1ed760",
-    "waiting": "#cb785c",
-    "completed": "#4D217A",
-    "stale": "#D62728",
+_SEMANTIC_DARK: dict[str, str] = {
+    # Issue Types
     "bug": "#EF4444",
     "feature": "#1ed760",
     "task": "#10B981",
     "epic": "#8B5CF6",
+
+    # Status/Flow Stages
+    "active": "#1ed760",
+    "waiting": "#cb785c",
+    "completed": "#4D217A",
+    "stale": "#D62728",
+    "opened": "#6366F1",
+    "closed": "#10B981",
+
+    # UI/Domain Shared
+    "primary": "#4F46E5",
+    "neutral": "#64748B",
+
+    # Severity
     "critical": "#cb785c",
     "high": "#FB923C",
     "medium": "#FBBF24",
     "low": "#34D399",
     "unset": "#94A3B8",
+
+    # Priority
     "p1": "#cb785c",
     "p2": "#FBBF24",
     "p3": "#34D399",
-    "opened": "#6366F1",
-    "closed": "#10B981",
+
+    # Chart Series specific
     "scope_line": "#94A3B8",
     "burnup_feature_fill": "#166534",
     "burnup_feature_area": "#BBF7D0",
@@ -183,157 +188,111 @@ _PALETTE_DARK: dict[str, str] = {
     "ms_on_track": "#16A34A",
     "ms_overdue": "#EA580C",
     "ms_highlight": "#F59E0B",
-    "surface": "#121212",
+
+    # Grid details (zebra stripes etc.)
     "surface_hover": "#2a2a2a",
-    "border": "rgba(124, 124, 124, 0.3)",
-    "shadow": "rgba(0, 0, 0, 0.5)",
-    "shadow_hover": "rgba(0, 0, 0, 0.8)",
-    "sidebar_bg": "#121212",
-    "sidebar_bg_alt": "#000000",
-    "sidebar_text": "#ffffff",
-    "sidebar_text_muted": "#b3b3b3",
-    "sidebar_border": "rgba(124, 124, 124, 0.15)",
-    "sidebar_accent": "#1ed760",
 }
 
-# The wrapper dictionary that returns the active mode colors dynamically
-PALETTE = ThemeAwareDict(_PALETTE_LIGHT, _PALETTE_DARK)
-
-SEVERITY_COLORS = ThemeAwareDict(
-    {
-        "Critical": _PALETTE_LIGHT["critical"],
-        "High": _PALETTE_LIGHT["high"],
-        "Medium": _PALETTE_LIGHT["medium"],
-        "Low": _PALETTE_LIGHT["low"],
-        "Unset": _PALETTE_LIGHT["unset"],
-    },
-    {
-        "Critical": _PALETTE_DARK["critical"],
-        "High": _PALETTE_DARK["high"],
-        "Medium": _PALETTE_DARK["medium"],
-        "Low": _PALETTE_DARK["low"],
-        "Unset": _PALETTE_DARK["unset"],
-    },
-)
-
-ISSUE_TYPE_COLORS = ThemeAwareDict(
-    {
-        "Bug": _PALETTE_LIGHT["bug"],
-        "Feature": _PALETTE_LIGHT["feature"],
-        "Task": _PALETTE_LIGHT["task"],
-        "Epic": _PALETTE_LIGHT["epic"],
-    },
-    {
-        "Bug": _PALETTE_DARK["bug"],
-        "Feature": _PALETTE_DARK["feature"],
-        "Task": _PALETTE_DARK["task"],
-        "Epic": _PALETTE_DARK["epic"],
-    },
-)
-
-STAGE_TYPE_COLORS = ThemeAwareDict(
-    {
-        "active": _PALETTE_LIGHT["active"],
-        "waiting": _PALETTE_LIGHT["waiting"],
-        "completed": _PALETTE_LIGHT["completed"],
-        "backlog": _PALETTE_LIGHT["neutral"],
-        "triage": _PALETTE_LIGHT["neutral"],
-    },
-    {
-        "active": _PALETTE_DARK["active"],
-        "waiting": _PALETTE_DARK["waiting"],
-        "completed": _PALETTE_DARK["completed"],
-        "backlog": _PALETTE_DARK["neutral"],
-        "triage": _PALETTE_DARK["neutral"],
-    },
-)
-
-
-_THEME_MODE_TOKENS: dict[str, dict[str, str]] = {
-    "light": {
-        "accent": "#cb785c",
-        "accent_light": "rgba(203,120,92,0.15)",
-        "accent_border": "rgba(203,120,92,0.40)",
-        "text": "#3d3a2a",
-        "text_muted": "#6b695e",
-        "border": "#d3d2ca",
-        "plotly_font": "#3d3a2a",
-        "plotly_grid": "rgba(211,210,202,0.50)",
-        "card_grad_a": "#fdfdf8",
-        "card_grad_b": "#f0f0ec",
-        "shadow": "rgba(61,58,42,0.05)",
-        "shadow_hover": "rgba(61,58,42,0.12)",
-    },
-    "dark": {
-        "accent": "#1ed760",
-        "accent_light": "rgba(30,215,96,0.15)",
-        "accent_border": "rgba(30,215,96,0.40)",
-        "text": "#ffffff",
-        "text_muted": "#b3b3b3",
-        "border": "#7c7c7c",
-        "plotly_font": "#ffffff",
-        "plotly_grid": "rgba(124,124,124,0.30)",
-        "card_grad_a": "#2a2a2a",
-        "card_grad_b": "#121212",
-        "shadow": "rgba(0,0,0,0.50)",
-        "shadow_hover": "rgba(0,0,0,0.80)",
-    },
-}
-
-
-def get_active_theme() -> dict[str, Any]:
-    """Backward-compatible theme payload for existing callers."""
-    mode = get_active_theme_mode()
-    payload = dict(_THEME_MODE_TOKENS[mode])
-    payload["is_dark"] = mode == "dark"
-    return payload
-
-
-def get_streamlit_theme_color(option_name: str, fallback: str) -> str:
-    """Return a resolved Streamlit theme color option with fallback.
-
-    Args:
-        option_name: Theme option name without ``theme.`` prefix
-            (e.g. ``"textColor"``, ``"primaryColor"``).
-        fallback: Value to use when option is unavailable.
+def get_palette() -> dict[str, str]:
+    """Return the active semantic palette mapping.
+    
+    This is the single source of truth for semantic colors in charts and widgets.
     """
-    try:
-        import streamlit as st
+    mode = get_active_theme_mode()
+    return _SEMANTIC_DARK.copy() if mode == "dark" else _SEMANTIC_LIGHT.copy()
 
-        value = st.get_option(f"theme.{option_name}")
-        if isinstance(value, str) and value.strip():
-            return value
-    except Exception:
-        pass
-    return fallback
+def get_severity_colors() -> dict[str, str]:
+    """Return colors mapping for severities."""
+    p = get_palette()
+    return {
+        "Critical": p["critical"],
+        "High": p["high"],
+        "Medium": p["medium"],
+        "Low": p["low"],
+        "Unset": p["unset"],
+    }
+
+def get_issue_type_colors() -> dict[str, str]:
+    """Return colors mapping for issue types."""
+    p = get_palette()
+    return {
+        "Bug": p["bug"],
+        "Feature": p["feature"],
+        "Task": p["task"],
+        "Epic": p["epic"],
+    }
+
+def get_stage_colors() -> dict[str, str]:
+    """Return colors mapping for workflow stages."""
+    p = get_palette()
+    return {
+        "active": p["active"],
+        "waiting": p["waiting"],
+        "completed": p["completed"],
+        "backlog": p["neutral"],
+        "triage": p["neutral"],
+    }
+
+# --- YAML Color Overrides ---
+
+def _normalize_color_mapping(value: Any) -> dict[str, str]:
+    if not isinstance(value, collections.abc.Mapping):
+        return {}
+    return {str(k): str(v) for k, v in value.items() if isinstance(v, str)}
+
+def apply_rule_color_overrides(overrides: dict[str, Any] | None) -> None:
+    """Apply YAML color overrides mutatively to the semantic palettes.
+    
+    This should be called once at startup when rule configuration is loaded.
+    """
+    if not isinstance(overrides, collections.abc.Mapping):
+        return
+
+    global_overrides: dict[str, str] = {}
+    light_overrides: dict[str, str] = {}
+    dark_overrides: dict[str, str] = {}
+
+    for key, value in overrides.items():
+        key_lower = str(key).strip().lower()
+
+        if key_lower == "light":
+            light_overrides.update(_normalize_color_mapping(value))
+            continue
+        if key_lower == "dark":
+            dark_overrides.update(_normalize_color_mapping(value))
+            continue
+        if key_lower == "global":
+            global_overrides.update(_normalize_color_mapping(value))
+            continue
+
+        if isinstance(value, str):
+            global_overrides[str(key)] = value
+
+    if global_overrides:
+        _SEMANTIC_LIGHT.update(global_overrides)
+        _SEMANTIC_DARK.update(global_overrides)
+    if light_overrides:
+        _SEMANTIC_LIGHT.update(light_overrides)
+    if dark_overrides:
+        _SEMANTIC_DARK.update(dark_overrides)
 
 
-def _with_alpha(color: str, alpha: float, fallback: str) -> str:
-    rgb = _parse_rgb_from_color(color)
-    if rgb is None:
-        return fallback
-    red, green, blue = rgb
-    return f"rgba({red},{green},{blue},{alpha})"
-
+# --- Plotly Helpers ---
 
 def get_plotly_font_color() -> str:
     """Return a Plotly-valid font color derived from Streamlit theme."""
     mode = get_active_theme_mode()
-    return get_streamlit_theme_color(
-        "textColor", _THEME_MODE_TOKENS[mode]["plotly_font"]
-    )
-
+    fallback = "#ffffff" if mode == "dark" else "#3d3a2a"
+    return get_streamlit_theme_color("textColor", fallback)
 
 def get_plotly_grid_color() -> str:
     """Return Plotly grid color derived from active Streamlit theme."""
     mode = get_active_theme_mode()
-    border_color = get_streamlit_theme_color(
-        "borderColor", _THEME_MODE_TOKENS[mode]["border"]
-    )
-    return _with_alpha(
-        border_color, alpha=0.22, fallback=_THEME_MODE_TOKENS[mode]["plotly_grid"]
-    )
-
+    fallback_border = "#7c7c7c" if mode == "dark" else "#d3d2ca"
+    fallback_grid = "rgba(124,124,124,0.30)" if mode == "dark" else "rgba(211,210,202,0.50)"
+    
+    border_color = get_streamlit_theme_color("borderColor", fallback_border)
+    return _with_alpha(border_color, alpha=0.22, fallback=fallback_grid)
 
 def plotly_layout(
     height: int = 400,
@@ -343,7 +302,7 @@ def plotly_layout(
     legend_pos: str = "top",
     **overrides: Any,
 ) -> dict[str, Any]:
-    """Build a consistent Plotly layout dictionary."""
+    """Build a consistent Plotly layout dictionary that adapts to Streamlit theme."""
     if margin is None:
         margin = {"l": 0, "r": 20, "t": 10, "b": 0}
 
@@ -395,7 +354,6 @@ def plotly_layout(
     layout.update(overrides)
     return layout
 
-
 def plotly_bar_trace_style() -> dict[str, Any]:
     """Return shared trace styling for bar charts."""
     return {
@@ -406,20 +364,39 @@ def plotly_bar_trace_style() -> dict[str, Any]:
     }
 
 
+# --- CSS Injection ---
+
 def get_global_css() -> str:
-    """Return minimal CSS not covered by Streamlit config theming."""
-    token = _THEME_MODE_TOKENS[get_active_theme_mode()]
+    """Return minimal CSS not covered by Streamlit config theming.
+    
+    Dynamically reads colors from Streamlit's base theme options to build
+    custom widgets like metric cards and tabbed radios.
+    """
+    mode = get_active_theme_mode()
+
+    # Read from the active client theme (respects light/dark toggle)
+    bg = get_streamlit_theme_color("backgroundColor", "#2a2a2a" if mode == "dark" else "#fdfdf8")
+    secondary_bg = get_streamlit_theme_color("secondaryBackgroundColor", "#121212" if mode == "dark" else "#f0f0ec")
+    text_color = get_streamlit_theme_color("textColor", "#ffffff" if mode == "dark" else "#3d3a2a")
+    primary = get_streamlit_theme_color("primaryColor", "#1ed760" if mode == "dark" else "#cb785c")
+    border = get_streamlit_theme_color("borderColor", "#7c7c7c" if mode == "dark" else "#d3d2ca")
+    
+    text_muted = _with_alpha(text_color, 0.7, "#b3b3b3" if mode == "dark" else "#6b695e")
+    primary_light = _with_alpha(primary, 0.15, "transparent")
+    primary_border = _with_alpha(primary, 0.40, primary)
+    shadow = "rgba(0,0,0,0.50)" if mode == "dark" else "rgba(61,58,42,0.05)"
+    shadow_hover = "rgba(0,0,0,0.80)" if mode == "dark" else "rgba(61,58,42,0.12)"
 
     return f"""
 <style>
 /* Metric cards */
 div[data-testid="stMetric"],
 div[data-testid="metric-container"] {{
-    background: linear-gradient(135deg, {token['card_grad_a']} 0%, {token['card_grad_b']} 100%);
-    border: 1px solid {token['border']};
+    background: linear-gradient(135deg, {bg} 0%, {secondary_bg} 100%);
+    border: 1px solid {border};
     padding: 18px 22px;
     border-radius: 12px;
-    box-shadow: {token['shadow']} 0 4px 12px;
+    box-shadow: {shadow} 0 4px 12px;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     min-height: 140px;
     display: flex;
@@ -430,8 +407,8 @@ div[data-testid="metric-container"] {{
 
 div[data-testid="stMetric"]:hover {{
     transform: translateY(-3px);
-    box-shadow: {token['shadow_hover']} 0 8px 24px;
-    border-color: {token['accent_border']};
+    box-shadow: {shadow_hover} 0 8px 24px;
+    border-color: {primary_border};
 }}
 
 div[data-testid="stMetric"] label {{
@@ -439,13 +416,13 @@ div[data-testid="stMetric"] label {{
     font-size: 0.82rem !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: {token['text_muted']} !important;
+    color: {text_muted} !important;
 }}
 
 div[data-testid="stMetric"] [data-testid="stMetricValue"] {{
     font-weight: 700 !important;
     font-size: 1.8rem !important;
-    color: {token['text']} !important;
+    color: {text_color} !important;
 }}
 
 div[data-testid="stMetric"] [data-testid="stMetricDelta"] {{
@@ -465,18 +442,18 @@ div[data-testid="stRadio"] > div > label {{
     font-size: 0.85rem !important;
     transition: all 0.2s ease !important;
     border: 1px solid transparent !important;
-    color: {token['text']} !important;
+    color: {text_color} !important;
 }}
 
 div[data-testid="stRadio"] > div > label:hover {{
-    background-color: {token['accent_light']} !important;
-    border-color: {token['accent_border']} !important;
+    background-color: {primary_light} !important;
+    border-color: {primary_border} !important;
 }}
 
 div[data-testid="stRadio"] > div > label[data-checked="true"] {{
-    background-color: {token['accent_light']} !important;
-    border-color: {token['accent']} !important;
-    color: {token['accent']} !important;
+    background-color: {primary_light} !important;
+    border-color: {primary} !important;
+    color: {primary} !important;
 }}
 
 /* Plotly wrapper */
@@ -493,11 +470,56 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     background: transparent;
 }}
 ::-webkit-scrollbar-thumb {{
-    background: {token['border']};
+    background: {border};
     border-radius: 3px;
 }}
 ::-webkit-scrollbar-thumb:hover {{
-    background: {token['accent_border']};
+    background: {primary_border};
 }}
 </style>
 """
+
+def inject_theme_watcher() -> None:
+    """Inject a JavaScript watcher to auto-reload on theme toggle.
+
+    Streamlit's ``st.context.theme`` only updates on a full page reload. This
+    watcher detects frontend theme changes via CSS variables and triggers a
+    reload automatically. It uses an invisible iframe component and accesses
+    the parent document.
+    """
+    import streamlit.components.v1 as components
+    
+    js_code = """
+    <script>
+    (function() {
+        // Streamlit components run in an iframe, so access parent styling
+        var parent = window.parent;
+        var parentDoc = parent.document;
+        
+        // Find a reliable element (.stApp usually exists)
+        function getThemeState() {
+            var el = parentDoc.querySelector('[data-testid="stApp"]') 
+                     || parentDoc.querySelector('.stApp') 
+                     || parentDoc.body;
+            var compStyle = window.parent.getComputedStyle(el);
+            // Combine bg and text color for a robust check
+            return compStyle.backgroundColor + ":" + compStyle.color;
+        }
+
+        // Wait 1.5s for Streamlit to fully render and apply CSS
+        setTimeout(function() {
+            var initialState = getThemeState();
+            
+            setInterval(function() {
+                var currentState = getThemeState();
+                
+                // If the state changes and it's not a transparent glitch, user toggled theme!
+                if (currentState !== initialState && currentState.indexOf("rgba(0, 0, 0, 0)") === -1 && currentState.indexOf("transparent") === -1) {
+                    parent.location.reload();
+                }
+            }, 500);
+        }, 1500);
+    })();
+    </script>
+    """
+    components.html(js_code, height=0, width=0)

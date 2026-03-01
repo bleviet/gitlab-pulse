@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import PALETTE, plotly_layout
+from app.dashboard.theme import get_palette, plotly_layout
 
 
 def quality_gauge(
@@ -31,13 +31,14 @@ def quality_gauge(
 
     score = round((total_valid / total) * 100, 1)
 
+    palette = get_palette()
     # Determine color based on score
     if score >= 90:
-        color = PALETTE["task"]
+        color = palette["task"]
     elif score >= 70:
-        color = PALETTE["medium"]
+        color = palette["medium"]
     else:
-        color = PALETTE["bug"]
+        color = palette["bug"]
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
@@ -55,7 +56,7 @@ def quality_gauge(
                 {"range": [90, 100], "color": "rgba(16, 163, 74, 0.15)"},
             ],
             "threshold": {
-                "line": {"color": PALETTE["task"], "width": 2},
+                "line": {"color": palette["task"], "width": 2},
                 "thickness": 0.75,
                 "value": 90,
             },
