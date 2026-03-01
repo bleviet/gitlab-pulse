@@ -74,7 +74,7 @@ def render_daily_report(
 
     with st.expander(f"🆕 New Issues ({len(new_df)})", expanded=True):
         if new_df.empty:
-            st.success("No new issues in this period.")
+            st.info("No new issues in this period.")
         else:
             issue_detail_grid(
                 new_df,
@@ -91,7 +91,7 @@ def render_daily_report(
 
     with st.expander(f"✅ Closed Issues ({len(closed_df)})", expanded=True):
         if closed_df.empty:
-            st.success("No issues closed in this period.")
+            st.info("No issues closed in this period.")
         else:
             issue_detail_grid(
                 closed_df,

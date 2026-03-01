@@ -159,7 +159,7 @@ weight = "900"
 
 [theme.light]
 primaryColor = "#cb785c"
-backgroundColor = "#fdfdf8"
+backgroundColor = "#f4f3ed"
 secondaryBackgroundColor = "#ecebe3"
 textColor = "#3d3a2a"
 borderColor = "#d3d2ca"
@@ -168,7 +168,7 @@ dataframeHeaderBackgroundColor = "#e4e4e0"
 
 [theme.light.sidebar]
 primaryColor = "#cb785c"
-backgroundColor = "#f0f0ec"
+backgroundColor = "#e8e7dd"
 secondaryBackgroundColor = "#ecebe3"
 textColor = "#3d3a2a"
 borderColor = "#d3d2ca"
