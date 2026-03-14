@@ -5,7 +5,9 @@ GitLabInsight Layer 3 Presentation Layer.
 
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 from dotenv import load_dotenv
+from PIL import Image
 
 # Load environment variables
 load_dotenv()
@@ -26,10 +28,12 @@ from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
 from app.dashboard.theme import apply_rule_color_overrides, get_global_css
 
+_FAVICON = Image.open(Path(__file__).parent.parent / "static" / "favicon.png")
+
 # Page configuration
 st.set_page_config(
     page_title="GitLabInsight",
-    page_icon="🔍",
+    page_icon=_FAVICON,
     layout="wide",
     initial_sidebar_state="expanded",
 )
