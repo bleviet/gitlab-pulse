@@ -6,7 +6,14 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import get_palette, get_streamlit_theme_color, plotly_layout, with_alpha
+from app.dashboard.theme import (
+    get_active_theme_mode,
+    get_palette,
+    get_plotly_font_color,
+    get_streamlit_theme_color,
+    plotly_layout,
+    with_alpha,
+)
 
 
 def milestone_timeline(
@@ -86,7 +93,10 @@ def milestone_timeline(
 
     # Prepare scatter data
     # Resolve background color once for marker outline "floating" effect
-    bg_color = get_streamlit_theme_color("backgroundColor", "#050811")
+    bg_color = get_streamlit_theme_color(
+        "backgroundColor",
+        "#050811" if get_active_theme_mode() == "dark" else "#f8f9fc",
+    )
     scatter_data = []
     for _, row in display_df.iterrows():
         ms_id = row["id"]
@@ -247,7 +257,7 @@ def milestone_timeline(
         yref="paper",
         text="Today",
         showarrow=False,
-        font=dict(size=10),
+        font=dict(size=10, color=get_plotly_font_color()),
     )
 
     fig.update_layout(

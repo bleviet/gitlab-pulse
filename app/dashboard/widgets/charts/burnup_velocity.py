@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from app.dashboard.theme import get_palette, get_plotly_grid_color, plotly_layout
+from app.dashboard.theme import get_palette, get_plotly_font_color, get_plotly_grid_color, plotly_layout
 
 
 def burnup_velocity(
@@ -105,6 +105,11 @@ def burnup_velocity(
             hovermode="x unified"
         )
     )
+
+    # Subplot titles are annotations — explicitly apply theme font color
+    font_color = get_plotly_font_color()
+    for annotation in fig.layout.annotations:
+        annotation.font.color = font_color
 
     for i in range(1, 4):
         fig.update_yaxes(

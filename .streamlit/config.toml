@@ -16,9 +16,6 @@ headingFontWeights = [600, 500, 500, 500, 500, 500]
 headingFontSizes = ["3rem", "2rem"]
 codeFont = "SpaceMono"
 codeFontSize = ".75rem"
-codeBackgroundColor = "#ecebe4"
-linkColor = "#3d3a2a"
-chartCategoricalColors = ["#0ea5e9", "#059669", "#fbbf24"]
 
 [[theme.fontFaces]]
 family = "SpaceGrotesk"
@@ -52,17 +49,6 @@ url = "app/static/SpaceMono-Regular.ttf"
 style = "normal"
 weight = 400
 
-
-
-
-
-
-
-
-
-
-
-
 [theme.light]
 primaryColor = "#ff512f"
 backgroundColor = "#f8f9fc"
@@ -71,6 +57,9 @@ textColor = "#0d1120"
 borderColor = "#e2e3e5"
 dataframeBorderColor = "#e2e3e5"
 dataframeHeaderBackgroundColor = "#eef0f5"
+linkColor = "#0079b3"
+codeBackgroundColor = "#e8eaf0"
+chartCategoricalColors = ["#0079b3", "#cf2c48", "#a110bd", "#059669", "#ff512f", "#dd2476", "#d97706"]
 
 [theme.light.sidebar]
 primaryColor = "#ff512f"
@@ -89,6 +78,9 @@ textColor = "#ffffff"
 borderColor = "#1e2129"
 dataframeBorderColor = "#1e2129"
 dataframeHeaderBackgroundColor = "#0a0f1e"
+linkColor = "#4facfe"
+codeBackgroundColor = "#0a0f1e"
+chartCategoricalColors = ["#4facfe", "#F5576C", "#DA22FF", "#4ade80", "#ff512f", "#dd2476", "#fbbf24"]
 
 [theme.dark.sidebar]
 primaryColor = "#ff512f"

@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import get_palette, plotly_layout
+from app.dashboard.theme import get_palette, get_plotly_font_color, plotly_layout
 
 
 def daily_activity_bar(
@@ -57,6 +57,7 @@ def daily_activity_bar(
     fig = go.Figure()
 
     palette = get_palette()
+    text_color = get_plotly_font_color()
     fig.add_trace(go.Bar(
         y=all_types,
         x=[int(new_counts.get(t, 0)) for t in all_types],
@@ -66,6 +67,7 @@ def daily_activity_bar(
         marker_line_width=0,
         text=[int(new_counts.get(t, 0)) for t in all_types],
         textposition="auto",
+        textfont=dict(color=text_color),
     ))
 
     fig.add_trace(go.Bar(
@@ -77,6 +79,7 @@ def daily_activity_bar(
         marker_line_width=0,
         text=[int(closed_counts.get(t, 0)) for t in all_types],
         textposition="auto",
+        textfont=dict(color=text_color),
     ))
 
     fig.update_layout(
