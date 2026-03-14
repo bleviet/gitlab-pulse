@@ -139,62 +139,62 @@ validation:
 # 2) Theme-aware palette with `light` and `dark` sections
 colors:
   light:
-    # Issue Types
-    bug: "#EF4444"
+    # Issue Types — aligned with node palette (light)
+    bug:     "#cf2c48"   # --node-pink
     feature: "#059669"
-    task: "#10B981"
-    epic: "#8B5CF6"
+    task:    "#0079b3"   # --node-cyan
+    epic:    "#a110bd"   # --node-purple
 
-    # Status/Flow
-    active: "#059669"
-    waiting: "#cb785c"
-    completed: "#3d3a2a"
-    stale: "#cb785c"
+    # Status / Flow
+    active:    "#059669"
+    waiting:   "#d97706"   # amber
+    completed: "#a110bd"   # --node-purple
+    stale:     "#cf2c48"   # --node-pink
 
     # General UI
-    primary: "#cb785c"
-    neutral: "#6b695e"
+    primary: "#ff512f"   # --brand
+    neutral: "#5a6a82"   # --muted
 
-    # Severity
-    critical: "#d07374"
-    high: "#f5ded9"
-    medium: "#f5f4d7"
-    low: "#deeede"
-    unset: "#ebe9df"
+    # Severity — semantic red → amber → yellow → green scale
+    critical: "#dc2626"
+    high:     "#ea580c"
+    medium:   "#ca8a04"
+    low:      "#16a34a"
+    unset:    "#5a6a82"   # --muted
 
     # Priority
-    p1: "#d07374"
-    p2: "#f5f4d7"
-    p3: "#deeede"
+    p1: "#cf2c48"   # --node-pink
+    p2: "#ca8a04"   # amber/yellow
+    p3: "#16a34a"   # green
 
   dark:
-    # Issue Types
-    bug: "#EF4444"
-    feature: "#1ed760"
-    task: "#10B981"
-    epic: "#8B5CF6"
+    # Issue Types — aligned with node palette (dark)
+    bug:     "#F5576C"   # --node-pink
+    feature: "#4ade80"
+    task:    "#4facfe"   # --node-cyan
+    epic:    "#DA22FF"   # --node-purple
 
-    # Status/Flow
-    active: "#1ed760"
-    waiting: "#cb785c"
-    completed: "#4D217A"
-    stale: "#D62728"
+    # Status / Flow
+    active:    "#4ade80"
+    waiting:   "#e8a87c"   # warm amber
+    completed: "#DA22FF"   # --node-purple
+    stale:     "#F5576C"   # --node-pink
 
     # General UI
-    primary: "#4F46E5"
-    neutral: "#94A3B8"
+    primary: "#ff512f"   # --brand
+    neutral: "#8a9bb2"   # --muted
 
-    # Severity
-    critical: "#F43F5E"
-    high: "#FB923C"
-    medium: "#FBBF24"
-    low: "#34D399"
-    unset: "#94A3B8"
+    # Severity — semantic red → amber → yellow → green scale
+    critical: "#f87171"
+    high:     "#fb923c"
+    medium:   "#fbbf24"
+    low:      "#4ade80"
+    unset:    "#8a9bb2"   # --muted
 
     # Priority
-    p1: "#F43F5E"
-    p2: "#FBBF24"
-    p3: "#34D399"
+    p1: "#dd2476"   # --brand-2
+    p2: "#fbbf24"   # yellow
+    p3: "#4ade80"   # green
 
 # Capacity View Configuration
 capacity:

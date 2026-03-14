@@ -21,7 +21,11 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
     """
     with st.sidebar:
         # Header
-        st.title("🔍 GitLabInsight")
+        st.markdown(
+            '<h1 style="font-size:1.4rem; margin:0 0 0.1rem; font-family:\'Space Grotesk\',sans-serif; font-weight:700;">'
+            '🔍 <span style="color:#ff512f;">GitLab</span>Insight</h1>',
+            unsafe_allow_html=True,
+        )
         st.caption("Analytics Dashboard")
 
         st.divider()
