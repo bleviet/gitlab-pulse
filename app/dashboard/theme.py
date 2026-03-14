@@ -16,6 +16,17 @@ import collections.abc
 import re
 from typing import Any
 
+# --- Font Constants ---
+FONT_BODY    = "'Manrope', sans-serif"
+FONT_HEADING = "'Space Grotesk', 'SpaceGrotesk', sans-serif"
+FONT_CODE    = "'Space Mono', 'SpaceMono', monospace"
+
+_GOOGLE_FONTS_URL = (
+    "https://fonts.googleapis.com/css2?"
+    "family=Manrope:wght@400;500;600;700;800"
+    "&family=Space+Grotesk:wght@400;500;600;700"
+    "&display=swap"
+)
 
 # --- Color Parsing Utilities ---
 
@@ -329,9 +340,7 @@ def plotly_layout(
 
     font_color = get_plotly_font_color()
     grid_color = get_plotly_grid_color()
-    font_family = get_streamlit_theme_color(
-        "font", "'SpaceGrotesk', 'Poppins', sans-serif"
-    )
+    font_family = FONT_BODY
 
     layout: dict[str, Any] = {
         "height": height,
@@ -413,6 +422,50 @@ def get_global_css() -> str:
 
     return f"""
 <style>
+@import url('{_GOOGLE_FONTS_URL}');
+
+/* ── Base font assignments ──────────────────────────────────────────── */
+/* Use body for inheritance — avoids breaking icon fonts on span/div    */
+body {{
+    font-family: {FONT_BODY} !important;
+}}
+
+/* Explicit overrides for Streamlit text components */
+p, textarea,
+.stMarkdown, .stMarkdown p,
+.stText, .stCaption, .stAlert,
+[data-testid="stSidebar"],
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stSelectbox"] span,
+[data-testid="stMultiSelect"] span,
+[data-testid="stButton"] p,
+[data-testid="stCheckbox"] span[data-testid="stWidgetLabel"],
+[data-testid="stWidgetLabel"],
+[data-testid="stCaptionContainer"] p {{
+    font-family: {FONT_BODY} !important;
+}}
+
+/* Heading font — Space Grotesk */
+h1, h2, h3, h4, h5, h6,
+[data-testid="stHeading"] h1,
+[data-testid="stHeading"] h2,
+[data-testid="stHeading"] h3,
+[data-testid="stHeading"] h4,
+[data-testid="stHeading"] h5,
+[data-testid="stHeading"] h6,
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+.metric-value {{
+    font-family: {FONT_HEADING} !important;
+}}
+
+code, pre, [data-testid="stCode"] {{
+    font-family: {FONT_CODE} !important;
+}}
+
 /* Metric cards */
 div[data-testid="stMetric"],
 div[data-testid="metric-container"] {{
@@ -436,6 +489,7 @@ div[data-testid="stMetric"]:hover {{
 }}
 
 div[data-testid="stMetric"] label {{
+    font-family: {FONT_BODY} !important;
     font-weight: 500 !important;
     font-size: 0.82rem !important;
     text-transform: uppercase;
@@ -444,12 +498,14 @@ div[data-testid="stMetric"] label {{
 }}
 
 div[data-testid="stMetric"] [data-testid="stMetricValue"] {{
+    font-family: {FONT_HEADING} !important;
     font-weight: 700 !important;
     font-size: 1.8rem !important;
     color: {text_color} !important;
 }}
 
 div[data-testid="stMetric"] [data-testid="stMetricDelta"] {{
+    font-family: {FONT_BODY} !important;
     font-weight: 400;
     font-size: 0.8rem !important;
 }}
@@ -462,6 +518,7 @@ div[data-testid="stRadio"] > div {{
 div[data-testid="stRadio"] > div > label {{
     padding: 8px 16px !important;
     border-radius: 8px !important;
+    font-family: {FONT_BODY} !important;
     font-weight: 500 !important;
     font-size: 0.85rem !important;
     transition: all 0.2s ease !important;
