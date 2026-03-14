@@ -92,6 +92,10 @@ class WorkflowConfig(BaseModel):
 class ValidationConfig(BaseModel):
     """Validation rules configuration."""
 
+    enabled: bool = Field(
+        default=True,
+        description="Master switch — set to false to accept all issues without validation",
+    )
     required_labels: dict[str, list[str]] = Field(default_factory=dict)
     required_fields: dict[str, list[str]] = Field(default_factory=dict)
     stale_threshold_days: int = 30

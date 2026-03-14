@@ -13,19 +13,34 @@ from app.dashboard.widgets import charts, tables
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
 from app.dashboard.theme import get_alert_background_colors
+from app.processor.rule_loader import DomainRule
 
 # Error code severity mapping
 
 
 
-def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
+def render_hygiene(
+    valid_df: pd.DataFrame,
+    quality_df: pd.DataFrame,
+    rule: DomainRule | None = None,
+) -> None:
     """Render the Hygiene (Quality) page.
 
     Args:
         valid_df: DataFrame with valid issues
         quality_df: DataFrame with quality (failed) issues
+        rule: Active domain rule (used to detect disabled validation)
     """
     st.caption("Quality view for metadata cleanup and validation")
+
+    # Show an informational banner when validation is globally disabled
+    if rule is not None and not getattr(rule.validation, 'enabled', True):
+        st.info(
+            "**Validation is disabled** — all issues are accepted without hygiene checks.  \n"
+            "Set `validation.enabled: true` in your rule YAML to turn checks back on.",
+            icon="🔕",
+        )
+        return
 
     # Apply Bento Grid Style
     style_metric_cards()

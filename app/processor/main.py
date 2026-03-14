@@ -82,10 +82,11 @@ class Processor:
             self._write_parquet(combined_valid, self.analytics_path / "issues_valid.parquet")
             valid_count = len(combined_valid)
 
-        if all_quality:
-            combined_quality = pd.concat(all_quality, ignore_index=True)
-            self._write_parquet(combined_quality, self.analytics_path / "data_quality.parquet")
-            quality_count = len(combined_quality)
+        # Always write the quality file so a stale file from a previous run
+        # (with validation enabled) is cleared when validation is now disabled.
+        combined_quality = pd.concat(all_quality, ignore_index=True) if all_quality else pd.DataFrame()
+        self._write_parquet(combined_quality, self.analytics_path / "data_quality.parquet")
+        quality_count = len(combined_quality)
 
         logger.info(f"Processed: {valid_count} valid, {quality_count} quality issues")
         return {"valid": valid_count, "quality": quality_count}

@@ -230,7 +230,7 @@ def main() -> None:
     elif view_id == "aging":
         render_aging(filtered_df)
     elif view_id == "hygiene":
-        render_hygiene(filtered_df, quality_df)
+        render_hygiene(filtered_df, quality_df, rule=default_rule)
     elif view_id == "custom":
         # Custom view using layout-based widget rendering
         from app.dashboard.engine import load_layout, save_layout, remove_widget_from_layout

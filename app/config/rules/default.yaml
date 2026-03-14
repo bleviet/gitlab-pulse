@@ -108,6 +108,10 @@ workflow:
       type: "waiting"
 
 validation:
+  # Master switch — set to false to bypass all hygiene checks.
+  # When false, every issue is marked valid and the Hygiene view shows no errors.
+  enabled: true
+
   # Required labels for specific issue types
   required_labels:
     Bug:

@@ -56,6 +56,10 @@ def validate_issues(
     if df.empty:
         return ValidationResult(valid_df=df, quality_df=pd.DataFrame())
 
+    if rule and not getattr(rule.validation, 'enabled', True):
+        logger.info("Validation disabled by rule config — all issues accepted")
+        return ValidationResult(valid_df=df.copy(), quality_df=pd.DataFrame())
+
     # Separate open and closed issues - only validate open issues
     # Closed issues are historical records; hygiene checks are not actionable
     if "state" in df.columns:
