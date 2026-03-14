@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import get_palette, get_stage_colors, plotly_layout
+from app.dashboard.theme import get_palette, get_plotly_grid_color, get_stage_colors, plotly_layout
 
 
 def workload_distribution(
@@ -68,7 +68,7 @@ def workload_distribution(
             show_ygrid=False,
         ),
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(148, 163, 184, 0.18)", title="Issue Count")
+    fig.update_xaxes(showgrid=True, gridcolor=get_plotly_grid_color(), title="Issue Count")
     fig.update_yaxes(showgrid=False, title="")
 
     # Add threshold line

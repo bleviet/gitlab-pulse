@@ -12,6 +12,7 @@ from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
+from app.dashboard.theme import get_alert_background_colors
 
 # Error code severity mapping
 
@@ -87,11 +88,7 @@ def render_hygiene(valid_df: pd.DataFrame, quality_df: pd.DataFrame) -> None:
             def style_error_code(row: pd.Series) -> list[str]:
                 code = row.get("Error", "")
                 severity = ERROR_SEVERITY.get(code, "info")
-                bg_colors = {
-                    "error": "background-color: rgba(239,68,68,0.2)",
-                    "warning": "background-color: rgba(245,158,11,0.2)",
-                    "info": "background-color: rgba(100,116,139,0.1)",
-                }
+                bg_colors = get_alert_background_colors()
                 style = bg_colors.get(severity, "")
                 return [style if c == "Error" else "" for c in row.index]
 

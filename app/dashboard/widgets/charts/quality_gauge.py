@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import get_palette, plotly_layout
+from app.dashboard.theme import get_palette, plotly_layout, with_alpha
 
 
 def quality_gauge(
@@ -51,9 +51,9 @@ def quality_gauge(
             "bgcolor": "rgba(0,0,0,0)",
             "borderwidth": 0,
             "steps": [
-                {"range": [0, 70], "color": "rgba(220, 38, 38, 0.15)"},
-                {"range": [70, 90], "color": "rgba(202, 138, 4, 0.15)"},
-                {"range": [90, 100], "color": "rgba(16, 163, 74, 0.15)"},
+                {"range": [0, 70],  "color": with_alpha(palette["bug"],    0.15)},
+                {"range": [70, 90], "color": with_alpha(palette["medium"], 0.15)},
+                {"range": [90, 100],"color": with_alpha(palette["low"],    0.15)},
             ],
             "threshold": {
                 "line": {"color": palette["task"], "width": 2},

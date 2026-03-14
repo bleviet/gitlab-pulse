@@ -147,19 +147,19 @@ def render_grid(
         /* Grid background pattern for 12-column visualization */
         .stElementsFrame iframe {
             background-image:
-                linear-gradient(to right, rgba(79, 70, 229, 0.1) 1px, transparent 1px);
+                linear-gradient(to right, rgba(255, 81, 47, 0.08) 1px, transparent 1px);
             background-size: calc(100% / 12) 100%;
         }
 
         /* Resize handles styling */
         .react-resizable-handle {
-            background-color: #4F46E5 !important;
+            background-color: #ff512f !important;
             border-radius: 3px !important;
             opacity: 0.8 !important;
         }
         .react-resizable-handle:hover {
             opacity: 1 !important;
-            background-color: #3730A3 !important;
+            background-color: #dd2476 !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -228,8 +228,8 @@ def render_grid(
                             "alignItems": "center",
                             "justifyContent": "center",
                             "height": "100%",
-                            "bgcolor": "#EEF2FF",
-                            "border": "2px dashed #4F46E5",
+                            "bgcolor": "rgba(255,81,47,0.08)",
+                            "border": "2px dashed #ff512f",
                             "borderRadius": "8px",
                             "cursor": "move",
                             "textAlign": "center",
@@ -247,7 +247,7 @@ def render_grid(
                                     "top": 2,
                                     "right": 2,
                                     "zIndex": 10,
-                                    "bgcolor": "rgba(255,255,255,0.7)",
+                                    "bgcolor": "rgba(255,255,255,0.85)",
                                     "&:hover": { "bgcolor": "#ef4444", "color": "white" }
                                 }
                             ),

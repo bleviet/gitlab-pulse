@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from app.dashboard.theme import get_palette, plotly_layout
+from app.dashboard.theme import get_palette, get_plotly_grid_color, plotly_layout
 
 
 def burnup_velocity(
@@ -109,7 +109,7 @@ def burnup_velocity(
     for i in range(1, 4):
         fig.update_yaxes(
             showgrid=True,
-            gridcolor="rgba(148, 163, 184, 0.18)",
+            gridcolor=get_plotly_grid_color(),
             zeroline=False,
             row=i, col=1,
         )

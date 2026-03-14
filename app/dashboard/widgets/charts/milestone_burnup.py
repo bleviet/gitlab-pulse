@@ -112,11 +112,11 @@ def milestone_burnup(
     ))
 
     # Add vertical line for Today
-    fig.add_vline(x=now.timestamp() * 1000, line_width=1, line_dash="dash", line_color="red", annotation_text="Today")
+    fig.add_vline(x=now.timestamp() * 1000, line_width=1, line_dash="dash", line_color=palette["ms_incomplete"], annotation_text="Today")
 
     # Add vertical line for Due Date
     if pd.notna(milestone_meta.get("milestone_due_date")):
-        fig.add_vline(x=pd.to_datetime(milestone_meta["milestone_due_date"]).timestamp() * 1000, line_width=2, line_color="green", annotation_text="Due Date")
+        fig.add_vline(x=pd.to_datetime(milestone_meta["milestone_due_date"]).timestamp() * 1000, line_width=2, line_color=palette["ms_on_track"], annotation_text="Due Date")
 
     fig.update_layout(
         **plotly_layout(

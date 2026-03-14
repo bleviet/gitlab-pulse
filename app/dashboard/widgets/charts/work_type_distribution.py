@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import get_issue_type_colors, plotly_layout
+from app.dashboard.theme import get_palette, plotly_bar_trace_style, plotly_layout
 
 
 def work_type_distribution(
@@ -30,7 +30,13 @@ def work_type_distribution(
     type_counts = df["issue_type"].value_counts().reset_index()
     type_counts.columns = ["Type", "Count"]
 
-    color_map = get_issue_type_colors()
+    color_map = get_palette()
+    issue_type_colors = {
+        "Bug":     color_map["bug"],
+        "Feature": color_map["feature"],
+        "Task":    color_map["task"],
+        "Epic":    color_map["epic"],
+    }
 
     fig = px.bar(
         type_counts,
@@ -38,10 +44,11 @@ def work_type_distribution(
         y="Type",
         orientation="h",
         color="Type",
-        color_discrete_map=color_map,
+        color_discrete_map=issue_type_colors,
+        text="Count",
     )
 
-    fig.update_traces(marker_line_width=0)
+    fig.update_traces(**plotly_bar_trace_style())
 
     fig.update_layout(
         **plotly_layout(

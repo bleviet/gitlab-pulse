@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import plotly_layout
+from app.dashboard.theme import get_palette, plotly_bar_trace_style, plotly_layout
 
 
 def error_distribution(
@@ -29,15 +29,31 @@ def error_distribution(
     error_counts = quality_df["error_code"].value_counts().reset_index()
     error_counts.columns = ["Error Code", "Count"]
 
+    palette = get_palette()
+    # Map error codes to semantic severity colors
+    _SEVERITY_COLORS: dict[str, str] = {
+        "CONFLICTING_LABELS":    palette["bug"],
+        "ORPHAN_TASK":           palette["bug"],
+        "MISSING_LABEL":         palette["high"],
+        "STALE_WITHOUT_UPDATE":  palette["high"],
+        "EXCEEDS_CYCLE_TIME":    palette["neutral"],
+    }
+    color_map = {
+        code: _SEVERITY_COLORS.get(code, palette["neutral"])
+        for code in error_counts["Error Code"]
+    }
+
     fig = px.bar(
         error_counts,
         x="Count",
         y="Error Code",
         orientation="h",
         color="Error Code",
+        color_discrete_map=color_map,
+        text="Count",
     )
 
-    fig.update_traces(marker_line_width=0)
+    fig.update_traces(**plotly_bar_trace_style())
 
     fig.update_layout(
         **plotly_layout(

@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.dashboard.theme import get_palette, get_stage_colors, plotly_layout
+from app.dashboard.theme import get_palette, get_plotly_grid_color, get_stage_colors, plotly_layout
 
 
 def aging_boxplot(
@@ -116,7 +116,7 @@ def aging_boxplot(
     )
     fig.update_layout(showlegend=show_legend)
     fig.update_xaxes(showgrid=False, title="")
-    fig.update_yaxes(gridcolor="rgba(148, 163, 184, 0.18)", title="Days in Stage")
+    fig.update_yaxes(gridcolor=get_plotly_grid_color(), title="Days in Stage")
 
     selection = st.plotly_chart(
         fig,
