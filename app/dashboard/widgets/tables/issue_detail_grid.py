@@ -6,17 +6,50 @@ import pandas as pd
 import streamlit as st
 from pandas.io.formats.style import Styler
 
-from app.dashboard.theme import get_palette
+from app.dashboard.theme import (
+    FONT_BODY,
+    get_active_theme_mode,
+    get_palette,
+    get_streamlit_theme_color,
+)
 from app.dashboard.utils import sort_hierarchy
 
 
-def _apply_zebra_stripes(styler: Styler, stripe_color: str) -> Styler:
+def _table_theme() -> dict[str, str]:
+    """Return table-specific colors derived from the active theme."""
+    mode = get_active_theme_mode()
+    if mode == "dark":
+        bg      = get_streamlit_theme_color("backgroundColor",          "#050811")
+        row_alt = get_streamlit_theme_color("secondaryBackgroundColor", "#0c1123")
+        text    = get_streamlit_theme_color("textColor",                "#ffffff")
+        muted   = "#8a9bb2"
+    else:
+        bg      = get_streamlit_theme_color("backgroundColor",          "#f8f9fc")
+        row_alt = get_streamlit_theme_color("secondaryBackgroundColor", "#ffffff")
+        text    = get_streamlit_theme_color("textColor",                "#0d1120")
+        muted   = "#5a6a82"
+    return {"bg": bg, "row_alt": row_alt, "text": text, "muted": muted}
+
+
+def _apply_base_cell_styles(styler: Styler, bg: str, text: str) -> Styler:
+    """Apply background and text colour to every cell so they match the theme."""
+    return styler.set_properties(**{
+        "background-color": bg,
+        "color": text,
+        "font-family": FONT_BODY,
+        "font-size": "0.83rem",
+    })
+
+
+def _apply_zebra_stripes(styler: Styler, stripe_color: str, text: str) -> Styler:
     """Apply zebra-striping styles to a Styler object."""
     dataframe = styler.data
 
     def _zebra(_: pd.DataFrame) -> pd.DataFrame:
         styles = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
-        styles.iloc[1::2, :] = f"background-color: {stripe_color}"
+        styles.iloc[1::2, :] = (
+            f"background-color: {stripe_color}; color: {text};"
+        )
         return styles
 
     return styler.apply(_zebra, axis=None)
@@ -51,7 +84,9 @@ def issue_detail_grid(
     selection_mode = config.get("selection_mode", "multi-row")
     default_page_size = config.get("page_size", 25)
     zebra_stripes = config.get("zebra_stripes", True)
-    zebra_color = config.get("zebra_color") or get_palette()["surface_hover"]
+
+    t = _table_theme()
+    zebra_color = config.get("zebra_color") or t["row_alt"]
 
     if title:
         st.subheader(title)
@@ -267,9 +302,15 @@ def issue_detail_grid(
 
     if zebra_stripes:
         if isinstance(page_display, Styler):
-            page_display = _apply_zebra_stripes(page_display, zebra_color)
+            page_display = _apply_base_cell_styles(page_display, t["bg"], t["text"])
+            page_display = _apply_zebra_stripes(page_display, zebra_color, t["text"])
         else:
-            page_display = _apply_zebra_stripes(page_display.style, zebra_color)
+            styled = _apply_base_cell_styles(page_display.style, t["bg"], t["text"])
+            page_display = _apply_zebra_stripes(styled, zebra_color, t["text"])
+    elif isinstance(page_display, Styler):
+        page_display = _apply_base_cell_styles(page_display, t["bg"], t["text"])
+    else:
+        page_display = _apply_base_cell_styles(page_display.style, t["bg"], t["text"])
 
     # Render
     return st.dataframe(

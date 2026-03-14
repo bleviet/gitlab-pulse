@@ -542,6 +542,22 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     border-radius: 8px;
 }}
 
+/* Dataframe card container */
+[data-testid="stDataFrame"] {{
+    border: 1px solid {border} !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+    box-shadow: 0 2px 8px {shadow};
+}}
+
+/* Pagination controls sit just above the dataframe */
+[data-testid="stDataFrame"] + div .stSelectbox label,
+[data-testid="stDataFrame"] + div .stCaption {{
+    font-family: {FONT_BODY} !important;
+    color: {text_muted} !important;
+    font-size: 0.78rem !important;
+}}
+
 /* Scrollbar */
 ::-webkit-scrollbar {{
     width: 6px;

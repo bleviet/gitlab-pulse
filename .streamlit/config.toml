@@ -7,7 +7,7 @@ enableStaticServing = false
 
 [theme]
 base = "light"
-font = "SpaceGrotesk"
+font = "Manrope"
 baseRadius = "0.5rem"
 buttonRadius = "full"
 showSidebarBorder = true
@@ -16,6 +16,24 @@ headingFontWeights = [600, 500, 500, 500, 500, 500]
 headingFontSizes = ["3rem", "2rem"]
 codeFont = "SpaceMono"
 codeFontSize = ".75rem"
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-Regular.ttf"
+style = "normal"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-SemiBold.ttf"
+style = "normal"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-Bold.ttf"
+style = "normal"
+weight = 700
 
 [[theme.fontFaces]]
 family = "SpaceGrotesk"
