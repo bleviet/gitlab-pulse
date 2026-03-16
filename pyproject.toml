@@ -15,6 +15,7 @@ dependencies = [
   # GitLab API
   "python-gitlab>=4.0",
   "httpx>=0.25",
+  "requests>=2.25",
   # Dashboard
   "streamlit>=1.30",
   "plotly>=5.18",

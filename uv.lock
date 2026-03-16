@@ -303,6 +303,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-gitlab" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "streamlit" },
     { name = "streamlit-elements" },
 ]
@@ -335,6 +336,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "python-gitlab", specifier = ">=4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "requests", specifier = ">=2.25" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.20" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "streamlit", specifier = ">=1.30" },

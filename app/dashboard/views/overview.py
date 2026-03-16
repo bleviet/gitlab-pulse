@@ -304,8 +304,13 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # Persist selected issue for AI panel (survives sorting/rerun)
     if has_selection:
-        # Store the selected issue data in session state
-        selected_idx = selected_indices[0]
+        # Resolve page-relative index to full display_df index.
+        # st.dataframe() returns selection.rows relative to the *displayed page*, not the
+        # full dataframe, so we must add the current page offset to get the correct row.
+        _page = st.session_state.get("issue_drilldown_table_page", 0)
+        _page_size = st.session_state.get("issue_drilldown_table_page_size", 25)
+        _offset = 0 if isinstance(_page_size, str) else _page * int(_page_size)
+        selected_idx = selected_indices[0] + _offset
         if selected_idx < len(display_df):
             selected_row = display_df.iloc[selected_idx]
             st.session_state.selected_issue_url = selected_row.get("web_url", "")
