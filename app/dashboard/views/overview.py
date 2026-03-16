@@ -27,20 +27,27 @@ def render_overview(
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
 
-    # Top Row: Milestone Timeline — clicking a milestone updates the sidebar filter
+    # Top Row: Milestone Timeline — clicking a milestone updates the sidebar filter;
+    # double-clicking resets it to "All"
     if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
         with st.expander("📅 Milestone Timeline", expanded=True):
             timeline_selection = charts.milestone_timeline(
-                unique_df, config={"key": "overview_timeline"}
+                unique_df, config={"key": "overview_timeline", "height": 150}
             )
-            if timeline_selection and timeline_selection.get("selection", {}).get("points"):
-                points = timeline_selection["selection"]["points"]
-                if points:
-                    try:
-                        selected_ms = points[0]["customdata"][2]
+            points = (timeline_selection or {}).get("selection", {}).get("points")
+            prev_ms = st.session_state.get("overview_last_timeline_ms", "")
+            if points:
+                try:
+                    selected_ms = points[0]["customdata"][2]
+                    if selected_ms != prev_ms:
+                        st.session_state["overview_last_timeline_ms"] = selected_ms
                         st.session_state["overview_milestone_pending"] = selected_ms
-                    except (IndexError, KeyError):
-                        pass
+                except (IndexError, KeyError):
+                    pass
+            elif isinstance(points, list) and prev_ms:
+                # Empty list after a prior selection = double-click reset
+                st.session_state["overview_last_timeline_ms"] = ""
+                st.session_state["overview_milestone_reset"] = True
 
     # Side-by-side layout: issue list on the left, chart on the right
     col_list, col_chart = st.columns([1, 1], gap="medium")

@@ -262,7 +262,7 @@ def milestone_timeline(
 
     fig.update_layout(
         **plotly_layout(
-            height=200,
+            height=config.get("height", 200),
             show_xgrid=True,
             show_ygrid=False,
             legend_pos="top",

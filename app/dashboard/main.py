@@ -155,6 +155,9 @@ def main() -> None:
     # render_sidebar instantiates the sidebar_milestone_selector widget)
     if "overview_milestone_pending" in st.session_state:
         st.session_state["sidebar_milestone_selector"] = st.session_state.pop("overview_milestone_pending")
+    elif "overview_milestone_reset" in st.session_state:
+        st.session_state.pop("overview_milestone_reset")
+        st.session_state["sidebar_milestone_selector"] = "All"
 
     # Render sidebar and get filters
     filters = render_sidebar(valid_df)
