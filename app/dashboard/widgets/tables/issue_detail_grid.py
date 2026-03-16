@@ -204,16 +204,8 @@ def issue_detail_grid(
     display_df = df.copy()
 
     if is_styler:
-        # If Styler, underlying data is in data.data
-        # We cannot easily rename columns in a Styler object without reconstructing it
-        # or using specific pandas calls which might break existing styles.
-        # However, users passing a Styler usually have already set up the display dataframe.
-        # But if we want to apply our standard column configs (which use renamed global
-        # keys like 'IID'), the styler data must match.
-        # Ideally, caller should rename BEFORE styling.
-        # For now, we assume Styler input has valid columns or we mapped them earlier
-        # in the View.
-        # IMPORTANT: 'column_renames' is mainly for raw DF handling.
+        # Styler path: caller has already prepared the DataFrame (e.g. overview.py with
+        # context-label highlighting). Column names are raw; we leave them untouched.
         display_data = data
     else:
         # Sort by hierarchy if available
@@ -221,9 +213,31 @@ def issue_detail_grid(
             display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
 
         display_df = display_df.rename(columns={k: v for k, v in column_renames.items() if k in display_df.columns})
+
+        # Combine the separate Link (IID), numeric IID, and Title columns into a
+        # single clickable "Title" column whose value is "{url}#{iid} - {title}".
+        # Streamlit's LinkColumn uses the regex `#(.+)$` to extract display text
+        # while the browser navigates to the real URL (the fragment is ignored by GitLab).
+        if "IID" in display_df.columns and "Title" in display_df.columns:
+            if "iid" in display_df.columns:
+                iid_part = display_df["iid"].astype(str)
+                display_df = display_df.drop(columns=["iid"])
+            else:
+                iid_part = display_df["IID"].str.extract(r"/(\d+)$")[0].fillna("?")
+            display_df["Title"] = (
+                display_df["IID"]
+                + "#"
+                + iid_part
+                + " - "
+                + display_df["Title"].fillna("")
+            )
+            display_df = display_df.drop(columns=["IID"])
+
         display_data = display_df
 
-    # Default configured columns (mapped to new names)
+    # Default configured columns (mapped to new names).
+    # Note: "web_url" and "title" are combined into a single "Title" (link) column,
+    # so neither "IID" nor a bare "Title" text column appear separately.
     default_columns_raw = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]
 
     # Get user config columns and map them
@@ -235,17 +249,21 @@ def issue_detail_grid(
         if ecol not in column_order:
             column_order.append(ecol)
 
-    # If column_order is not passed explicitly in config['column_order'], use the mapped 'columns' list
-    final_column_order = config.get("column_order", column_order)
+    # If column_order is not passed explicitly in config['column_order'], use the mapped
+    # 'columns' list filtered to columns that actually exist after all transformations.
+    if "column_order" in config:
+        final_column_order = config["column_order"]
+    else:
+        existing_cols = set(display_data.data.columns if is_styler else display_data.columns)
+        final_column_order = [c for c in column_order if c in existing_cols]
 
     # Base Column Configuration
     base_config = {
-        "IID": st.column_config.LinkColumn(
-            "IID",
-            display_text=r"/(?:issues|work_items)/(\d+)$",
-            width="small",
+        "Title": st.column_config.LinkColumn(
+            "Title",
+            display_text=r"#(.+)$",
+            width="large",
         ),
-        "Title": st.column_config.TextColumn("Title", width="large"),
         "Type": st.column_config.TextColumn("Type", width="small"),
         "Stage": st.column_config.TextColumn("Stage", width="small"),
         "Assignee": st.column_config.TextColumn("Assignee", width="medium"),

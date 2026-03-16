@@ -238,26 +238,34 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
 
+    # Combine web_url + iid + title into a single clickable "title" column.
+    # Keep web_url as a hidden column so the AI panel can still read the URL.
+    if "web_url" in display_df.columns and "title" in display_df.columns:
+        iid_part = display_df["iid"].astype(str) if "iid" in display_df.columns else "?"
+        display_df["title"] = (
+            display_df["web_url"]
+            + "#"
+            + iid_part
+            + " - "
+            + display_df["title"].fillna("")
+        )
+        if "iid" in display_df.columns:
+            display_df = display_df.drop(columns=["iid"])
+
     column_config = {
         "ai_status": st.column_config.TextColumn(
             "AI",
             width=40,
             help="📝 = Has AI summary | ✨ = No summary yet"
         ),
-        "iid": st.column_config.NumberColumn(
-            "IID",
-            width=60,
-            help="Issue IID (numeric for proper sorting)"
-        ),
-        "web_url": st.column_config.LinkColumn(
-            "Link",
-            display_text="🔗",
-            width=40,
-            help="Click to open in GitLab"
+        "title": st.column_config.LinkColumn(
+            "Title",
+            display_text=r"#(.+)$",
+            width="large",
+            help="Click to open in GitLab",
         ),
         "assignee": st.column_config.TextColumn("Assignee", width="small"),
         "stage": st.column_config.TextColumn("Stage", width="small"),
-        "title": st.column_config.TextColumn("Title", width="large"),
         "days_in_stage": st.column_config.NumberColumn(
             "Days in Stage",
             help="Days since last update in this stage",
@@ -286,9 +294,9 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
         styler = display_df.style.map(highlight_context, subset=["context"])
 
-    column_order = ["ai_status", "web_url", "iid", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+    column_order = ["ai_status", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
     if "context" in display_df.columns:
-        column_order.insert(6, "context")
+        column_order.insert(2, "context")
 
     # --- AI PANEL LOGIC ---
     # Check if a row is selected - if so, auto-show split view
@@ -356,9 +364,9 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             }
         )
 
-    # Compact column order for split view (essential columns + Priority)
+    # Compact column order for split view (essential columns only)
     if is_split_view:
-        compact_column_order = ["ai_status", "web_url", "iid", "title", "stage", "severity", "days_in_stage"]
+        compact_column_order = ["ai_status", "title", "stage", "severity", "days_in_stage"]
         # Split view: Side-by-side columns
         col_left, col_right = st.columns([1.5, 1], gap="medium")
         with col_left:
