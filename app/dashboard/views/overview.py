@@ -77,19 +77,162 @@ def render_overview(
                 final_mask |= m
             filtered_df = filtered_df[final_mask]
 
+    # Determine whether a selection is persisted before rendering the table
+    # so we can decide whether to split the issue list column.
+    has_persisted = st.session_state.get("selected_issue_url", "") != ""
+
     with col_list, st.expander("📋 Issue List", expanded=True):
-        _render_issue_detail_grid(filtered_df, compact=True)
+        if has_persisted:
+            tbl_col, det_col = st.columns([1.2, 0.8], gap="medium")
+            with tbl_col:
+                display_df = _render_issue_detail_grid(filtered_df, compact=True)
+            with det_col:
+                selected_row = _get_selected_original_row(df, display_df)
+                if selected_row is not None:
+                    _render_selected_issue_panel(selected_row)
+        else:
+            display_df = _render_issue_detail_grid(filtered_df, compact=True)
+            selected_row = None
+
+    has_selection = selected_row is not None if has_persisted else False
+
+    # AI Summary in the right column (below Visual Analysis)
+    with col_chart, st.expander("🤖 AI Summary", expanded=has_selection):
+        if has_selection:
+            features.ai_assistant(df, display_df)
+        else:
+            st.caption("Select an issue from the list to view AI insights.")
 
 
+def _get_selected_original_row(
+    df: pd.DataFrame,
+    display_df: pd.DataFrame,
+) -> pd.Series | None:
+    """Return the full original row for the currently selected issue, or None."""
+    url = st.session_state.get("selected_issue_url", "")
+    if not url or "web_url" not in df.columns:
+        return None
+    matches = df[df["web_url"] == url]
+    if matches.empty:
+        return None
+    return matches.iloc[0]
 
 
-def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
+def _fmt(val: object) -> str:
+    """Return a clean string value or '—' for missing/empty."""
+    if val is None:
+        return "—"
+    s = str(val).strip()
+    return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
+
+
+def _cell(val: str) -> str:
+    """Escape a string for safe use inside a markdown table cell."""
+    return val.replace("|", "\\|").replace("\n", " ").replace("\r", "")
+
+
+def _label_chips_html(label_list: list[str], label_styles: dict) -> str:
+    """Build GitLab-style label chip HTML for each label on its own line."""
+    chips = []
+    for lb in label_list:
+        style = label_styles.get(lb, {})
+        bg = style.get("color", "#e0e0e0")
+        fg = style.get("text_color", "#333333")
+        chips.append(
+            f'<span style="'
+            f"background-color:{bg};"
+            f"color:{fg};"
+            f"border-radius:1em;"
+            f"padding:2px 10px;"
+            f"font-size:0.78em;"
+            f"font-weight:500;"
+            f"display:inline-block;"
+            f'margin:2px 0;">{lb}</span>'
+        )
+    return "<br>".join(chips)
+
+
+def _render_selected_issue_panel(row: pd.Series) -> None:
+    """Render a compact textual detail view for the selected issue."""
+    web_url = _fmt(row.get("web_url"))
+    iid = _fmt(row.get("iid"))
+    title = _fmt(row.get("title"))
+
+    if web_url != "—":
+        st.markdown(f"**[#{iid} — {_cell(title)}]({web_url})**")
+    else:
+        st.markdown(f"**#{iid} — {_cell(title)}**")
+
+    st.divider()
+
+    days = row.get("days_in_stage")
+    days_str = f"{int(days)}d" if pd.notna(days) else "—"
+    age = row.get("age_days")
+    age_str = f"{int(age)}d" if pd.notna(age) else "—"
+    cycle = row.get("cycle_time")
+    cycle_str = f"{int(cycle)}d" if pd.notna(cycle) else "—"
+
+    fields: list[tuple[str, str]] = [
+        ("Team", _fmt(row.get("team"))),
+        ("Milestone", _fmt(row.get("milestone"))),
+        ("Priority", _fmt(row.get("severity"))),
+        ("Type", _fmt(row.get("issue_type"))),
+        ("State", _fmt(row.get("state"))),
+        ("Assignee", _fmt(row.get("assignee"))),
+        ("Stage", _fmt(row.get("stage"))),
+        ("Days in Stage", days_str),
+        ("Age", age_str),
+        ("Cycle Time", cycle_str),
+        ("Context", _fmt(row.get("context"))),
+    ]
+
+    rows = "\n".join(
+        f"| **{label}** | {_cell(value)} |"
+        for label, value in fields
+        if value != "—"
+    )
+    st.markdown(f"| | |\n|---|---|\n{rows}")
+
+    # Labels — rendered as GitLab-style chips (HTML), one per line
+    raw_labels = row.get("labels")
+    label_list: list[str] = []
+    if hasattr(raw_labels, "__iter__") and not isinstance(raw_labels, str):
+        label_list = [
+            str(lb).strip()
+            for lb in raw_labels
+            if str(lb).strip().lower() not in ("nan", "none", "")
+        ]
+    elif raw_labels is not None:
+        raw = str(raw_labels).strip()
+        if raw not in ("nan", "None", "[]", ""):
+            label_list = [raw]
+
+    if label_list:
+        from app.dashboard.data_loader import load_labels as _load_labels
+        label_styles = _load_labels()
+        st.markdown(
+            _label_chips_html(label_list, label_styles),
+            unsafe_allow_html=True,
+        )
+
+    # Description (collapsible)
+    desc = _fmt(row.get("description"))
+    if desc != "—":
+        with st.expander("📄 Description", expanded=False):
+            st.markdown(desc[:3000])
+
+
+def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.DataFrame:
     """Render unified issue detail grid with drill-down filters.
 
     Args:
         df: DataFrame of issues to display
         compact: When True, show only title and assignee columns (used in
             side-by-side layout where the chart provides stage/priority context).
+
+    Returns:
+        The prepared display DataFrame (used by the caller for AI panel and
+        detail card lookup).
     """
 
     # --- Column Filters (Expandable) ---
@@ -216,14 +359,11 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
     from pathlib import Path
     ai_storage_path = Path("data/ai")
 
-    def check_summary_status(issue_id):
-        """Check if an AI summary exists for the issue."""
+    def check_summary_status(issue_id: object) -> str:
         if pd.isna(issue_id):
             return "✨"
         summary_file = ai_storage_path / f"chat_{int(issue_id)}.parquet"
-        if summary_file.exists():
-            return "📝"
-        return "✨"
+        return "📝" if summary_file.exists() else "✨"
 
     display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
 
@@ -270,7 +410,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
         from app.dashboard.data_loader import load_labels
         label_styles = load_labels()
 
-        def highlight_context(val):
+        def highlight_context(val: object) -> str | None:
             if not isinstance(val, str):
                 return None
             style = label_styles.get(val)
@@ -290,7 +430,9 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
         if "context" in display_df.columns:
             column_order.insert(2, "context")
 
-    # --- AI PANEL LOGIC ---
+    # Persist selected issue for downstream panels (AI + detail card).
+    # Call st.rerun() whenever the persisted URL changes so that the layout
+    # decision in render_overview is always made with up-to-date state.
     selection_state = st.session_state.get("issue_drilldown_table", {})
     if hasattr(selection_state, "selection"):
         selection_state = selection_state.selection
@@ -298,59 +440,36 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
     if not selected_indices and isinstance(selection_state, dict):
         selected_indices = selection_state.get("rows", [])
 
-    has_selection = len(selected_indices) > 0
+    _prev_url = st.session_state.get("selected_issue_url", "")
 
-    # Persist selected issue for AI panel (survives sorting/rerun)
-    if has_selection:
+    if selected_indices:
         _page = st.session_state.get("issue_drilldown_table_page", 0)
         _page_size = st.session_state.get("issue_drilldown_table_page_size", 25)
         _offset = 0 if isinstance(_page_size, str) else _page * int(_page_size)
         selected_idx = selected_indices[0] + _offset
         if selected_idx < len(display_df):
             selected_row = display_df.iloc[selected_idx]
-            st.session_state.selected_issue_url = selected_row.get("web_url", "")
-            st.session_state.selected_issue_title = selected_row.get("title", "")
+            _new_url = selected_row.get("web_url", "")
+            if _new_url != _prev_url:
+                st.session_state.selected_issue_url = _new_url
+                st.session_state.selected_issue_title = selected_row.get("title", "")
+                st.rerun()
+    elif "issue_drilldown_table" in st.session_state and _prev_url != "":
+        st.session_state.selected_issue_url = ""
+        st.session_state.selected_issue_title = ""
+        st.rerun()
 
-    if "show_ai_panel" not in st.session_state:
-        st.session_state.show_ai_panel = False
+    st.caption("Select an issue to view details and AI insights.")
+    tables.issue_detail_grid(
+        styler if styler is not None else display_df,
+        config={
+            "column_config": column_config,
+            "column_order": column_order,
+            "selection_mode": "single-row",
+            "key": "issue_drilldown_table",
+            "minimize_columns": False,
+            "enable_filters": False,
+        }
+    )
 
-    if has_selection and not st.session_state.show_ai_panel:
-        st.session_state.show_ai_panel = True
-
-    has_persisted_selection = st.session_state.get("selected_issue_url", "") != ""
-
-    # Header row with toggle
-    col_header, col_toggle = st.columns([4, 1])
-    with col_toggle:
-        if st.session_state.show_ai_panel and st.button("✕ Close AI", use_container_width=True, help="Hide AI Assistant panel"):
-            st.session_state.show_ai_panel = False
-            st.session_state.selected_issue_url = ""
-            st.session_state.selected_issue_title = ""
-            st.rerun()
-
-    is_split_view = st.session_state.show_ai_panel and has_persisted_selection
-
-    def render_table(cols):
-        st.caption("Select an issue to view AI insights.")
-        tables.issue_detail_grid(
-            styler if styler is not None else display_df,
-            config={
-                "column_config": column_config,
-                "column_order": cols,
-                "selection_mode": "single-row",
-                "key": "issue_drilldown_table",
-                "minimize_columns": False,
-                "enable_filters": False
-            }
-        )
-
-    if is_split_view:
-        # In compact mode the AI panel uses the same minimal columns
-        ai_column_order = ["ai_status", "title"] if compact else ["ai_status", "title", "stage", "severity", "days_in_stage"]
-        col_left, col_right = st.columns([1.5, 1], gap="medium")
-        with col_left:
-            render_table(ai_column_order)
-        with col_right:
-            features.ai_assistant(df, display_df)
-    else:
-        render_table(column_order)
+    return display_df
