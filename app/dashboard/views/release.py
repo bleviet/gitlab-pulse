@@ -49,11 +49,14 @@ def render_release_view(df: pd.DataFrame) -> None:
                 except (IndexError, KeyError):
                     pass
             elif isinstance(points, list) and prev_ms and not skip_reset:
-                # Double-click reset — revert to first milestone (release page default)
-                st.session_state["release_last_timeline_ms"] = ""
-                st.session_state.pop("release_milestone_selector", None)
-                st.session_state["release_timeline_skip_reset"] = True
-                st.rerun()
+                # Only reset if the active milestone still matches what the timeline
+                # last set. An independent sidebar change also produces empty points
+                # (figure redraws) — guard against that false positive.
+                if _active_ms_highlight == prev_ms:
+                    st.session_state["release_last_timeline_ms"] = ""
+                    st.session_state.pop("release_milestone_selector", None)
+                    st.session_state["release_timeline_skip_reset"] = True
+                    st.rerun()
 
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():

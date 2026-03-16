@@ -64,8 +64,10 @@ def render_overview(
                         st.rerun()
                 except (IndexError, KeyError):
                     pass
-            elif isinstance(points, list) and prev_ms and not skip_reset:
-                # Empty list after a prior selection = double-click reset
+            elif isinstance(points, list) and prev_ms and not skip_reset and _active_ms == prev_ms:
+                # Empty selection after a prior timeline selection = double-click reset.
+                # Guard: only reset if sidebar still reflects what the timeline set;
+                # an independent sidebar change also causes empty points (figure redraws).
                 st.session_state["overview_last_timeline_ms"] = ""
                 st.session_state["overview_milestone_reset"] = True
                 st.session_state["overview_timeline_skip_reset"] = True
