@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.widgets import charts, features, kpis, tables
+from app.dashboard.widgets import charts, features, tables
 
 
 def render_overview(
@@ -27,8 +27,10 @@ def render_overview(
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
 
-    # Top Row: Metrics (Use unique issues) - via widget
-    kpis.flow_metrics(unique_df)
+    # Top Row: Milestone Timeline (collapsed by default, only shown when milestones exist)
+    if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
+        with st.expander("📅 Milestone Timeline", expanded=True):
+            charts.milestone_timeline(unique_df, config={"key": "overview_timeline"})
 
     # Side-by-side layout: issue list on the left, chart on the right
     col_list, col_chart = st.columns([1, 1], gap="medium")
