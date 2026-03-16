@@ -266,7 +266,7 @@ def milestone_timeline(
             show_xgrid=True,
             show_ygrid=False,
             legend_pos="top",
-            margin=dict(l=20, r=20, t=40, b=20),
+            margin=dict(l=20, r=20, t=20, b=20),
         )
     )
     
@@ -279,7 +279,7 @@ def milestone_timeline(
     )
     fig.update_yaxes(
         showticklabels=False,
-        range=[-0.5, 2.5],  # Fixed range for 3 rows
+        range=[-0.8, 2.2],  # Shifted down so top-row labels aren't clipped
     )
 
     selection = st.plotly_chart(

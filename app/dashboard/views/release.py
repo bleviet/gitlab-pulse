@@ -23,22 +23,37 @@ def render_release_view(df: pd.DataFrame) -> None:
     """
 
 
-    # Milestone Timeline Section (Collapsible, collapsed by default)
+    # Milestone Timeline Section
     if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
+        _active_ms = st.session_state.get("release_milestone_selector")
+        _active_ms_highlight = _active_ms if _active_ms and _active_ms != "All" else None
         with st.expander("📅 Milestone Timeline", expanded=True):
-            timeline_selection = charts.milestone_timeline(df, config={"key": "release_timeline"})
-
-            # Handle selection from timeline
-            if timeline_selection and timeline_selection.get("selection", {}).get("points"):
-                points = timeline_selection["selection"]["points"]
-                if points:
-                    # We added title as customdata[2]
-                    try:
-                        selected_milestone = points[0]["customdata"][2]
+            timeline_selection = charts.milestone_timeline(
+                df,
+                config={
+                    "key": "release_timeline",
+                    "highlight_milestone": _active_ms_highlight,
+                },
+            )
+            points = (timeline_selection or {}).get("selection", {}).get("points")
+            prev_ms = st.session_state.get("release_last_timeline_ms", "")
+            skip_reset = st.session_state.pop("release_timeline_skip_reset", False)
+            if points:
+                try:
+                    selected_milestone = points[0]["customdata"][2]
+                    if selected_milestone != prev_ms:
+                        st.session_state["release_last_timeline_ms"] = selected_milestone
                         st.session_state["release_milestone_selector"] = selected_milestone
-                        # Rerun is handled by st.plotly_chart(on_select="rerun")
-                    except (IndexError, KeyError):
-                        pass
+                        st.session_state["release_timeline_skip_reset"] = True
+                        st.rerun()
+                except (IndexError, KeyError):
+                    pass
+            elif isinstance(points, list) and prev_ms and not skip_reset:
+                # Double-click reset — revert to first milestone (release page default)
+                st.session_state["release_last_timeline_ms"] = ""
+                st.session_state.pop("release_milestone_selector", None)
+                st.session_state["release_timeline_skip_reset"] = True
+                st.rerun()
 
     # 1. Milestone Selection
     if "milestone_id" not in df.columns or df["milestone_id"].isnull().all():
