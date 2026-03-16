@@ -151,6 +151,11 @@ def main() -> None:
                                  except (IndexError, KeyError):
                                      pass
 
+    # Drain pending milestone selection from overview timeline (must happen before
+    # render_sidebar instantiates the sidebar_milestone_selector widget)
+    if "overview_milestone_pending" in st.session_state:
+        st.session_state["sidebar_milestone_selector"] = st.session_state.pop("overview_milestone_pending")
+
     # Render sidebar and get filters
     filters = render_sidebar(valid_df)
 

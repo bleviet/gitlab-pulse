@@ -38,7 +38,7 @@ def render_overview(
                 if points:
                     try:
                         selected_ms = points[0]["customdata"][2]
-                        st.session_state["sidebar_milestone_selector"] = selected_ms
+                        st.session_state["overview_milestone_pending"] = selected_ms
                     except (IndexError, KeyError):
                         pass
 
