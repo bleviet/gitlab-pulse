@@ -27,10 +27,37 @@ def render_overview(
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
 
-    # Top Row: Milestone Timeline (collapsed by default, only shown when milestones exist)
+    # Top Row: Milestone Timeline — clicking a milestone filters the whole page
     if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
         with st.expander("📅 Milestone Timeline", expanded=True):
-            charts.milestone_timeline(unique_df, config={"key": "overview_timeline"})
+            timeline_selection = charts.milestone_timeline(
+                unique_df, config={"key": "overview_timeline"}
+            )
+            if timeline_selection and timeline_selection.get("selection", {}).get("points"):
+                points = timeline_selection["selection"]["points"]
+                if points:
+                    try:
+                        selected_ms = points[0]["customdata"][2]
+                        st.session_state["overview_milestone_filter"] = selected_ms
+                    except (IndexError, KeyError):
+                        pass
+
+    # Apply milestone filter from timeline click
+    active_ms_filter: str | None = st.session_state.get("overview_milestone_filter")
+    if active_ms_filter and "milestone" in df.columns:
+        ms_match = df["milestone"] == active_ms_filter
+        if ms_match.any():
+            df = df[ms_match]
+            unique_df = unique_df[unique_df["milestone"] == active_ms_filter]
+            col_filter, col_clear = st.columns([6, 1])
+            col_filter.info(f"🔍 Filtered by milestone: **{active_ms_filter}**")
+            if col_clear.button("✕ Clear", key="clear_ms_filter"):
+                del st.session_state["overview_milestone_filter"]
+                st.rerun()
+        else:
+            # Milestone no longer in data; clear stale filter
+            del st.session_state["overview_milestone_filter"]
+            active_ms_filter = None
 
     # Side-by-side layout: issue list on the left, chart on the right
     col_list, col_chart = st.columns([1, 1], gap="medium")
