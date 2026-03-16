@@ -164,9 +164,12 @@ def main() -> None:
 
     # Apply filters
     filtered_df = valid_df.copy()
+    pre_milestone_df = filtered_df.copy()
     if not filtered_df.empty:
         filtered_df = filter_by_team(filtered_df, filters["team"])
         filtered_df = filter_by_context(filtered_df, filters["context"])
+        # Save df before milestone filter — overview timeline needs all milestones
+        pre_milestone_df = filtered_df.copy()
         filtered_df = filter_by_milestone(filtered_df, filters["milestone"])
         filtered_df = filter_by_date_range(
             filtered_df,
@@ -224,7 +227,12 @@ def main() -> None:
             for stage in default_rule.workflow.stages
             if hasattr(stage, "description")
         }
-        render_overview(filtered_df, stage_descriptions=stage_descriptions)
+        render_overview(
+            filtered_df,
+            stage_descriptions=stage_descriptions,
+            timeline_df=pre_milestone_df,
+            highlight_milestone=filters["milestone"],
+        )
     elif view_id == "stats":
         # Stats is the old overview (KPIs, Burnup)
         render_stats_view(filtered_df)

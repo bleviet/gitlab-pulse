@@ -13,26 +13,40 @@ from app.dashboard.widgets import charts, features, tables
 
 def render_overview(
     df: pd.DataFrame,
-    stage_descriptions: dict[str, str] | None = None
+    stage_descriptions: dict[str, str] | None = None,
+    timeline_df: pd.DataFrame | None = None,
+    highlight_milestone: str | None = None,
 ) -> None:
     """Render the Overview (Flow) page.
 
     Args:
-        df: Filtered DataFrame with valid issues
+        df: Filtered DataFrame with valid issues (milestone filter applied)
         stage_descriptions: Optional mapping of stage names to description strings
+        timeline_df: Unfiltered DataFrame for the milestone timeline (all milestones visible)
+        highlight_milestone: Active milestone name to highlight in the timeline
     """
     if df.empty:
         st.warning("No data available.")
         return
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
+    # Use pre-milestone-filtered df for the timeline so all milestones stay visible
+    _timeline_source = (timeline_df if timeline_df is not None else df).drop_duplicates(
+        subset=["id"]
+    ) if "id" in (timeline_df if timeline_df is not None else df).columns else (timeline_df or df)
+    _active_ms = highlight_milestone if highlight_milestone and highlight_milestone != "All" else None
 
     # Top Row: Milestone Timeline — clicking a milestone updates the sidebar filter;
     # double-clicking resets it to "All"
-    if "milestone_id" in df.columns and not df["milestone_id"].isnull().all():
+    if "milestone_id" in _timeline_source.columns and not _timeline_source["milestone_id"].isnull().all():
         with st.expander("📅 Milestone Timeline", expanded=True):
             timeline_selection = charts.milestone_timeline(
-                unique_df, config={"key": "overview_timeline", "height": 150}
+                _timeline_source,
+                config={
+                    "key": "overview_timeline",
+                    "height": 150,
+                    "highlight_milestone": _active_ms,
+                },
             )
             points = (timeline_selection or {}).get("selection", {}).get("points")
             prev_ms = st.session_state.get("overview_last_timeline_ms", "")
