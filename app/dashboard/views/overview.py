@@ -50,19 +50,25 @@ def render_overview(
             )
             points = (timeline_selection or {}).get("selection", {}).get("points")
             prev_ms = st.session_state.get("overview_last_timeline_ms", "")
+            # Pop the skip flag — set before any programmatic rerun so the following
+            # render (where the chart may return empty selection after re-drawing)
+            # does not falsely trigger the double-click reset.
+            skip_reset = st.session_state.pop("overview_timeline_skip_reset", False)
             if points:
                 try:
                     selected_ms = points[0]["customdata"][2]
                     if selected_ms != prev_ms:
                         st.session_state["overview_last_timeline_ms"] = selected_ms
                         st.session_state["overview_milestone_pending"] = selected_ms
+                        st.session_state["overview_timeline_skip_reset"] = True
                         st.rerun()
                 except (IndexError, KeyError):
                     pass
-            elif isinstance(points, list) and prev_ms:
+            elif isinstance(points, list) and prev_ms and not skip_reset:
                 # Empty list after a prior selection = double-click reset
                 st.session_state["overview_last_timeline_ms"] = ""
                 st.session_state["overview_milestone_reset"] = True
+                st.session_state["overview_timeline_skip_reset"] = True
                 st.rerun()
 
     # Side-by-side layout: issue list on the left, chart on the right
