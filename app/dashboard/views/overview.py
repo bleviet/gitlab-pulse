@@ -42,12 +42,14 @@ def render_overview(
                     if selected_ms != prev_ms:
                         st.session_state["overview_last_timeline_ms"] = selected_ms
                         st.session_state["overview_milestone_pending"] = selected_ms
+                        st.rerun()
                 except (IndexError, KeyError):
                     pass
             elif isinstance(points, list) and prev_ms:
                 # Empty list after a prior selection = double-click reset
                 st.session_state["overview_last_timeline_ms"] = ""
                 st.session_state["overview_milestone_reset"] = True
+                st.rerun()
 
     # Side-by-side layout: issue list on the left, chart on the right
     col_list, col_chart = st.columns([1, 1], gap="medium")
