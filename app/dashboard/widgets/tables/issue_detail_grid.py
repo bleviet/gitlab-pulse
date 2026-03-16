@@ -94,6 +94,31 @@ def issue_detail_grid(
     # Check if data is Styler
     is_styler = isinstance(data, Styler)
 
+    # Column Renames (defined early so they are available inside the filter expander)
+    column_renames = {
+        "web_url": "IID",
+        "title": "Title",
+        "issue_type": "Type",
+        "stage": "Stage",
+        "assignee": "Assignee",
+        "priority": "Priority",
+        "milestone": "Milestone",
+        "age_days": "Age (Days)",
+        "days_in_stage": "Days in Stage",
+        "severity": "Severity",
+        "weight": "Weight",
+        "context": "Context",
+        "error_code": "Error",
+        "error_message": "Message",
+        "updated_at": "Last Update",
+    }
+
+    def map_col(c: str) -> str:
+        return column_renames.get(c, c)
+
+    # Track extra columns selected by the user via the Filters expander
+    extra_cols_selected: list[str] = []
+
     if is_styler:
         # If Styler, we assume pre-processing (filtering/sorting) is done by caller
         display_data = data
@@ -153,29 +178,30 @@ def issue_detail_grid(
                         if selected_types:
                             df = df[df["issue_type"].isin(selected_types)]
 
+                # Additional Columns selector
+                default_cols_raw = config.get(
+                    "columns",
+                    ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"],
+                )
+                optional_raw = [
+                    c for c in column_renames
+                    if c in df.columns and c not in default_cols_raw
+                ]
+                if optional_raw:
+                    optional_display = [map_col(c) for c in optional_raw]
+                    extra_key = f"{widget_key}_extra_cols"
+                    extra_cols_selected = st.multiselect(
+                        "Additional Columns",
+                        options=optional_display,
+                        default=[],
+                        key=extra_key,
+                        help="Add extra columns to the table view",
+                    )
+
         # Column handling
         # User request: "The table should have the possiblity display all the issue details..."
         # We generally avoid hard-dropping columns.
     display_df = df.copy()
-
-    # Column Renames (Defined here for scope availability)
-    column_renames = {
-        "web_url": "IID",
-        "title": "Title",
-        "issue_type": "Type",
-        "stage": "Stage",
-        "assignee": "Assignee",
-        "priority": "Priority",
-        "milestone": "Milestone",
-        "age_days": "Age (Days)",
-        "days_in_stage": "Days in Stage",
-        "severity": "Severity",
-        "weight": "Weight",
-        "context": "Context",
-        "error_code": "Error",
-        "error_message": "Message",
-        "updated_at": "Last Update"
-    }
 
     if is_styler:
         # If Styler, underlying data is in data.data
@@ -200,13 +226,14 @@ def issue_detail_grid(
     # Default configured columns (mapped to new names)
     default_columns_raw = ["web_url", "title", "issue_type", "stage", "assignee", "priority", "milestone"]
 
-    # Map raw config columns to display names
-    def map_col(c: str) -> str:
-        return column_renames.get(c, c)
-
     # Get user config columns and map them
     user_cols_raw = config.get("columns", default_columns_raw)
     column_order = [map_col(c) for c in user_cols_raw if c in df.columns]
+
+    # Append any extra columns the user selected in the Filters expander
+    for ecol in extra_cols_selected:
+        if ecol not in column_order:
+            column_order.append(ecol)
 
     # If column_order is not passed explicitly in config['column_order'], use the mapped 'columns' list
     final_column_order = config.get("column_order", column_order)
