@@ -131,6 +131,7 @@ def milestone_timeline(
         # Highlight logic from config (e.g. linked to sidebar)
         highlight_title = config.get("highlight_milestone")
         is_highlighted = title == highlight_title
+        has_highlight = bool(highlight_title)
 
         palette = get_palette()
         if state == "closed":
@@ -152,6 +153,7 @@ def milestone_timeline(
         size = 16
         line_width = 1
         line_color = bg_color  # matches background for a "floating" marker effect
+        opacity = 0.25 if (has_highlight and not is_highlighted) else 1.0
 
         if is_highlighted:
             size = 22
@@ -171,6 +173,7 @@ def milestone_timeline(
             "size": size,
             "line_width": line_width,
             "line_color": line_color,
+            "opacity": opacity,
         })
 
     if not scatter_data:
@@ -213,22 +216,29 @@ def milestone_timeline(
 
     for status, color in status_colors.items():
         status_df = chart_df[chart_df["status"] == status]
-        if not status_df.empty:
+        if status_df.empty:
+            continue
+        # Split into normal (opacity=1) and dimmed (opacity<1) so Plotly can
+        # apply per-group opacity (scatter opacity is trace-level, not per-point)
+        for opacity_val, group_df in status_df.groupby("opacity", sort=False):
+            is_dim = opacity_val < 1.0
             fig.add_trace(go.Scatter(
-                x=status_df["date"],
-                y=status_df["y_pos"],
+                x=group_df["date"],
+                y=group_df["y_pos"],
                 mode="markers+text",
                 name=status,
+                showlegend=not is_dim,  # only one legend entry per status
+                opacity=float(opacity_val),
                 marker=dict(
-                    size=status_df["size"],
+                    size=group_df["size"],
                     color=color,
                     symbol="diamond",
                     line=dict(
-                        width=status_df["line_width"],
-                        color=status_df["line_color"]
+                        width=group_df["line_width"],
+                        color=group_df["line_color"],
                     ),
                 ),
-                text=status_df["title"],
+                text=group_df["title"],
                 textposition="top center",
                 textfont=dict(size=10),
                 hovertemplate=(
@@ -238,8 +248,7 @@ def milestone_timeline(
                     "Status: " + status +
                     "<extra></extra>"
                 ),
-                # Add title to customdata[2] for selection
-                customdata=list(zip(status_df["date_str"], status_df["issues"], status_df["title"], strict=False)),
+                customdata=list(zip(group_df["date_str"], group_df["issues"], group_df["title"], strict=False)),
             ))
 
     # Add vertical line for today using shape (avoids annotation arithmetic issues)
