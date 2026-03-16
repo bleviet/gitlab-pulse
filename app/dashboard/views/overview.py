@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.widgets import kpis, charts, tables, features
+from app.dashboard.widgets import charts, features, kpis, tables
 
 
 def render_overview(
@@ -21,65 +21,53 @@ def render_overview(
         df: Filtered DataFrame with valid issues
         stage_descriptions: Optional mapping of stage names to description strings
     """
-    # Filter out empty stages or irrelevant data if needed
-    # But for flow, we usually want to see everything
     if df.empty:
         st.warning("No data available.")
         return
 
-    # Deduplicate for global metrics and charts to avoid double counting
-    # Multi-context issues appear as multiple rows in 'df' (one per context)
-    # We want to count the issue only once for WIP, Efficiency, and Charts
-    if "id" in df.columns:
-        unique_df = df.drop_duplicates(subset=["id"])
-    else:
-        unique_df = df
+    unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
 
     # Top Row: Metrics (Use unique issues) - via widget
     kpis.flow_metrics(unique_df)
 
-    # Charts (Collapsible)
-    with st.expander("Visual Analysis", expanded=True):
-        # Use unique issues for stage distribution to show correct counts
-        # Use shared widget with overview-specific key
+    # Side-by-side layout: issue list on the left, chart on the right
+    col_list, col_chart = st.columns([1, 1], gap="medium")
+
+    with col_chart, st.expander("Visual Analysis", expanded=True):
+        # Stage distribution rotated 90° CCW (vertical bars: stages on x-axis)
         stage_selection = charts.stage_distribution(
             unique_df,
             config={
                 "stage_descriptions": stage_descriptions,
-                "key": "flow_chart_stage_dist"
+                "key": "flow_chart_stage_dist",
+                "orientation": "v",
             }
         )
 
-    # Apply interactive filters (Apply to original DF which allows exploring contexts)
+    # Apply interactive filters (apply to original DF to allow exploring contexts)
     filtered_df = df.copy()
 
-    # Filter by Stage Distribution Selection
     if stage_selection and stage_selection.get("selection", {}).get("points"):
         selected_points = stage_selection["selection"]["points"]
-        # Extract filters: stage and severity
-        # We perform an OR filter for multiple selected points
         masks = []
         for point in selected_points:
-            # Point has customdata or y (stage) and legend group/color (severity)
-            # px.bar with orientation h: y is stage, color is severity
-            # customdata is likely needed to be robust
-            stage = point.get("y")
-            severity = point.get("customdata", [None])[0] # customdata[0] is severity if we add it
+            # Vertical chart: x=stage (string), y=count (number)
+            # Detect stage value robustly: it is the string dimension
+            x_val = point.get("x")
+            y_val = point.get("y")
+            stage = x_val if isinstance(x_val, str) else y_val
+
+            severity = point.get("customdata", [None])[0]
 
             mask = (filtered_df["stage"] == stage)
             if severity:
-                 # Normalize severity for comparison to match the chart's logic
-                 # The chart uses Title Case for all severities, and "Unset" for NaNs
-
-                 if severity == "Unset":
-                     # Match "Unset", NaNs, None, empty strings
-                     mask &= (
-                         filtered_df["severity"].isna() |
-                         (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
-                     )
-                 else:
-                     # Match severity (case-insensitive to be safe)
-                     mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
+                if severity == "Unset":
+                    mask &= (
+                        filtered_df["severity"].isna() |
+                        (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
+                    )
+                else:
+                    mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
 
             masks.append(mask)
 
@@ -89,15 +77,20 @@ def render_overview(
                 final_mask |= m
             filtered_df = filtered_df[final_mask]
 
-    # Detail grid (Collapsible)
-    with st.expander("📋 Issue List", expanded=True):
-        _render_issue_detail_grid(filtered_df)
+    with col_list, st.expander("📋 Issue List", expanded=True):
+        _render_issue_detail_grid(filtered_df, compact=True)
 
 
 
 
-def _render_issue_detail_grid(df: pd.DataFrame) -> None:
-    """Render unified issue detail grid with drill-down filters."""
+def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> None:
+    """Render unified issue detail grid with drill-down filters.
+
+    Args:
+        df: DataFrame of issues to display
+        compact: When True, show only title and assignee columns (used in
+            side-by-side layout where the chart provides stage/priority context).
+    """
 
     # --- Column Filters (Expandable) ---
     with st.expander("🔍 Filters", expanded=False):
@@ -201,29 +194,25 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
     if selected_assignees:
         display_df = display_df[display_df["assignee"].isin(selected_assignees)]
 
-    # 3. Sort by Hierarchy (Parent -> Child) or Staleness
-    # User requested hierarchical view.
+    # Sort by Hierarchy (Parent -> Child) or Staleness
     if "parent_id" in display_df.columns:
-        # parent_id contains IID, so we must map to 'iid' column, not 'id'
         display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
     else:
         display_df = display_df.sort_values("days_in_stage", ascending=False)
 
-    # 4. Select Columns (keep 'id' for AI status lookup, 'iid' for numeric sorting)
+    # Select Columns (keep 'id' for AI status lookup, 'iid' for numeric sorting)
     cols_to_show = [
-        "id", "iid", "web_url", "title", "stage", "days_in_stage", "severity", "context", "milestone", "assignee"
+        "id", "iid", "web_url", "title", "stage", "days_in_stage",
+        "severity", "context", "milestone", "assignee",
     ]
-    # Filter columns that exist
     cols = [c for c in cols_to_show if c in display_df.columns]
 
-    # 5. Configure Columns and Render
     display_df = display_df[cols]
 
-    # Reset index to ensure uniqueness for styling (sort_hierarchy can cause duplicate indices with exploded contexts)
+    # Reset index to ensure uniqueness for styling
     display_df = display_df.reset_index(drop=True)
 
-    # 6. Add AI Summary Status Column
-    # Check which issues have existing AI summaries using the 'id' column directly
+    # Add AI Summary Status Column
     from pathlib import Path
     ai_storage_path = Path("data/ai")
 
@@ -233,13 +222,12 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             return "✨"
         summary_file = ai_storage_path / f"chat_{int(issue_id)}.parquet"
         if summary_file.exists():
-            return "📝"  # Has summary
-        return "✨"  # No summary (generate)
+            return "📝"
+        return "✨"
 
     display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
 
-    # Combine web_url + iid + title into a single clickable "title" column.
-    # Keep web_url as a hidden column so the AI panel can still read the URL.
+    # Combine web_url + iid + title into a single clickable "title" column
     if "web_url" in display_df.columns and "title" in display_df.columns:
         iid_part = display_df["iid"].astype(str) if "iid" in display_df.columns else "?"
         display_df["title"] = (
@@ -294,13 +282,15 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
         styler = display_df.style.map(highlight_context, subset=["context"])
 
-    column_order = ["ai_status", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
-    if "context" in display_df.columns:
-        column_order.insert(2, "context")
+    # Compact mode: title + assignee only (stage/priority context via chart clicks)
+    if compact:
+        column_order = ["ai_status", "title", "assignee"]
+    else:
+        column_order = ["ai_status", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+        if "context" in display_df.columns:
+            column_order.insert(2, "context")
 
     # --- AI PANEL LOGIC ---
-    # Check if a row is selected - if so, auto-show split view
-    
     selection_state = st.session_state.get("issue_drilldown_table", {})
     if hasattr(selection_state, "selection"):
         selection_state = selection_state.selection
@@ -312,9 +302,6 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
 
     # Persist selected issue for AI panel (survives sorting/rerun)
     if has_selection:
-        # Resolve page-relative index to full display_df index.
-        # st.dataframe() returns selection.rows relative to the *displayed page*, not the
-        # full dataframe, so we must add the current page offset to get the correct row.
         _page = st.session_state.get("issue_drilldown_table_page", 0)
         _page_size = st.session_state.get("issue_drilldown_table_page_size", 25)
         _offset = 0 if isinstance(_page_size, str) else _page * int(_page_size)
@@ -324,32 +311,25 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             st.session_state.selected_issue_url = selected_row.get("web_url", "")
             st.session_state.selected_issue_title = selected_row.get("title", "")
 
-    # Show/Hide AI Panel Toggle
     if "show_ai_panel" not in st.session_state:
         st.session_state.show_ai_panel = False
 
-    # Auto-show AI panel when a row is selected
     if has_selection and not st.session_state.show_ai_panel:
         st.session_state.show_ai_panel = True
 
-    # Determine if we have a persisted selection (even if current selection is lost due to sorting)
     has_persisted_selection = st.session_state.get("selected_issue_url", "") != ""
 
     # Header row with toggle
     col_header, col_toggle = st.columns([4, 1])
     with col_toggle:
-        if st.session_state.show_ai_panel:
-            if st.button("✕ Close AI", use_container_width=True, help="Hide AI Assistant panel"):
-                st.session_state.show_ai_panel = False
-                # Clear persisted selection when closing
-                st.session_state.selected_issue_url = ""
-                st.session_state.selected_issue_title = ""
-                st.rerun()
+        if st.session_state.show_ai_panel and st.button("✕ Close AI", use_container_width=True, help="Hide AI Assistant panel"):
+            st.session_state.show_ai_panel = False
+            st.session_state.selected_issue_url = ""
+            st.session_state.selected_issue_title = ""
+            st.rerun()
 
-    # Layout Logic - use persisted selection to maintain AI panel visibility
     is_split_view = st.session_state.show_ai_panel and has_persisted_selection
 
-    # Helper for table rendering
     def render_table(cols):
         st.caption("Select an issue to view AI insights.")
         tables.issue_detail_grid(
@@ -364,15 +344,13 @@ def _render_issue_detail_grid(df: pd.DataFrame) -> None:
             }
         )
 
-    # Compact column order for split view (essential columns only)
     if is_split_view:
-        compact_column_order = ["ai_status", "title", "stage", "severity", "days_in_stage"]
-        # Split view: Side-by-side columns
+        # In compact mode the AI panel uses the same minimal columns
+        ai_column_order = ["ai_status", "title"] if compact else ["ai_status", "title", "stage", "severity", "days_in_stage"]
         col_left, col_right = st.columns([1.5, 1], gap="medium")
         with col_left:
-            render_table(compact_column_order)
+            render_table(ai_column_order)
         with col_right:
             features.ai_assistant(df, display_df)
     else:
-        # Table only view - show all columns
         render_table(column_order)

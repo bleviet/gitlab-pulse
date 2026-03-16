@@ -57,7 +57,7 @@ def _contrast_text_color(color_value: str) -> str:
 def stage_distribution(
     df: pd.DataFrame, config: dict[str, Any] | None = None
 ) -> dict | None:
-    """Render horizontal bar chart of issues per stage (Work by Stage).
+    """Render bar chart of issues per stage (Work by Stage).
 
     Features:
     - Severity stacked bars with priority colors
@@ -65,6 +65,7 @@ def stage_distribution(
     - Stage descriptions in hover tooltips
     - Visible stages filter
     - Stage ordering by workflow
+    - Configurable orientation (horizontal or vertical)
 
     Args:
         df: DataFrame of issues
@@ -72,6 +73,8 @@ def stage_distribution(
             - stage_descriptions: dict mapping stage names to descriptions
             - height: chart height in pixels
             - key: unique widget key
+            - orientation: 'h' for horizontal (default) or 'v' for vertical
+              (rotated 90° counter-clockwise — stages on x-axis, count on y-axis)
 
     Returns:
         Selection state dictionary or None
@@ -80,6 +83,8 @@ def stage_distribution(
     height = config.get("height", 400)
     widget_key = config.get("key", "stage_distribution")
     stage_descriptions = config.get("stage_descriptions", {})
+    orientation = config.get("orientation", "h")
+    is_vertical = orientation == "v"
     # Use configured colors if available, else fallback to default
     palette = config.get("colors")
     if palette is None:
@@ -97,16 +102,6 @@ def stage_distribution(
         show_ygrid=False,
     )
     chart_text_color: str = chart_layout["font"]["color"]
-
-    total_issues = len(df)
-    help_text = (
-        "**Interaction Guide:**\n"
-        "- **Hover** to view stage details.\n"
-        "- **Click** a bar segment to filter tables below.\n"
-        "- **Shift+Click** to select multiple segments.\n"
-        "- **Double-Click** to reset selection."
-    )
-    st.subheader(f"Issues Total: {total_issues}", help=help_text)
 
     # Check if severity column exists for stacked view
     has_severity = "severity" in df.columns
@@ -131,14 +126,12 @@ def stage_distribution(
     options_hash_key = f"{widget_key}_options_hash"
     filter_key = f"{widget_key}_stages_filter"
 
-    # Check if options changed since last render
     if st.session_state.get(options_hash_key) != options_hash:
-        # Options changed - reset filter by removing cached widget state
         if filter_key in st.session_state:
             del st.session_state[filter_key]
         st.session_state[options_hash_key] = options_hash
 
-    # Visible stages filter
+    # Visible stages filter — placed above the total so it aligns with the issue list header
     with st.expander("🔍 Filters", expanded=False):
         selected_stages = st.multiselect(
             "Visible Stages",
@@ -151,6 +144,16 @@ def stage_distribution(
     if not selected_stages:
         st.warning("Please select at least one stage.")
         return None
+
+    total_issues = len(df[df["stage"].isin(selected_stages)])
+    help_text = (
+        "**Interaction Guide:**\n"
+        "- **Hover** to view stage details.\n"
+        "- **Click** a bar segment to filter tables below.\n"
+        "- **Shift+Click** to select multiple segments.\n"
+        "- **Double-Click** to reset selection."
+    )
+    st.subheader(f"Issues Total: {total_issues}", help=help_text)
 
     # Filter data to selected stages
     df = df[df["stage"].isin(selected_stages)].copy()
@@ -242,17 +245,17 @@ def stage_distribution(
                     sev, priority_colors["Unset"]
                 )
 
-        for sev, label in severity_label_map.items():
+        for _sev, label in severity_label_map.items():
             if label not in final_color_map:
                 ordered_severity_labels.append(label)
                 final_color_map[label] = priority_colors["Unset"]
 
         fig = px.bar(
             stage_stats,
-            x="count",
-            y="stage",
+            x="stage" if is_vertical else "count",
+            y="count" if is_vertical else "stage",
             color="severity_label",
-            orientation="h",
+            orientation=orientation,
             text="count",
             title="",
             color_discrete_map=final_color_map,
@@ -263,11 +266,16 @@ def stage_distribution(
             custom_data=["severity", "description"],
         )
 
+        _stage_ref = "%{x}" if is_vertical else "%{y}"
+        _count_ref = "%{y}" if is_vertical else "%{x}"
         trace_style = plotly_bar_trace_style()
         trace_style["textposition"] = "auto"
         fig.update_traces(
             **trace_style,
-            hovertemplate="<b>%{y}</b><br>%{customdata[1]}<br>Severity: %{customdata[0]}<br>Count: %{x}<extra></extra>",
+            hovertemplate=(
+                f"<b>{_stage_ref}</b><br>%{{customdata[1]}}<br>"
+                f"Severity: %{{customdata[0]}}<br>Count: {_count_ref}<extra></extra>"
+            ),
         )
 
         for trace in fig.data:
@@ -309,9 +317,9 @@ def stage_distribution(
 
         fig = px.bar(
             stage_stats,
-            x="count",
-            y="stage",
-            orientation="h",
+            x="stage" if is_vertical else "count",
+            y="count" if is_vertical else "stage",
+            orientation=orientation,
             text="count",
             title="",
             category_orders={"stage": sorted_stages},
@@ -326,13 +334,22 @@ def stage_distribution(
     # Add Total Labels at bar ends
     stage_totals = stage_totals[stage_totals["stage"].isin(sorted_stages)]
 
+    if is_vertical:
+        scatter_x = stage_totals["stage"]
+        scatter_y = stage_totals["total_count"]
+        scatter_textpos = "top center"
+    else:
+        scatter_x = stage_totals["total_count"]
+        scatter_y = stage_totals["stage"]
+        scatter_textpos = "middle right"
+
     fig.add_trace(
         go.Scatter(
-            x=stage_totals["total_count"],
-            y=stage_totals["stage"],
+            x=scatter_x,
+            y=scatter_y,
             mode="text",
             text=stage_totals["total_count"].apply(lambda x: f"({x})"),
-            textposition="middle right",
+            textposition=scatter_textpos,
             hoverinfo="skip",
             showlegend=False,
             textfont=dict(color=chart_text_color),
@@ -348,7 +365,11 @@ def stage_distribution(
         uniformtext_minsize=10,
         uniformtext_mode="hide",
     )
-    fig.update_xaxes(showgrid=False, range=[0, max_count * 1.15])
+    if is_vertical:
+        fig.update_xaxes(showgrid=False, tickangle=-30)
+        fig.update_yaxes(range=[0, max_count * 1.15])
+    else:
+        fig.update_xaxes(showgrid=False, range=[0, max_count * 1.15])
 
     selection = st.plotly_chart(
         fig,
