@@ -134,31 +134,15 @@ def render_overview(
                 final_mask |= m
             filtered_df = filtered_df[final_mask]
 
-    # Determine whether a selection is persisted before rendering the table
-    # so we can decide whether to split the issue list column.
-    has_persisted = st.session_state.get("selected_issue_url", "") != ""
-
     with col_list, st.expander("📋 Issue List", expanded=True):
-        if has_persisted:
-            tbl_col, det_col = st.columns([1.2, 0.8], gap="medium")
-            with tbl_col:
-                display_df = _render_issue_detail_grid(filtered_df, compact=True)
-            with det_col:
-                selected_row = _get_selected_original_row(df, display_df)
-                if selected_row is not None:
-                    _render_selected_issue_panel(selected_row)
-        else:
-            display_df = _render_issue_detail_grid(filtered_df, compact=True)
-            selected_row = None
+        display_df = _render_issue_detail_grid(filtered_df, compact=True)
 
-    has_selection = selected_row is not None if has_persisted else False
-
-    # AI Summary in the right column (below Visual Analysis)
-    with col_chart, st.expander("🤖 AI Summary", expanded=has_selection):
-        if has_selection:
-            features.ai_assistant(df, display_df)
-        else:
-            st.caption("Select an issue from the list to view AI insights.")
+    # Open dialog when a row is selected
+    selected_url = st.session_state.get("selected_issue_url", "")
+    if selected_url and st.session_state.get("show_issue_dialog", False):
+        selected_row = _get_selected_original_row(df, display_df)
+        if selected_row is not None:
+            _show_issue_dialog(selected_row, df, display_df)
 
 
 def _get_selected_original_row(
@@ -175,82 +159,91 @@ def _get_selected_original_row(
     return matches.iloc[0]
 
 
-def _fmt(val: object) -> str:
-    """Return a clean string value or '—' for missing/empty."""
-    if val is None:
-        return "—"
-    s = str(val).strip()
-    return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
+@st.dialog("Issue Details", width="large")
+def _show_issue_dialog(row: pd.Series, df: pd.DataFrame, display_df: pd.DataFrame) -> None:
+    """Render issue details and AI summary in a modal dialog.
 
+    Layout:
+        Header  — title link + inline colored tag chips
+        Body    — 70% description | 30% metadata (metrics + text fields)
+        Footer  — AI Summary container + Close button
 
-def _cell(val: str) -> str:
-    """Escape a string for safe use inside a markdown table cell."""
-    return val.replace("|", "\\|").replace("\n", " ").replace("\r", "")
-
-
-def _label_chips_html(label_list: list[str], label_styles: dict) -> str:
-    """Build GitLab-style label chip HTML for each label on its own line."""
-    chips = []
-    for lb in label_list:
-        style = label_styles.get(lb, {})
-        bg = style.get("color", "#e0e0e0")
-        fg = style.get("text_color", "#333333")
-        chips.append(
-            f'<span style="'
-            f"background-color:{bg};"
-            f"color:{fg};"
-            f"border-radius:1em;"
-            f"padding:2px 10px;"
-            f"font-size:0.78em;"
-            f"font-weight:500;"
-            f"display:inline-block;"
-            f'margin:2px 0;">{lb}</span>'
-        )
-    return "<br>".join(chips)
-
-
-def _render_selected_issue_panel(row: pd.Series) -> None:
-    """Render a compact textual detail view for the selected issue."""
+    Args:
+        row: Full original row for the selected issue.
+        df: Full DataFrame of issues (for AI assistant context).
+        display_df: Currently displayed DataFrame (for AI assistant index mapping).
+    """
+    # ── HEADER ──────────────────────────────────────────────────────────────
     web_url = _fmt(row.get("web_url"))
     iid = _fmt(row.get("iid"))
     title = _fmt(row.get("title"))
 
     if web_url != "—":
-        st.markdown(f"**[#{iid} — {_cell(title)}]({web_url})**")
+        st.markdown(f"### [#{iid} — {_cell(title)}]({web_url})")
     else:
-        st.markdown(f"**#{iid} — {_cell(title)}**")
+        st.markdown(f"### #{iid} — {_cell(title)}")
 
+    _render_tag_chips(row)
     st.divider()
 
-    days = row.get("days_in_stage")
-    days_str = f"{int(days)}d" if pd.notna(days) else "—"
-    age = row.get("age_days")
-    age_str = f"{int(age)}d" if pd.notna(age) else "—"
-    cycle = row.get("cycle_time")
-    cycle_str = f"{int(cycle)}d" if pd.notna(cycle) else "—"
+    # ── BODY (70 / 30) ──────────────────────────────────────────────────────
+    col_content, col_meta = st.columns([0.7, 0.3], gap="medium")
 
-    fields: list[tuple[str, str]] = [
-        ("Team", _fmt(row.get("team"))),
-        ("Milestone", _fmt(row.get("milestone"))),
-        ("Priority", _fmt(row.get("severity"))),
-        ("Type", _fmt(row.get("issue_type"))),
-        ("State", _fmt(row.get("state"))),
-        ("Assignee", _fmt(row.get("assignee"))),
-        ("Stage", _fmt(row.get("stage"))),
-        ("Days in Stage", days_str),
-        ("Age", age_str),
-        ("Cycle Time", cycle_str),
-        ("Context", _fmt(row.get("context"))),
-    ]
+    with col_content:
+        desc = _fmt(row.get("description"))
+        if desc != "—":
+            st.markdown(desc[:3000])
+        else:
+            st.caption("_No description provided._")
 
-    rows = "\n".join(
-        f"| **{label}** | {_cell(value)} |"
-        for label, value in fields
-        if value != "—"
+    with col_meta:
+        _render_dialog_meta(row)
+
+    # ── FOOTER ──────────────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("#### 🤖 AI Summary")
+    with st.container():
+        features.ai_assistant(df, display_df)
+    st.divider()
+    if st.button("Close", use_container_width=True):
+        st.session_state["show_issue_dialog"] = False
+        st.rerun()
+
+
+def _chip_html(text: str, bg: str, fg: str) -> str:
+    """Return an inline HTML badge/chip span."""
+    return (
+        f'<span style="background-color:{bg};color:{fg};border-radius:1em;'
+        f'padding:3px 10px;font-size:0.78em;font-weight:500;'
+        f'display:inline-block;white-space:nowrap;">{text}</span>'
     )
-    st.markdown(f"| | |\n|---|---|\n{rows}")
 
-    # Labels — rendered as GitLab-style chips (HTML), one per line
+
+def _render_tag_chips(row: pd.Series) -> None:
+    """Render priority, issue type, stage, and GitLab label chips inline."""
+    from app.dashboard.data_loader import load_labels as _load_labels
+    label_styles = _load_labels()
+
+    chips_html: list[str] = []
+
+    _severity_colors: dict[str, tuple[str, str]] = {
+        "critical": ("#c0392b", "#ffffff"),
+        "high":     ("#e67e22", "#ffffff"),
+        "medium":   ("#f39c12", "#ffffff"),
+        "low":      ("#27ae60", "#ffffff"),
+    }
+
+    for field, color_map in [
+        ("severity", _severity_colors),
+        ("issue_type", {}),
+        ("stage", {}),
+    ]:
+        val = _fmt(row.get(field))
+        if val == "—":
+            continue
+        bg, fg = color_map.get(val.lower(), ("#e0e0e0", "#333333"))
+        chips_html.append(_chip_html(val, bg, fg))
+
     raw_labels = row.get("labels")
     label_list: list[str] = []
     if hasattr(raw_labels, "__iter__") and not isinstance(raw_labels, str):
@@ -264,19 +257,57 @@ def _render_selected_issue_panel(row: pd.Series) -> None:
         if raw not in ("nan", "None", "[]", ""):
             label_list = [raw]
 
-    if label_list:
-        from app.dashboard.data_loader import load_labels as _load_labels
-        label_styles = _load_labels()
+    for lb in label_list:
+        style = label_styles.get(lb, {})
+        bg = style.get("color", "#e0e0e0")
+        fg = style.get("text_color", "#333333")
+        chips_html.append(_chip_html(lb, bg, fg))
+
+    if chips_html:
         st.markdown(
-            _label_chips_html(label_list, label_styles),
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">'
+            + "".join(chips_html)
+            + "</div>",
             unsafe_allow_html=True,
         )
 
-    # Description (collapsible)
-    desc = _fmt(row.get("description"))
-    if desc != "—":
-        with st.expander("📄 Description", expanded=False):
-            st.markdown(desc[:3000])
+
+def _render_dialog_meta(row: pd.Series) -> None:
+    """Render metadata fields in the right column of the dialog body."""
+    days = row.get("days_in_stage")
+    age = row.get("age_days")
+    cycle = row.get("cycle_time")
+
+    if pd.notna(days):
+        st.metric("Days in Stage", f"{int(days)}d")
+    if pd.notna(age):
+        st.metric("Age", f"{int(age)}d")
+    if pd.notna(cycle):
+        st.metric("Cycle Time", f"{int(cycle)}d")
+
+    text_fields: list[tuple[str, str]] = [
+        ("State", _fmt(row.get("state"))),
+        ("Assignee", _fmt(row.get("assignee"))),
+        ("Team", _fmt(row.get("team"))),
+        ("Milestone", _fmt(row.get("milestone"))),
+        ("Context", _fmt(row.get("context"))),
+    ]
+    for label, value in text_fields:
+        if value != "—":
+            st.markdown(f"**{label}**  \n{value}")
+
+
+def _fmt(val: object) -> str:
+    """Return a clean string value or '—' for missing/empty."""
+    if val is None:
+        return "—"
+    s = str(val).strip()
+    return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
+
+
+def _cell(val: str) -> str:
+    """Escape a string for safe use inside a markdown table cell."""
+    return val.replace("|", "\\|").replace("\n", " ").replace("\r", "")
 
 
 def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.DataFrame:
@@ -510,10 +541,12 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             if _new_url != _prev_url:
                 st.session_state.selected_issue_url = _new_url
                 st.session_state.selected_issue_title = selected_row.get("title", "")
+                st.session_state["show_issue_dialog"] = True
                 st.rerun()
     elif "issue_drilldown_table" in st.session_state and _prev_url != "":
         st.session_state.selected_issue_url = ""
         st.session_state.selected_issue_title = ""
+        st.session_state["show_issue_dialog"] = False
         st.rerun()
 
     st.caption("Select an issue to view details and AI insights.")
