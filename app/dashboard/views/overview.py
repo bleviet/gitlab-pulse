@@ -4,6 +4,9 @@ Visualizes flow efficiency, bottlenecks, and aging.
 Refactored to use Widget Registry where applicable.
 """
 
+import hashlib
+import json
+
 import pandas as pd
 import streamlit as st
 
@@ -54,6 +57,17 @@ def render_overview(
             # render (where the chart may return empty selection after re-drawing)
             # does not falsely trigger the double-click reset.
             skip_reset = st.session_state.pop("overview_timeline_skip_reset", False)
+            # Hash-based change detection: only treat empty points as an explicit
+            # double-click reset when the selection object itself has changed since
+            # the last render. Reruns triggered by unrelated widgets (e.g. table row
+            # selection) leave the chart value unchanged → hash stays the same →
+            # the reset branch is skipped.
+            _sel_hash = hashlib.md5(
+                json.dumps(timeline_selection or {}, sort_keys=True, default=str).encode()
+            ).hexdigest()
+            _prev_sel_hash = st.session_state.get("overview_timeline_sel_hash", "")
+            _selection_changed = _sel_hash != _prev_sel_hash
+            st.session_state["overview_timeline_sel_hash"] = _sel_hash
             if points:
                 try:
                     selected_ms = points[0]["customdata"][2]
@@ -64,7 +78,7 @@ def render_overview(
                         st.rerun()
                 except (IndexError, KeyError):
                     pass
-            elif isinstance(points, list) and prev_ms and not skip_reset and _active_ms == prev_ms:
+            elif isinstance(points, list) and prev_ms and not skip_reset and _active_ms == prev_ms and _selection_changed:
                 # Empty selection after a prior timeline selection = double-click reset.
                 # Guard: only reset if sidebar still reflects what the timeline set;
                 # an independent sidebar change also causes empty points (figure redraws).
