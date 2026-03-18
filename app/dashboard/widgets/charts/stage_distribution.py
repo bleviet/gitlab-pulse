@@ -84,6 +84,8 @@ def stage_distribution(
     widget_key = config.get("key", "stage_distribution")
     stage_descriptions = config.get("stage_descriptions", {})
     orientation = config.get("orientation", "h")
+    show_stage_filter = config.get("show_stage_filter", True)
+    show_issues_total = config.get("show_issues_total", True)
     is_vertical = orientation == "v"
     # Use configured colors if available, else fallback to default
     palette = config.get("colors")
@@ -131,15 +133,18 @@ def stage_distribution(
             del st.session_state[filter_key]
         st.session_state[options_hash_key] = options_hash
 
-    # Visible stages filter — placed above the total so it aligns with the issue list header
-    with st.expander("🔍 Filters", expanded=False):
-        selected_stages = st.multiselect(
-            "Visible Stages",
-            options=all_stages,
-            default=all_stages,
-            help="Deselect stages (like 'Done') to rescale the chart.",
-            key=filter_key,
-        )
+    if show_stage_filter:
+        # Visible stages filter — placed above the total so it aligns with the issue list header
+        with st.expander("🔍 Filters", expanded=False):
+            selected_stages = st.multiselect(
+                "Visible Stages",
+                options=all_stages,
+                default=all_stages,
+                help="Deselect stages (like 'Done') to rescale the chart.",
+                key=filter_key,
+            )
+    else:
+        selected_stages = all_stages
 
     if not selected_stages:
         st.warning("Please select at least one stage.")
@@ -153,7 +158,8 @@ def stage_distribution(
         "- **Shift+Click** to select multiple segments.\n"
         "- **Double-Click** to reset selection."
     )
-    st.subheader(f"Issues Total: {total_issues}", help=help_text)
+    if show_issues_total:
+        st.subheader(f"Issues Total: {total_issues}", help=help_text)
 
     # Filter data to selected stages
     df = df[df["stage"].isin(selected_stages)].copy()

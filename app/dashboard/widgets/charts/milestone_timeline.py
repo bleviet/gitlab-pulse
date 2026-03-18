@@ -26,12 +26,15 @@ def milestone_timeline(
         issues_df: DataFrame with all issues (needed for completion stats)
         config: Optional configuration
             - key: widget key
+            - height: chart height in pixels
 
     Returns:
         Selection state dictionary (if supported) or None
     """
     config = config or {}
     widget_key = config.get("key", "milestone_timeline")
+    raw_height = config.get("height", 160)
+    timeline_height = max(120, min(int(raw_height), 320))
 
     display_df = None
 
@@ -271,7 +274,7 @@ def milestone_timeline(
 
     fig.update_layout(
         **plotly_layout(
-            height=config.get("height", 200),
+            height=timeline_height,
             show_xgrid=True,
             show_ygrid=False,
             legend_pos="top",

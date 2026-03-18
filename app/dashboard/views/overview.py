@@ -113,7 +113,7 @@ def render_overview(
                 _timeline_source,
                 config={
                     "key": "overview_timeline",
-                    "height": 150,
+                    "height": 120,
                     "highlight_milestone": _active_ms,
                 },
             )
@@ -157,15 +157,60 @@ def render_overview(
     col_list, col_chart = st.columns([1, 1], gap="medium")
 
     with col_chart, st.expander("Visual Analysis", expanded=True):
+        if "stage_order" in unique_df.columns:
+            chart_stage_orders = unique_df.groupby("stage")["stage_order"].min().sort_values()
+            chart_stage_options = chart_stage_orders.index.tolist()
+        else:
+            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+            chart_stage_options = unique_df["stage"].unique().tolist()
+            chart_stage_options = sorted(
+                chart_stage_options,
+                key=lambda stage_name: (
+                    default_stage_order.index(stage_name)
+                    if stage_name in default_stage_order
+                    else len(default_stage_order)
+                ),
+            )
+
+        chart_filter_key = "overview_chart_visible_stages"
+        chart_options_hash_key = "overview_chart_visible_stages_options_hash"
+        chart_options_hash = hash(tuple(chart_stage_options))
+        if st.session_state.get(chart_options_hash_key) != chart_options_hash:
+            if chart_filter_key in st.session_state:
+                del st.session_state[chart_filter_key]
+            st.session_state[chart_options_hash_key] = chart_options_hash
+
+        header_text_col, header_filter_col = st.columns([0.72, 0.28], gap="small")
+        with header_filter_col, st.popover("⚙️ Chart Filters", use_container_width=True):
+            selected_chart_stages = st.multiselect(
+                "Visible Stages",
+                options=chart_stage_options,
+                default=chart_stage_options,
+                help="Deselect stages (like 'Done') to rescale the chart.",
+                key=chart_filter_key,
+            )
+
+        if not selected_chart_stages:
+            with header_text_col:
+                st.caption("Issues Total: 0")
+            st.warning("Please select at least one stage.")
+            stage_selection = None
+        else:
+            chart_df = unique_df[unique_df["stage"].isin(selected_chart_stages)]
+            with header_text_col:
+                st.caption(f"Issues Total: {len(chart_df)}")
+
         # Stage distribution rotated 90° CCW (vertical bars: stages on x-axis)
-        stage_selection = charts.stage_distribution(
-            unique_df,
-            config={
-                "stage_descriptions": stage_descriptions,
-                "key": "flow_chart_stage_dist",
-                "orientation": "v",
-            }
-        )
+            stage_selection = charts.stage_distribution(
+                chart_df,
+                config={
+                    "stage_descriptions": stage_descriptions,
+                    "key": "flow_chart_stage_dist",
+                    "orientation": "v",
+                    "show_stage_filter": False,
+                    "show_issues_total": False,
+                }
+            )
 
     # Apply interactive filters (apply to original DF to allow exploring contexts)
     filtered_df = df.copy()
@@ -421,16 +466,21 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         detail card lookup).
     """
 
-    # --- Column Filters (Expandable) ---
-    with st.expander("🔍 Filters", expanded=False):
-        # Row 1: Title search (full width)
+    popover_label = "⚙️ Filters"
+
+    filter_controls_col, filter_popover_col = st.columns([0.72, 0.28], gap="small")
+
+    with filter_controls_col:
         title_search = st.text_input(
             "Search Title",
             placeholder="Type to search issue titles...",
-            key="filter_title"
+            key="filter_title",
+            label_visibility="collapsed",
         )
 
-        # Row 2: Multiselect filters (3 columns)
+    # --- Column Filters (Popover) ---
+    with filter_popover_col, st.popover(popover_label, use_container_width=True):
+        # Row 1: Multiselect filters (3 columns)
         filter_cols_row1 = st.columns(3)
 
         # 1. Stage Filter
@@ -472,7 +522,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             else:
                 selected_contexts = []
 
-        # Row 3: Milestone and Assignee (2 columns)
+        # Row 2: Milestone and Assignee (2 columns)
         filter_cols_row2 = st.columns(2)
 
         # 4. Milestone Filter
