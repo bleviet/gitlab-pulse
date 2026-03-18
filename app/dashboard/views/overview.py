@@ -154,63 +154,67 @@ def render_overview(
                 st.rerun()
 
     # Side-by-side layout: issue list on the left, chart on the right
+    # Both expander panels share the same fixed inner height so they align.
+    _PANEL_HEIGHT = 490
+
     col_list, col_chart = st.columns([1, 1], gap="medium")
 
     with col_chart, st.expander("Visual Analysis", expanded=True):
-        if "stage_order" in unique_df.columns:
-            chart_stage_orders = unique_df.groupby("stage")["stage_order"].min().sort_values()
-            chart_stage_options = chart_stage_orders.index.tolist()
-        else:
-            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
-            chart_stage_options = unique_df["stage"].unique().tolist()
-            chart_stage_options = sorted(
-                chart_stage_options,
-                key=lambda stage_name: (
-                    default_stage_order.index(stage_name)
-                    if stage_name in default_stage_order
-                    else len(default_stage_order)
-                ),
-            )
+        with st.container(height=_PANEL_HEIGHT):
+            if "stage_order" in unique_df.columns:
+                chart_stage_orders = unique_df.groupby("stage")["stage_order"].min().sort_values()
+                chart_stage_options = chart_stage_orders.index.tolist()
+            else:
+                default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+                chart_stage_options = unique_df["stage"].unique().tolist()
+                chart_stage_options = sorted(
+                    chart_stage_options,
+                    key=lambda stage_name: (
+                        default_stage_order.index(stage_name)
+                        if stage_name in default_stage_order
+                        else len(default_stage_order)
+                    ),
+                )
 
-        chart_filter_key = "overview_chart_visible_stages"
-        chart_options_hash_key = "overview_chart_visible_stages_options_hash"
-        chart_options_hash = hash(tuple(chart_stage_options))
-        if st.session_state.get(chart_options_hash_key) != chart_options_hash:
-            if chart_filter_key in st.session_state:
-                del st.session_state[chart_filter_key]
-            st.session_state[chart_options_hash_key] = chart_options_hash
+            chart_filter_key = "overview_chart_visible_stages"
+            chart_options_hash_key = "overview_chart_visible_stages_options_hash"
+            chart_options_hash = hash(tuple(chart_stage_options))
+            if st.session_state.get(chart_options_hash_key) != chart_options_hash:
+                if chart_filter_key in st.session_state:
+                    del st.session_state[chart_filter_key]
+                st.session_state[chart_options_hash_key] = chart_options_hash
 
-        header_text_col, header_filter_col = st.columns([0.72, 0.28], gap="small")
-        with header_filter_col, st.popover("⚙️ Chart Filters", use_container_width=True):
-            selected_chart_stages = st.multiselect(
-                "Visible Stages",
-                options=chart_stage_options,
-                default=chart_stage_options,
-                help="Deselect stages (like 'Done') to rescale the chart.",
-                key=chart_filter_key,
-            )
+            header_text_col, header_filter_col = st.columns([0.72, 0.28], gap="small")
+            with header_filter_col, st.popover("⚙️ Chart Filters", use_container_width=True):
+                selected_chart_stages = st.multiselect(
+                    "Visible Stages",
+                    options=chart_stage_options,
+                    default=chart_stage_options,
+                    help="Deselect stages (like 'Done') to rescale the chart.",
+                    key=chart_filter_key,
+                )
 
-        if not selected_chart_stages:
-            with header_text_col:
-                st.caption("Issues Total: 0")
-            st.warning("Please select at least one stage.")
-            stage_selection = None
-        else:
-            chart_df = unique_df[unique_df["stage"].isin(selected_chart_stages)]
-            with header_text_col:
-                st.caption(f"Issues Total: {len(chart_df)}")
+            if not selected_chart_stages:
+                with header_text_col:
+                    st.caption("Issues Total: 0")
+                st.warning("Please select at least one stage.")
+                stage_selection = None
+            else:
+                chart_df = unique_df[unique_df["stage"].isin(selected_chart_stages)]
+                with header_text_col:
+                    st.caption(f"Issues Total: {len(chart_df)}")
 
-        # Stage distribution rotated 90° CCW (vertical bars: stages on x-axis)
-            stage_selection = charts.stage_distribution(
-                chart_df,
-                config={
-                    "stage_descriptions": stage_descriptions,
-                    "key": "flow_chart_stage_dist",
-                    "orientation": "v",
-                    "show_stage_filter": False,
-                    "show_issues_total": False,
-                }
-            )
+            # Stage distribution rotated 90° CCW (vertical bars: stages on x-axis)
+                stage_selection = charts.stage_distribution(
+                    chart_df,
+                    config={
+                        "stage_descriptions": stage_descriptions,
+                        "key": "flow_chart_stage_dist",
+                        "orientation": "v",
+                        "show_stage_filter": False,
+                        "show_issues_total": False,
+                    }
+                )
 
     # Apply interactive filters (apply to original DF to allow exploring contexts)
     filtered_df = df.copy()
@@ -246,7 +250,8 @@ def render_overview(
             filtered_df = filtered_df[final_mask]
 
     with col_list, st.expander("📋 Issue List", expanded=True):
-        _render_issue_detail_grid(filtered_df, compact=True)
+        with st.container(height=_PANEL_HEIGHT):
+            _render_issue_detail_grid(filtered_df, compact=True)
 
     # Open dialog when a row is selected
     selected_url = st.session_state.get("selected_issue_url", "")
