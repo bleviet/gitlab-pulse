@@ -6,12 +6,78 @@ Refactored to use Widget Registry where applicable.
 
 import hashlib
 import json
+import os
+from typing import TypedDict
 
+import gitlab
 import pandas as pd
 import streamlit as st
+from gitlab.exceptions import GitlabError
 
 from app.dashboard.utils import sort_hierarchy
-from app.dashboard.widgets import charts, features, tables
+from app.dashboard.widgets import charts, tables
+
+
+class _IssueNoteData(TypedDict):
+    """Serialized GitLab issue note for Streamlit caching and rendering."""
+
+    author_name: str
+    author_username: str
+    body: str
+    created_at: str
+    system: bool
+
+
+class _IssueDetailsData(TypedDict):
+    """Serialized GitLab issue details for the native modal view."""
+
+    description: str
+    notes: list[_IssueNoteData]
+    title: str
+    web_url: str
+
+
+@st.cache_resource
+def _get_gitlab_client() -> gitlab.Gitlab:
+    """Create and cache the GitLab API client used by the overview dialog."""
+    gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com").strip() or "https://gitlab.com"
+    private_token = os.environ.get("GITLAB_TOKEN", "").strip()
+
+    if not private_token:
+        raise ValueError("GITLAB_TOKEN environment variable is required to load issue details.")
+
+    return gitlab.Gitlab(gitlab_url, private_token=private_token, timeout=15)
+
+
+@st.cache_data(ttl=60)
+def _load_issue_details(project_id: int, issue_iid: int) -> _IssueDetailsData:
+    """Fetch the latest issue description and notes from the GitLab REST API."""
+    client = _get_gitlab_client()
+    project = client.projects.get(project_id)
+    issue = project.issues.get(issue_iid)
+
+    issue_attrs = issue.attributes
+    notes: list[_IssueNoteData] = []
+
+    for note in issue.notes.list(iterator=True, order_by="created_at", sort="asc"):
+        note_attrs = note.attributes
+        author = note_attrs.get("author") or {}
+        notes.append(
+            {
+                "author_name": str(author.get("name") or ""),
+                "author_username": str(author.get("username") or ""),
+                "body": str(note_attrs.get("body") or ""),
+                "created_at": str(note_attrs.get("created_at") or ""),
+                "system": bool(note_attrs.get("system", False)),
+            }
+        )
+
+    return {
+        "title": str(issue_attrs.get("title") or ""),
+        "description": str(issue_attrs.get("description") or ""),
+        "web_url": str(issue_attrs.get("web_url") or ""),
+        "notes": notes,
+    }
 
 
 def render_overview(
@@ -135,19 +201,18 @@ def render_overview(
             filtered_df = filtered_df[final_mask]
 
     with col_list, st.expander("📋 Issue List", expanded=True):
-        display_df = _render_issue_detail_grid(filtered_df, compact=True)
+        _render_issue_detail_grid(filtered_df, compact=True)
 
     # Open dialog when a row is selected
     selected_url = st.session_state.get("selected_issue_url", "")
     if selected_url and st.session_state.get("show_issue_dialog", False):
-        selected_row = _get_selected_original_row(df, display_df)
+        selected_row = _get_selected_original_row(df)
         if selected_row is not None:
-            _show_issue_dialog(selected_row, df, display_df)
+            _show_issue_dialog(selected_row)
 
 
 def _get_selected_original_row(
     df: pd.DataFrame,
-    display_df: pd.DataFrame,
 ) -> pd.Series | None:
     """Return the full original row for the currently selected issue, or None."""
     url = st.session_state.get("selected_issue_url", "")
@@ -160,28 +225,38 @@ def _get_selected_original_row(
 
 
 @st.dialog("Issue Details", width="large")
-def _show_issue_dialog(row: pd.Series, df: pd.DataFrame, display_df: pd.DataFrame) -> None:
-    """Render issue details and AI summary in a modal dialog.
+def _show_issue_dialog(row: pd.Series) -> None:
+    """Render a native, read-only issue details dialog backed by the GitLab API."""
+    project_id_val = row.get("project_id")
+    issue_iid_val = row.get("iid")
 
-    Layout:
-        Header  — title link + inline colored tag chips
-        Body    — 70% description | 30% metadata (metrics + text fields)
-        Footer  — AI Summary container + Close button
+    if pd.isna(project_id_val) or pd.isna(issue_iid_val):
+        st.error("This issue is missing the GitLab metadata required to load its details.")
+        return
 
-    Args:
-        row: Full original row for the selected issue.
-        df: Full DataFrame of issues (for AI assistant context).
-        display_df: Currently displayed DataFrame (for AI assistant index mapping).
-    """
-    # ── HEADER ──────────────────────────────────────────────────────────────
-    web_url = _fmt(row.get("web_url"))
+    project_id = int(project_id_val)
+    issue_iid = int(issue_iid_val)
+
+    try:
+        with st.spinner("Loading issue details from GitLab..."):
+            issue_details = _load_issue_details(project_id, issue_iid)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    except GitlabError as exc:
+        st.error(f"Failed to load issue details from GitLab: {exc}")
+        return
+
+    web_url = _fmt(issue_details["web_url"] or row.get("web_url"))
     iid = _fmt(row.get("iid"))
-    title = _fmt(row.get("title"))
+    title = _fmt(issue_details["title"] or row.get("title"))
 
-    if web_url != "—":
-        st.markdown(f"### [#{iid} — {_cell(title)}]({web_url})")
-    else:
+    header_col, link_col = st.columns([0.78, 0.22], gap="medium")
+    with header_col:
         st.markdown(f"### #{iid} — {_cell(title)}")
+    with link_col:
+        if web_url != "—":
+            st.link_button("Open in GitLab", web_url, type="primary")
 
     _render_tag_chips(row)
     st.divider()
@@ -190,9 +265,10 @@ def _show_issue_dialog(row: pd.Series, df: pd.DataFrame, display_df: pd.DataFram
     col_content, col_meta = st.columns([0.7, 0.3], gap="medium")
 
     with col_content:
-        desc = _fmt(row.get("description"))
-        if desc != "—":
-            st.markdown(desc[:3000])
+        st.markdown("#### Description")
+        description = issue_details["description"].strip()
+        if description:
+            st.markdown(description)
         else:
             st.caption("_No description provided._")
 
@@ -201,9 +277,21 @@ def _show_issue_dialog(row: pd.Series, df: pd.DataFrame, display_df: pd.DataFram
 
     # ── FOOTER ──────────────────────────────────────────────────────────────
     st.divider()
-    st.markdown("#### 🤖 AI Summary")
-    with st.container():
-        features.ai_assistant(df, display_df)
+    st.markdown("#### Activity")
+    if issue_details["notes"]:
+        for note in issue_details["notes"]:
+            author = note["author_name"] or note["author_username"] or "GitLab"
+            avatar = "📌" if note["system"] else "💬"
+            with st.chat_message("assistant", avatar=avatar):
+                st.markdown(f"**{author}**")
+                st.caption(_format_timestamp(note["created_at"], system_note=note["system"]))
+                if note["body"].strip():
+                    st.markdown(note["body"])
+                else:
+                    st.caption("_Empty comment._")
+    else:
+        st.caption("_No comments yet._")
+
     st.divider()
     if st.button("Close", use_container_width=True):
         st.session_state["show_issue_dialog"] = False
@@ -303,6 +391,16 @@ def _fmt(val: object) -> str:
         return "—"
     s = str(val).strip()
     return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
+
+
+def _format_timestamp(value: str, system_note: bool = False) -> str:
+    """Format a GitLab timestamp for dialog metadata."""
+    parsed = pd.to_datetime(value, utc=True, errors="coerce")
+    if pd.isna(parsed):
+        suffix = " · system note" if system_note else ""
+        return f"{value}{suffix}" if value else "Unknown time"
+    formatted = parsed.strftime("%Y-%m-%d %H:%M UTC")
+    return f"{formatted} · system note" if system_note else formatted
 
 
 def _cell(val: str) -> str:
@@ -531,10 +629,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     _prev_url = st.session_state.get("selected_issue_url", "")
 
     if selected_indices:
-        _page = st.session_state.get("issue_drilldown_table_page", 0)
-        _page_size = st.session_state.get("issue_drilldown_table_page_size", 25)
-        _offset = 0 if isinstance(_page_size, str) else _page * int(_page_size)
-        selected_idx = selected_indices[0] + _offset
+        selected_idx = selected_indices[0]
         if selected_idx < len(display_df):
             selected_row = display_df.iloc[selected_idx]
             _new_url = selected_row.get("web_url", "")

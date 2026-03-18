@@ -38,13 +38,7 @@ def ai_assistant(df: pd.DataFrame, display_df: pd.DataFrame) -> None:
     match_row = None
 
     if selected_indices:
-        # Resolve page-relative index to full display_df index.
-        # st.dataframe() returns selection.rows relative to the *displayed page*, not
-        # the full dataframe, so we must add the current page offset.
-        _page = st.session_state.get("issue_drilldown_table_page", 0)
-        _page_size = st.session_state.get("issue_drilldown_table_page_size", 25)
-        _offset = 0 if isinstance(_page_size, str) else _page * int(_page_size)
-        actual_idx = selected_indices[0] + _offset
+        actual_idx = selected_indices[0]
         if actual_idx < len(display_df):
             selected_display_row = display_df.iloc[actual_idx]
             matches = df[df["web_url"] == selected_display_row["web_url"]]
