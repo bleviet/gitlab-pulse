@@ -542,6 +542,19 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     border-radius: 8px;
 }}
 
+/* Reduce default Streamlit top whitespace so content starts near the app brand */
+[data-testid="stMainBlockContainer"] {{
+    padding-top: 2rem !important;
+}}
+
+/* Reduce sidebar top space — the gap is caused by the stSidebarHeader bar (3.75rem tall
+   by default) plus its marginBottom. Shrink both to push user content toward the top. */
+[data-testid="stSidebarHeader"] {{
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    margin-bottom: 0.25rem !important;
+}}
+
 /* Dataframe card container */
 [data-testid="stDataFrame"] {{
     border: 1px solid {border} !important;
