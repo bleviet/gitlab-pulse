@@ -485,76 +485,16 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
 
     # --- Column Filters (Popover) ---
     with filter_popover_col, st.popover(popover_label, use_container_width=True):
-        # Row 1: Multiselect filters (3 columns)
-        filter_cols_row1 = st.columns(3)
-
-        # 1. Stage Filter
-        with filter_cols_row1[0]:
-            available_stages = sorted(
-                df["stage"].unique(),
-                key=lambda s: df[df["stage"] == s]["stage_order"].min()
-            )
-            selected_stages = st.multiselect(
-                "Stage",
-                options=available_stages,
+        if "assignee" in df.columns:
+            available_assignees = sorted(df["assignee"].dropna().unique().tolist())
+            selected_assignees = st.multiselect(
+                "Assignee",
+                options=available_assignees,
                 default=[],
-                key="filter_stage"
+                key="filter_assignee"
             )
-
-        # 2. Priority Filter
-        with filter_cols_row1[1]:
-            if "severity" in df.columns:
-                available_priorities = sorted(df["severity"].dropna().unique().tolist())
-                selected_priorities = st.multiselect(
-                    "Priority",
-                    options=available_priorities,
-                    default=[],
-                    key="filter_priority"
-                )
-            else:
-                selected_priorities = []
-
-        # 3. Context Filter
-        with filter_cols_row1[2]:
-            if "context" in df.columns:
-                available_contexts = sorted(df["context"].dropna().unique().tolist())
-                selected_contexts = st.multiselect(
-                    "Context",
-                    options=available_contexts,
-                    default=[],
-                    key="filter_context"
-                )
-            else:
-                selected_contexts = []
-
-        # Row 2: Milestone and Assignee (2 columns)
-        filter_cols_row2 = st.columns(2)
-
-        # 4. Milestone Filter
-        with filter_cols_row2[0]:
-            if "milestone" in df.columns:
-                available_milestones = sorted(df["milestone"].dropna().unique().tolist())
-                selected_milestones = st.multiselect(
-                    "Milestone",
-                    options=available_milestones,
-                    default=[],
-                    key="filter_milestone"
-                )
-            else:
-                selected_milestones = []
-
-        # 5. Assignee Filter
-        with filter_cols_row2[1]:
-            if "assignee" in df.columns:
-                available_assignees = sorted(df["assignee"].dropna().unique().tolist())
-                selected_assignees = st.multiselect(
-                    "Assignee",
-                    options=available_assignees,
-                    default=[],
-                    key="filter_assignee"
-                )
-            else:
-                selected_assignees = []
+        else:
+            selected_assignees = []
 
     # --- Apply Filters ---
     display_df = df.copy()
@@ -562,18 +502,6 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     # Title search (case-insensitive)
     if title_search:
         display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
-
-    if selected_stages:
-        display_df = display_df[display_df["stage"].isin(selected_stages)]
-
-    if selected_priorities:
-        display_df = display_df[display_df["severity"].isin(selected_priorities)]
-
-    if selected_contexts:
-        display_df = display_df[display_df["context"].isin(selected_contexts)]
-
-    if selected_milestones:
-        display_df = display_df[display_df["milestone"].isin(selected_milestones)]
 
     if selected_assignees:
         display_df = display_df[display_df["assignee"].isin(selected_assignees)]
