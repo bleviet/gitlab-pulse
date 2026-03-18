@@ -219,6 +219,11 @@ def main() -> None:
     # Dynamic rendering based on selection
     view_id = pages[selected_page]
 
+    # Clear overview dialog state when navigating away so it never persists across views
+    if view_id != "overview":
+        st.session_state["show_issue_dialog"] = False
+        st.session_state["selected_issue_url"] = ""
+
     if view_id == "overview":
         # Overview is now the Flow view (Value Stream)
         # Extract stage descriptions
