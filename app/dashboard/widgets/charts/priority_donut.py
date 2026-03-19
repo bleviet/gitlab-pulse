@@ -6,7 +6,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.theme import get_palette, get_plotly_font_color, plotly_layout
+from app.dashboard.theme import (
+    get_active_theme_mode,
+    get_palette,
+    get_plotly_font_color,
+    get_streamlit_theme_color,
+    plotly_layout,
+)
 
 
 def priority_donut(
@@ -71,12 +77,17 @@ def priority_donut(
     colors = [colors_map.get(lbl, palette.get("neutral", "#95a5a6")) for lbl in labels]
 
     text_color = get_plotly_font_color()
+    mode = get_active_theme_mode()
+    bg_color = get_streamlit_theme_color("backgroundColor", "#050811" if mode == "dark" else "#f8f9fc")
 
     fig = go.Figure(data=[go.Pie(
         labels=labels,
         values=values,
         hole=0.6,
-        marker=dict(colors=colors),
+        marker=dict(
+            colors=colors,
+            line=dict(color=bg_color, width=2)
+        ),
         textinfo="value",
         textposition="inside",
         textfont=dict(color="#ffffff", size=12),
