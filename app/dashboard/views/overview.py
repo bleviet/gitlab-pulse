@@ -301,9 +301,6 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
         st.session_state["filtered_issues_state"] = None
         st.rerun()
         
-    source_chart = st.session_state.get("filtered_issues_source", "")
-    st.info(f"DEBUG: origin={source_chart} | stage_filter={st.session_state.get('filtered_issues_stage')} | state_filter={st.session_state.get('filtered_issues_state')} | pt={st.session_state.get('filtered_issues_selection', [{}])[0]}")
-        
     _render_issue_detail_grid(df, compact=False)
 
 
