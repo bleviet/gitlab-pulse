@@ -241,12 +241,14 @@ def render_overview(
                         selected_date = selected_date.floor("D")
                         
                         target_col = "closed_at" if pt.get("curveNumber") == 1 else "created_at"
+                        target_state = "closed" if pt.get("curveNumber") == 1 else "opened"
+                        
                         if target_col in filtered_df.columns:
                             col_dates = pd.to_datetime(filtered_df[target_col], errors="coerce")
                             if getattr(col_dates.dt, 'tz', None) is not None:
                                 col_dates = col_dates.dt.tz_localize(None)
                             col_dates = col_dates.dt.floor("D")
-                            filtered_df = filtered_df[col_dates == selected_date]
+                            filtered_df = filtered_df[(col_dates == selected_date) & (filtered_df["state"] == target_state)]
                     except Exception:
                         pass
                 else:
