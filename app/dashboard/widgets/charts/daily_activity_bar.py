@@ -93,4 +93,5 @@ def daily_activity_bar(
     fig.update_xaxes(showgrid=False, title="Count")
     fig.update_yaxes(title="")
 
-    st.plotly_chart(fig, width="stretch", key=widget_key)
+    show_modebar = st.session_state.get("show_chart_controls", False)
+    st.plotly_chart(fig, width="stretch", key=widget_key, config={"displayModeBar": show_modebar})

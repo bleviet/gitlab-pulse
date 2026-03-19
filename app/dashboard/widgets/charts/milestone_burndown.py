@@ -134,4 +134,5 @@ def milestone_burndown(
     )
     fig.update_yaxes(showgrid=False)
 
-    st.plotly_chart(fig, width="stretch", key=widget_key)
+    show_modebar = st.session_state.get("show_chart_controls", False)
+    st.plotly_chart(fig, width="stretch", key=widget_key, config={"displayModeBar": show_modebar})

@@ -71,4 +71,5 @@ def quality_gauge(
         ),
     )
 
-    st.plotly_chart(fig, width="stretch", key=config.get("key", "quality_gauge_chart") if config else None)
+    show_modebar = st.session_state.get("show_chart_controls", False)
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "quality_gauge_chart") if config else None, config={"displayModeBar": show_modebar})

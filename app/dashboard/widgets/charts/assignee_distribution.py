@@ -74,12 +74,16 @@ def assignee_distribution(
     fig.update_xaxes(showgrid=False, title="")
     fig.update_yaxes(showgrid=False, title="", showticklabels=False)
 
+    show_modebar = st.session_state.get("show_chart_controls", False)
+
+
     selection = st.plotly_chart(
         fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"],
         key=widget_key,
+        config={"displayModeBar": show_modebar},
     )
 
     return selection

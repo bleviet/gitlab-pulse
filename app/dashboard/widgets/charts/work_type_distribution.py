@@ -60,4 +60,5 @@ def work_type_distribution(
     )
     fig.update_yaxes(showgrid=False)
 
-    st.plotly_chart(fig, width="stretch", key=config.get("key", "work_type_chart") if config else None)
+    show_modebar = st.session_state.get("show_chart_controls", False)
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "work_type_chart") if config else None, config={"displayModeBar": show_modebar})

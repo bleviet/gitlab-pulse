@@ -90,12 +90,15 @@ def priority_bar(
     fig.update_xaxes(showgrid=False, title="", showticklabels=True, tickfont=dict(size=10))
     fig.update_yaxes(showgrid=False, title="", showticklabels=False, range=[0, priority_counts["Count"].max() * 1.3])
 
+    show_modebar = st.session_state.get("show_chart_controls", False)
+
     selection = st.plotly_chart(
         fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"],
         key=widget_key,
+        config={"displayModeBar": show_modebar}
     )
 
     return selection

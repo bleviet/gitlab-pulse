@@ -230,7 +230,6 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             st.session_state["current_layout"] = selected_layout
             st.session_state["layout_data"] = load_layout(selected_layout)
 
-        # Edit Mode toggle (compact, right under view selector)
         st.toggle(
             "✏️ Edit Mode",
             value=st.session_state.get("edit_mode", False),
@@ -238,6 +237,14 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             help="Enable to add/remove/arrange widgets"
         )
         st.session_state["edit_mode"] = st.session_state.get("edit_mode_toggle", False)
+        
+        st.toggle(
+            "🛠️ Show Chart Controls",
+            value=st.session_state.get("show_chart_controls", False),
+            key="show_chart_controls_toggle",
+            help="Enable zoom, pan, and save image overlay on charts"
+        )
+        st.session_state["show_chart_controls"] = st.session_state.get("show_chart_controls_toggle", False)
 
         # Delete confirmation dialog
         if st.session_state.get("show_delete_confirm"):

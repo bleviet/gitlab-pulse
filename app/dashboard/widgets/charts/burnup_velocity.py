@@ -124,4 +124,5 @@ def burnup_velocity(
             row=i, col=1,
         )
 
-    st.plotly_chart(fig, width="stretch", key=config.get("key", "burnup_velocity_chart") if config else None)
+    show_modebar = st.session_state.get("show_chart_controls", False)
+    st.plotly_chart(fig, width="stretch", key=config.get("key", "burnup_velocity_chart") if config else None, config={"displayModeBar": show_modebar})

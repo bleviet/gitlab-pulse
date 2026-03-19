@@ -111,12 +111,15 @@ def daily_velocity_line(
     )
     fig.update_yaxes(showgrid=False, title="ISSUE COUNT")
 
+    show_modebar = st.session_state.get("show_chart_controls", False)
+
     selection = st.plotly_chart(
         fig, 
         width="stretch", 
         key=widget_key,
         on_select="rerun",
-        selection_mode=["points"]
+        selection_mode=["points"],
+        config={"displayModeBar": show_modebar}
     )
     
     return selection

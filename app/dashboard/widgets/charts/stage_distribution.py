@@ -377,12 +377,16 @@ def stage_distribution(
     else:
         fig.update_xaxes(showgrid=False, range=[0, max_count * 1.15])
 
+    show_modebar = st.session_state.get("show_chart_controls", False)
+
+
     selection = st.plotly_chart(
         fig,
         width="stretch",
         on_select="rerun",
         selection_mode=["points"],
         key=widget_key,
+        config={"displayModeBar": show_modebar},
     )
 
     return selection
