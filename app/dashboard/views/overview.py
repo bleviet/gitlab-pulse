@@ -252,22 +252,22 @@ def render_overview(
                 else:
                     # Simple loose string matching for any column
                     val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
-                
-                # In charts, missing/none severity is coerced to "Low". Include them if searching for "Low".
-                sev_mask = (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False))
-                if val.lower() == "low":
-                    sev_mask = sev_mask | filtered_df["severity"].isna() | filtered_df["severity"].astype(str).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
-                
-                mask = (
-                    (filtered_df["stage"].astype(str).str.contains(val, case=False, na=False)) |
-                    (filtered_df["assignee"].astype(str).str.contains(val, case=False, na=False)) |
-                    sev_mask |
-                    (filtered_df["state"].astype(str).str.contains(val, case=False, na=False))
-                )
-                if mask.any():
-                    filtered_df = filtered_df[mask]
-                else:
-                    filtered_df = pd.DataFrame(columns=filtered_df.columns)
+                    
+                    # In charts, missing/none severity is coerced to "Low". Include them if searching for "Low".
+                    sev_mask = (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False))
+                    if val.lower() == "low":
+                        sev_mask = sev_mask | filtered_df["severity"].isna() | filtered_df["severity"].astype(str).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
+                    
+                    mask = (
+                        (filtered_df["stage"].astype(str).str.contains(val, case=False, na=False)) |
+                        (filtered_df["assignee"].astype(str).str.contains(val, case=False, na=False)) |
+                        sev_mask |
+                        (filtered_df["state"].astype(str).str.contains(val, case=False, na=False))
+                    )
+                    if mask.any():
+                        filtered_df = filtered_df[mask]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
                     
         if not filtered_df.empty:
             _show_filtered_issues_dialog(filtered_df)
