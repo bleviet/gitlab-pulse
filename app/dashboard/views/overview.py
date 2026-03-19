@@ -240,8 +240,12 @@ def render_overview(
                             selected_date = selected_date.tz_localize(None)
                         selected_date = selected_date.floor("D")
                         
-                        target_col = "closed_at" if pt.get("curveNumber") == 1 else "created_at"
-                        target_state = "closed" if pt.get("curveNumber") == 1 else "opened"
+                        is_closed_trace = (pt.get("curveNumber") == 1)
+                        if "customdata" in pt and pt["customdata"]:
+                            is_closed_trace = (pt["customdata"][0] == "Closed")
+                            
+                        target_col = "closed_at" if is_closed_trace else "created_at"
+                        target_state = "closed" if is_closed_trace else "opened"
                         
                         if target_col in filtered_df.columns:
                             col_dates = pd.to_datetime(filtered_df[target_col], errors="coerce")
@@ -296,6 +300,9 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
         st.session_state["filtered_issues_stage"] = None
         st.session_state["filtered_issues_state"] = None
         st.rerun()
+        
+    source_chart = st.session_state.get("filtered_issues_source", "")
+    st.info(f"DEBUG: origin={source_chart} | stage_filter={st.session_state.get('filtered_issues_stage')} | state_filter={st.session_state.get('filtered_issues_state')} | pt={st.session_state.get('filtered_issues_selection', [{}])[0]}")
         
     _render_issue_detail_grid(df, compact=False)
 
