@@ -152,10 +152,11 @@ def render_overview(
             stages = unique_df.groupby("stage")["stage_order"].min().sort_values().index.tolist()
         else:
             stages = unique_df["stage"].unique().tolist() if "stage" in unique_df.columns else []
-            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Testing", "Waiting for Release", "Done", "Closed"]
             stages = sorted(stages, key=lambda s: default_stage_order.index(s) if s in default_stage_order else len(default_stage_order))
-        # Limit the number of stages to prevent squashing UI in columns, e.g. top 6
-        stages = stages[:6]
+        
+        # Only show stages that actually have open issues otherwise it wastes horizontal space
+        stages = [s for s in stages if not unique_df[(unique_df["stage"] == s) & (unique_df["state"] == "opened")].empty]
         
         if stages:
             stage_cols = st.columns(len(stages))
@@ -168,7 +169,6 @@ def render_overview(
                         config={
                             "height": 200,
                             "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
-                            "show_all": True
                         }
                     )
                     handle_selection(sel, stage_filter=stage_name)
@@ -225,10 +225,16 @@ def render_overview(
             if val and isinstance(val, str):
                 # Simple loose string matching for any column
                 val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
+                
+                # In charts, missing/none severity is coerced to "Low". Include them if searching for "Low".
+                sev_mask = (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False))
+                if val.lower() == "low":
+                    sev_mask = sev_mask | filtered_df["severity"].isna() | filtered_df["severity"].astype(str).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
+                
                 mask = (
                     (filtered_df["stage"].astype(str).str.contains(val, case=False, na=False)) |
                     (filtered_df["assignee"].astype(str).str.contains(val, case=False, na=False)) |
-                    (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False)) |
+                    sev_mask |
                     (filtered_df["state"].astype(str).str.contains(val, case=False, na=False))
                 )
                 if mask.any():

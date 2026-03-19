@@ -67,11 +67,12 @@ def priority_bar(
         color="Priority",
         color_discrete_map=colors_map,
         orientation="v",
+        text="Count",
     )
     
     fig.update_traces(
         marker_line_width=0,
-        text=[f"<b>{c}</b>" for c in priority_counts["Count"]],
+        texttemplate="<b>%{text}</b>",
         textposition="outside",
         textfont=dict(color=get_plotly_font_color(), size=12) 
     )

@@ -114,7 +114,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             # Track which range is active for highlighting
             if "date_range" not in st.session_state:
                 # Default to All Time
-                st.session_state.date_range = (max_date - timedelta(days=365), max_date)
+                st.session_state.date_range = (min_date, max_date)
                 st.session_state.active_range = "All Time"
 
             # Helper to check if current range matches a preset
@@ -126,7 +126,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                 return start == expected_start and end == max_date
 
             # Determine active button
-            active_btn = st.session_state.get("active_range", "1 Year")
+            active_btn = st.session_state.get("active_range", "All Time")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -167,17 +167,17 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
 
             # Date range slider
             # Ensure stored date_range is within valid bounds
-            stored_range = st.session_state.get("date_range", (max_date - timedelta(days=365), max_date))
+            stored_range = st.session_state.get("date_range", (min_date, max_date))
             if isinstance(stored_range, tuple) and len(stored_range) == 2:
                 # Clamp to valid bounds
                 start_val = max(stored_range[0], min_date)
                 end_val = min(stored_range[1], max_date)
                 if start_val > end_val:
-                    start_val = max_date - timedelta(days=365)
+                    start_val = min_date
                     end_val = max_date
                 valid_range = (start_val, end_val)
             else:
-                valid_range = (max_date - timedelta(days=365), max_date)
+                valid_range = (min_date, max_date)
 
             date_range = st.date_input(
                 "Custom Range",
