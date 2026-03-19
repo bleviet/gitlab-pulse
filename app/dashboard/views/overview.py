@@ -107,13 +107,20 @@ def render_overview(
 
     chart_reset_suffix = st.session_state.get("chart_reset_counter", 0)
 
-    def handle_selection(selection_dict, stage_filter=None, state_filter=None):
+    def handle_selection(selection_dict, chart_id, stage_filter=None, state_filter=None):
         if selection_dict and selection_dict.get("selection", {}).get("points"):
-            if not st.session_state.get("show_filtered_issues_dialog", False):
+            pts = selection_dict["selection"]["points"]
+            prev_key = f"prev_sel_{chart_id}"
+            
+            if pts != st.session_state.get(prev_key):
+                st.session_state[prev_key] = pts
                 st.session_state["show_filtered_issues_dialog"] = True
-                st.session_state["filtered_issues_selection"] = selection_dict["selection"]["points"]
+                st.session_state["filtered_issues_selection"] = pts
                 st.session_state["filtered_issues_stage"] = stage_filter
                 st.session_state["filtered_issues_state"] = state_filter
+        else:
+            prev_key = f"prev_sel_{chart_id}"
+            st.session_state[prev_key] = []
 
     # ROW 1
     st.markdown("##### OVERVIEW & HEALTH")
@@ -122,7 +129,7 @@ def render_overview(
         with st.container(border=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
             sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False})
-            handle_selection(sel1, state_filter="opened")
+            handle_selection(sel1, chart_id="open_donut", state_filter="opened")
     with r1c2:
         with st.container(border=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>CLOSED ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
@@ -136,12 +143,12 @@ def render_overview(
                     "center_text": "CLOSED<br>ISSUES"
                 }
             )
-            handle_selection(sel2, state_filter="closed")
+            handle_selection(sel2, chart_id="closed_donut", state_filter="closed")
     with r1c3:
         with st.container(border=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
             sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"})
-            handle_selection(sel3)
+            handle_selection(sel3, chart_id="velocity_chart")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -171,7 +178,7 @@ def render_overview(
                             "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
                         }
                     )
-                    handle_selection(sel, stage_filter=stage_name)
+                    handle_selection(sel, chart_id=f"stage_bar_{idx}", stage_filter=stage_name)
         else:
             st.info("No stage data available.")
 
