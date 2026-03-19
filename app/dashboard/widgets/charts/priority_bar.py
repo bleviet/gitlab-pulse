@@ -27,10 +27,14 @@ def priority_bar(
         st.info("No priority data.")
         return None
 
-    work_df = df[df["state"] == "opened"].copy() if "state" in df.columns else df.copy()
+    show_all = config.get("show_all", False)
+    if not show_all and "state" in df.columns:
+        work_df = df[df["state"] == "opened"].copy()
+    else:
+        work_df = df.copy()
 
     if work_df.empty:
-        st.info("No open issues.")
+        st.info("No issues.")
         return None
 
     # Normalize severity

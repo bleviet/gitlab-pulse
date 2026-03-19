@@ -105,37 +105,42 @@ def render_overview(
     
     _active_ms = highlight_milestone if highlight_milestone and highlight_milestone != "All" else None
 
-    def handle_selection(selection_dict):
+    chart_reset_suffix = st.session_state.get("chart_reset_counter", 0)
+
+    def handle_selection(selection_dict, stage_filter=None, state_filter=None):
         if selection_dict and selection_dict.get("selection", {}).get("points"):
-            st.session_state["show_filtered_issues_dialog"] = True
-            st.session_state["filtered_issues_selection"] = selection_dict["selection"]["points"]
-            st.rerun()
+            if not st.session_state.get("show_filtered_issues_dialog", False):
+                st.session_state["show_filtered_issues_dialog"] = True
+                st.session_state["filtered_issues_selection"] = selection_dict["selection"]["points"]
+                st.session_state["filtered_issues_stage"] = stage_filter
+                st.session_state["filtered_issues_state"] = state_filter
 
     # ROW 1
     st.markdown("##### OVERVIEW & HEALTH")
-    r1c1, r1c2, r1c3 = st.columns([1, 2, 2])
+    r1c1, r1c2, r1c3 = st.columns([1, 1, 3])
     with r1c1:
         with st.container(border=True):
-            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
-            sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": "row1_priority", "show_legend": False})
-            handle_selection(sel1)
+            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+            sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False})
+            handle_selection(sel1, state_filter="opened")
     with r1c2:
         with st.container(border=True):
-            ms_title = f"{_active_ms} TIMELINE" if _active_ms else "RELEASE TIMELINE"
-            st.markdown(f"<div style='font-size:0.9rem; font-weight:bold; color:#555;'>{ms_title}</div>", unsafe_allow_html=True)
-            sel4 = charts.milestone_timeline(
-                _timeline_source,
+            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>CLOSED ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+            sel2 = charts.priority_donut(
+                unique_df, 
                 config={
-                    "key": "row1_timeline",
-                    "height": 200,
-                    "highlight_milestone": _active_ms,
-                },
+                    "height": 200, 
+                    "key": f"row1_priority_closed_{chart_reset_suffix}", 
+                    "show_legend": False, 
+                    "state_filter": "closed", 
+                    "center_text": "CLOSED<br>ISSUES"
+                }
             )
-            handle_selection(sel4)
+            handle_selection(sel2, state_filter="closed")
     with r1c3:
         with st.container(border=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
-            sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": "row1_velocity"})
+            sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"})
             handle_selection(sel3)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -162,21 +167,57 @@ def render_overview(
                         stage_df,
                         config={
                             "height": 200,
-                            "key": f"row2_stage_bar_{idx}",
+                            "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
+                            "show_all": True
                         }
                     )
-                    handle_selection(sel)
+                    handle_selection(sel, stage_filter=stage_name)
         else:
             st.info("No stage data available.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # ROW 3
+    st.markdown("##### RELEASE TIMELINE")
+    with st.container(border=True):
+        key_suffix = st.session_state.get("timeline_reset_counter", 0)
+        sel4 = charts.milestone_timeline(
+            _timeline_source,
+            config={
+                "key": f"row3_timeline_{key_suffix}",
+                "height": 120,
+                "highlight_milestone": _active_ms,
+            },
+        )
+        
+        if sel4 and sel4.get("selection", {}).get("points"):
+            pts = sel4["selection"]["points"]
+            if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
+                selected_ms = pts[0]["customdata"][2]
+                
+                if selected_ms == _active_ms:
+                    st.session_state["overview_milestone_reset"] = True
+                else:
+                    st.session_state["overview_milestone_pending"] = selected_ms
+                    
+                st.session_state.timeline_reset_counter = st.session_state.get("timeline_reset_counter", 0) + 1
+                st.rerun()
 
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # Display Filtered Issues Dialog
     if st.session_state.get("show_filtered_issues_dialog", False):
         pts = st.session_state.get("filtered_issues_selection", [])
+        stage_filter = st.session_state.get("filtered_issues_stage")
+        state_filter = st.session_state.get("filtered_issues_state")
         filtered_df = df.copy()
+        
+        if stage_filter:
+            filtered_df = filtered_df[filtered_df["stage"] == stage_filter]
+            
+        if state_filter and state_filter != "all":
+            filtered_df = filtered_df[filtered_df["state"] == state_filter]
+            
         if pts:
             pt = pts[0]
             val = pt.get("label") or pt.get("x") or pt.get("y") or pt.get("text")
@@ -208,6 +249,9 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
     """Render issue details grid in a dialog when a chart is clicked."""
     if st.button("Close Modal", key="close_filtered_issues_modal"):
         st.session_state["show_filtered_issues_dialog"] = False
+        st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
+        st.session_state["filtered_issues_stage"] = None
+        st.session_state["filtered_issues_state"] = None
         st.rerun()
         
     _render_issue_detail_grid(df, compact=False)

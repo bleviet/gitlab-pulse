@@ -29,10 +29,17 @@ def priority_donut(
         st.info("No priority data available.")
         return None
 
-    work_df = df[df["state"] == "opened"].copy() if "state" in df.columns else df.copy()
+    state_filter = config.get("state_filter", "opened")
+    if "state" in df.columns:
+        if state_filter == "all":
+            work_df = df.copy()
+        else:
+            work_df = df[df["state"] == state_filter].copy()
+    else:
+        work_df = df.copy()
 
     if work_df.empty:
-        st.info("No open issues.")
+        st.info(f"No {state_filter if state_filter != 'all' else ''} issues.")
         return None
 
     # Normalize severity

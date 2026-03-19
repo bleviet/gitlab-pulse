@@ -34,7 +34,7 @@ def milestone_timeline(
     config = config or {}
     widget_key = config.get("key", "milestone_timeline")
     raw_height = config.get("height", 160)
-    timeline_height = max(120, min(int(raw_height), 320))
+    timeline_height = max(80, min(int(raw_height), 320))
 
     display_df = None
 
