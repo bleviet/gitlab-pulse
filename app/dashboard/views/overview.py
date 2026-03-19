@@ -91,7 +91,7 @@ def render_overview(
     Args:
         df: Filtered DataFrame with valid issues (milestone filter applied)
         stage_descriptions: Optional mapping of stage names to description strings
-        timeline_df: Unfiltered DataFrame for the milestone timeline (all milestones visible)
+        timeline_df: Unfiltered DataFrame for the milestone timeline
         highlight_milestone: Active milestone name to highlight in the timeline
     """
     if df.empty:
@@ -99,166 +99,118 @@ def render_overview(
         return
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
-    # Use pre-milestone-filtered df for the timeline so all milestones stay visible
     _timeline_source = (timeline_df if timeline_df is not None else df).drop_duplicates(
         subset=["id"]
     ) if "id" in (timeline_df if timeline_df is not None else df).columns else (timeline_df or df)
+    
     _active_ms = highlight_milestone if highlight_milestone and highlight_milestone != "All" else None
 
-    # Top Row: Milestone Timeline — clicking a milestone updates the sidebar filter;
-    # double-clicking resets it to "All"
-    if "milestone_id" in _timeline_source.columns and not _timeline_source["milestone_id"].isnull().all():
-        with st.expander("📅 Milestone Timeline", expanded=True):
-            timeline_selection = charts.milestone_timeline(
+    def handle_selection(selection_dict):
+        if selection_dict and selection_dict.get("selection", {}).get("points"):
+            st.session_state["show_filtered_issues_dialog"] = True
+            st.session_state["filtered_issues_selection"] = selection_dict["selection"]["points"]
+            st.rerun()
+
+    # ROW 1
+    st.markdown("##### OVERVIEW & HEALTH")
+    r1c1, r1c2, r1c3 = st.columns([1, 2, 2])
+    with r1c1:
+        with st.container(border=True):
+            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+            sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": "row1_priority", "show_legend": False})
+            handle_selection(sel1)
+    with r1c2:
+        with st.container(border=True):
+            ms_title = f"{_active_ms} TIMELINE" if _active_ms else "RELEASE TIMELINE"
+            st.markdown(f"<div style='font-size:0.9rem; font-weight:bold; color:#555;'>{ms_title}</div>", unsafe_allow_html=True)
+            sel4 = charts.milestone_timeline(
                 _timeline_source,
                 config={
-                    "key": "overview_timeline",
-                    "height": 120,
+                    "key": "row1_timeline",
+                    "height": 200,
                     "highlight_milestone": _active_ms,
                 },
             )
-            points = (timeline_selection or {}).get("selection", {}).get("points")
-            prev_ms = st.session_state.get("overview_last_timeline_ms", "")
-            # Pop the skip flag — set before any programmatic rerun so the following
-            # render (where the chart may return empty selection after re-drawing)
-            # does not falsely trigger the double-click reset.
-            skip_reset = st.session_state.pop("overview_timeline_skip_reset", False)
-            # Hash-based change detection: only treat empty points as an explicit
-            # double-click reset when the selection object itself has changed since
-            # the last render. Reruns triggered by unrelated widgets (e.g. table row
-            # selection) leave the chart value unchanged → hash stays the same →
-            # the reset branch is skipped.
-            _sel_hash = hashlib.md5(
-                json.dumps(timeline_selection or {}, sort_keys=True, default=str).encode()
-            ).hexdigest()
-            _prev_sel_hash = st.session_state.get("overview_timeline_sel_hash", "")
-            _selection_changed = _sel_hash != _prev_sel_hash
-            st.session_state["overview_timeline_sel_hash"] = _sel_hash
-            if points:
-                try:
-                    selected_ms = points[0]["customdata"][2]
-                    if selected_ms != prev_ms:
-                        st.session_state["overview_last_timeline_ms"] = selected_ms
-                        st.session_state["overview_milestone_pending"] = selected_ms
-                        st.session_state["overview_timeline_skip_reset"] = True
-                        st.rerun()
-                except (IndexError, KeyError):
-                    pass
-            elif isinstance(points, list) and prev_ms and not skip_reset and _active_ms == prev_ms and _selection_changed:
-                # Empty selection after a prior timeline selection = double-click reset.
-                # Guard: only reset if sidebar still reflects what the timeline set;
-                # an independent sidebar change also causes empty points (figure redraws).
-                st.session_state["overview_last_timeline_ms"] = ""
-                st.session_state["overview_milestone_reset"] = True
-                st.session_state["overview_timeline_skip_reset"] = True
-                st.rerun()
+            handle_selection(sel4)
+    with r1c3:
+        with st.container(border=True):
+            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
+            sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": "row1_velocity"})
+            handle_selection(sel3)
 
-    # Side-by-side layout: issue list on the left, chart on the right
-    # Both expander panels share the same fixed inner height so they align.
-    _PANEL_HEIGHT = 490
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    col_list, col_chart = st.columns([1, 1], gap="medium")
-
-    with col_chart, st.expander("Visual Analysis", expanded=True):
-        with st.container(height=_PANEL_HEIGHT):
-            if "stage_order" in unique_df.columns:
-                chart_stage_orders = unique_df.groupby("stage")["stage_order"].min().sort_values()
-                chart_stage_options = chart_stage_orders.index.tolist()
-            else:
-                default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
-                chart_stage_options = unique_df["stage"].unique().tolist()
-                chart_stage_options = sorted(
-                    chart_stage_options,
-                    key=lambda stage_name: (
-                        default_stage_order.index(stage_name)
-                        if stage_name in default_stage_order
-                        else len(default_stage_order)
-                    ),
-                )
-
-            chart_filter_key = "overview_chart_visible_stages"
-            chart_options_hash_key = "overview_chart_visible_stages_options_hash"
-            chart_options_hash = hash(tuple(chart_stage_options))
-            if st.session_state.get(chart_options_hash_key) != chart_options_hash:
-                if chart_filter_key in st.session_state:
-                    del st.session_state[chart_filter_key]
-                st.session_state[chart_options_hash_key] = chart_options_hash
-
-            header_text_col, header_filter_col = st.columns([0.72, 0.28], gap="small")
-            with header_filter_col, st.popover("⚙️ Chart Filters", use_container_width=True):
-                selected_chart_stages = st.multiselect(
-                    "Visible Stages",
-                    options=chart_stage_options,
-                    default=chart_stage_options,
-                    help="Deselect stages (like 'Done') to rescale the chart.",
-                    key=chart_filter_key,
-                )
-
-            if not selected_chart_stages:
-                with header_text_col:
-                    st.caption("Issues Total: 0")
-                st.warning("Please select at least one stage.")
-                stage_selection = None
-            else:
-                chart_df = unique_df[unique_df["stage"].isin(selected_chart_stages)]
-                with header_text_col:
-                    st.caption(f"Issues Total: {len(chart_df)}")
-
-            # Stage distribution rotated 90° CCW (vertical bars: stages on x-axis)
-                stage_selection = charts.stage_distribution(
-                    chart_df,
-                    config={
-                        "stage_descriptions": stage_descriptions,
-                        "key": "flow_chart_stage_dist",
-                        "orientation": "v",
-                        "show_stage_filter": False,
-                        "show_issues_total": False,
-                    }
-                )
-
-    # Apply interactive filters (apply to original DF to allow exploring contexts)
-    filtered_df = df.copy()
-
-    if stage_selection and stage_selection.get("selection", {}).get("points"):
-        selected_points = stage_selection["selection"]["points"]
-        masks = []
-        for point in selected_points:
-            # Vertical chart: x=stage (string), y=count (number)
-            # Detect stage value robustly: it is the string dimension
-            x_val = point.get("x")
-            y_val = point.get("y")
-            stage = x_val if isinstance(x_val, str) else y_val
-
-            severity = point.get("customdata", [None])[0]
-
-            mask = (filtered_df["stage"] == stage)
-            if severity:
-                if severity == "Unset":
-                    mask &= (
-                        filtered_df["severity"].isna() |
-                        (filtered_df["severity"].astype(str).str.strip().str.lower().isin(["unset", "none", "nan", "<na>", ""]))
+    # ROW 2
+    st.markdown("##### ISSUES BY WORKFLOW STATE")
+    with st.container(border=True):
+        if "stage_order" in unique_df.columns:
+            stages = unique_df.groupby("stage")["stage_order"].min().sort_values().index.tolist()
+        else:
+            stages = unique_df["stage"].unique().tolist() if "stage" in unique_df.columns else []
+            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Done", "Closed"]
+            stages = sorted(stages, key=lambda s: default_stage_order.index(s) if s in default_stage_order else len(default_stage_order))
+        # Limit the number of stages to prevent squashing UI in columns, e.g. top 6
+        stages = stages[:6]
+        
+        if stages:
+            stage_cols = st.columns(len(stages))
+            for idx, stage_name in enumerate(stages):
+                with stage_cols[idx]:
+                    st.markdown(f"<div style='text-align:center; font-size:0.75rem; font-weight:bold; color:#777; margin-bottom:-10px;'>{stage_name.upper()}</div>", unsafe_allow_html=True)
+                    stage_df = unique_df[unique_df["stage"] == stage_name]
+                    sel = charts.priority_bar(
+                        stage_df,
+                        config={
+                            "height": 200,
+                            "key": f"row2_stage_bar_{idx}",
+                        }
                     )
-                else:
-                    mask &= (filtered_df["severity"].astype(str).str.strip().str.lower() == severity.lower())
+                    handle_selection(sel)
+        else:
+            st.info("No stage data available.")
 
-            masks.append(mask)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        if masks:
-            final_mask = pd.Series(False, index=filtered_df.index)
-            for m in masks:
-                final_mask |= m
-            filtered_df = filtered_df[final_mask]
 
-    with col_list, st.expander("📋 Issue List", expanded=True):
-        with st.container(height=_PANEL_HEIGHT):
-            _render_issue_detail_grid(filtered_df, compact=True)
 
-    # Open dialog when a row is selected
+    # Display Filtered Issues Dialog
+    if st.session_state.get("show_filtered_issues_dialog", False):
+        pts = st.session_state.get("filtered_issues_selection", [])
+        filtered_df = df.copy()
+        if pts:
+            pt = pts[0]
+            val = pt.get("label") or pt.get("x") or pt.get("y") or pt.get("text")
+            
+            if val and isinstance(val, str):
+                # Simple loose string matching for any column
+                val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
+                mask = (
+                    (filtered_df["stage"].astype(str).str.contains(val, case=False, na=False)) |
+                    (filtered_df["assignee"].astype(str).str.contains(val, case=False, na=False)) |
+                    (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False)) |
+                    (filtered_df["state"].astype(str).str.contains(val, case=False, na=False))
+                )
+                if mask.any():
+                    filtered_df = filtered_df[mask]
+                    
+        _show_filtered_issues_dialog(filtered_df)
+
+    # Open single native issue dialog if selected from the table
     selected_url = st.session_state.get("selected_issue_url", "")
     if selected_url and st.session_state.get("show_issue_dialog", False):
         selected_row = _get_selected_original_row(df)
         if selected_row is not None:
             _show_issue_dialog(selected_row)
+
+
+@st.dialog("Filtered Issues", width="large")
+def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
+    """Render issue details grid in a dialog when a chart is clicked."""
+    if st.button("Close Modal", key="close_filtered_issues_modal"):
+        st.session_state["show_filtered_issues_dialog"] = False
+        st.rerun()
+        
+    _render_issue_detail_grid(df, compact=False)
 
 
 def _get_selected_original_row(
