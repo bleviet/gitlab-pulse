@@ -118,6 +118,7 @@ def render_overview(
                 st.session_state["filtered_issues_selection"] = pts
                 st.session_state["filtered_issues_stage"] = stage_filter
                 st.session_state["filtered_issues_state"] = state_filter
+                st.session_state["filtered_issues_source"] = chart_id
         else:
             prev_key = f"prev_sel_{chart_id}"
             st.session_state[prev_key] = []
@@ -219,6 +220,8 @@ def render_overview(
         state_filter = st.session_state.get("filtered_issues_state")
         filtered_df = df.copy()
         
+        source_chart = st.session_state.get("filtered_issues_source", "")
+        
         if stage_filter:
             filtered_df = filtered_df[filtered_df["stage"] == stage_filter]
             
@@ -230,8 +233,25 @@ def render_overview(
             val = pt.get("label") or pt.get("x") or pt.get("y") or pt.get("text")
             
             if val and isinstance(val, str):
-                # Simple loose string matching for any column
-                val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
+                if source_chart == "velocity_chart":
+                    try:
+                        selected_date = pd.to_datetime(val)
+                        if selected_date.tzinfo is not None:
+                            selected_date = selected_date.tz_localize(None)
+                        selected_date = selected_date.floor("D")
+                        
+                        target_col = "closed_at" if pt.get("curveNumber") == 1 else "created_at"
+                        if target_col in filtered_df.columns:
+                            col_dates = pd.to_datetime(filtered_df[target_col], errors="coerce")
+                            if getattr(col_dates.dt, 'tz', None) is not None:
+                                col_dates = col_dates.dt.tz_localize(None)
+                            col_dates = col_dates.dt.floor("D")
+                            filtered_df = filtered_df[col_dates == selected_date]
+                    except Exception:
+                        pass
+                else:
+                    # Simple loose string matching for any column
+                    val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
                 
                 # In charts, missing/none severity is coerced to "Low". Include them if searching for "Low".
                 sev_mask = (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False))
@@ -246,8 +266,16 @@ def render_overview(
                 )
                 if mask.any():
                     filtered_df = filtered_df[mask]
+                else:
+                    filtered_df = pd.DataFrame(columns=filtered_df.columns)
                     
-        _show_filtered_issues_dialog(filtered_df)
+        if not filtered_df.empty:
+            _show_filtered_issues_dialog(filtered_df)
+        else:
+            st.session_state["show_filtered_issues_dialog"] = False
+            if source_chart:
+                st.session_state[f"prev_sel_{source_chart}"] = []
+            st.toast("No issues matched this selection.", icon="ℹ️")
 
     # Open single native issue dialog if selected from the table
     selected_url = st.session_state.get("selected_issue_url", "")

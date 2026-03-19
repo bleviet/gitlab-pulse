@@ -12,7 +12,7 @@ from app.dashboard.theme import get_palette, get_plotly_font_color, plotly_layou
 def daily_velocity_line(
     df: pd.DataFrame,
     config: dict[str, Any] | None = None,
-) -> None:
+) -> dict | None:
     """Render line chart of opened vs closed issues over time.
 
     Args:
@@ -109,4 +109,12 @@ def daily_velocity_line(
     )
     fig.update_yaxes(showgrid=False, title="ISSUE COUNT")
 
-    st.plotly_chart(fig, width="stretch", key=widget_key)
+    selection = st.plotly_chart(
+        fig, 
+        width="stretch", 
+        key=widget_key,
+        on_select="rerun",
+        selection_mode=["points"]
+    )
+    
+    return selection
