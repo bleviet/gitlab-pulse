@@ -355,12 +355,21 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     iid = _fmt(row.get("iid"))
     title = _fmt(issue_details["title"] or row.get("title"))
 
-    header_col, link_col = st.columns([0.78, 0.22], gap="medium")
+    header_col, action_col = st.columns([0.65, 0.35], gap="small")
     with header_col:
         st.markdown(f"### #{iid} — {_cell(title)}")
-    with link_col:
-        if web_url != "—":
-            st.link_button("Open in GitLab", web_url, type="primary")
+    with action_col:
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            if st.button("Back", use_container_width=True, type="primary", key="btn_top_back"):
+                st.session_state["show_issue_dialog"] = False
+                st.session_state["selected_issue_url"] = ""
+                if "selected_issue_title" in st.session_state:
+                    st.session_state["selected_issue_title"] = ""
+                st.rerun()
+        with btn_col2:
+            if web_url != "—":
+                st.link_button("Open in GitLab", web_url, type="primary", use_container_width=True)
 
     _render_tag_chips(row)
     st.divider()
@@ -398,8 +407,7 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
 
     st.divider()
     
-    button_label = "Back to Filtered Issues" if is_nested else "Close"
-    if st.button(button_label, use_container_width=True):
+    if st.button("Back", use_container_width=True, key="btn_bottom_back"):
         st.session_state["show_issue_dialog"] = False
         st.session_state["selected_issue_url"] = ""
         if "selected_issue_title" in st.session_state:
