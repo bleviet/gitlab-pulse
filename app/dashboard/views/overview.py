@@ -302,7 +302,7 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
             _render_issue_details_content(selected_row, is_nested=True)
             return
 
-    if st.button("Close Modal", key="close_filtered_issues_modal"):
+    if st.button("Close Modal", key="close_filtered_issues_modal", type="primary", use_container_width=True):
         st.session_state["show_filtered_issues_dialog"] = False
         st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
         st.session_state["filtered_issues_stage"] = None
@@ -406,8 +406,8 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
         st.caption("_No comments yet._")
 
     st.divider()
-    
-    if st.button("Back", use_container_width=True, key="btn_bottom_back"):
+
+    if st.button("Back", use_container_width=True, type="primary", key="btn_bottom_back"):
         st.session_state["show_issue_dialog"] = False
         st.session_state["selected_issue_url"] = ""
         if "selected_issue_title" in st.session_state:
