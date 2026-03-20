@@ -105,35 +105,35 @@ def get_streamlit_theme_color(option_name: str, fallback: str) -> str:
 # --- Semantic Domain Palettes ---
 
 _SEMANTIC_LIGHT: dict[str, str] = {
-    # Issue Types — new light node values per brand spec
-    "bug": "#b51c3c",       # --node-pink light
-    "feature": "#059669",
-    "task": "#005e9e",      # --node-cyan light
-    "epic": "#8a0ea8",      # --node-purple light
+    # Issue Types — mapped to frontend-design chart palette (light)
+    "bug": "#b51c3c",       # --chart-4 Rose
+    "feature": "#1a7a62",   # --chart-7 Mint
+    "task": "#005e9e",      # --chart-1 Cyan
+    "epic": "#8a0ea8",      # --chart-3 Orchid
 
     # Status/Flow Stages
-    "active": "#059669",
-    "waiting": "#d97706",
-    "completed": "#8a0ea8", # --node-purple light
-    "stale": "#b51c3c",     # --node-pink light
-    "opened": "#005e9e",    # --node-cyan light
-    "closed": "#059669",
+    "active": "#1a7a62",    # --chart-7 Mint
+    "waiting": "#b06000",   # --chart-6 Amber
+    "completed": "#8a0ea8", # --chart-3 Orchid
+    "stale": "#b51c3c",     # --chart-4 Rose
+    "opened": "#005e9e",    # --chart-1 Cyan
+    "closed": "#1a7a62",    # --chart-7 Mint
 
     # UI/Domain Shared
-    "primary": "#ff512f",   # --brand (shared)
-    "neutral": "#3d5370",   # --muted light (updated)
+    "primary": "#ff512f",   # --brand
+    "neutral": "#3d5370",   # --muted light
 
-    # Severity — kept semantic (red→green scale)
+    # Severity — semantic red→orange→amber→green scale (not chart-indexed)
     "critical": "#F43F5E",
     "high": "#FB923C",
     "medium": "#FBBF24",
-    "low": "#34D399",
+    "low": "#1a7a62",       # --chart-7 Mint
     "unset": "#3d5370",     # --muted light
 
     # Priority
-    "p1": "#b51c3c",        # --node-pink light
-    "p2": "#FBBF24",
-    "p3": "#34D399",
+    "p1": "#b51c3c",        # --chart-4 Rose
+    "p2": "#b06000",        # --chart-6 Amber
+    "p3": "#1a7a62",        # --chart-7 Mint
 
     # Chart Series specific
     "scope_line": "#3d5370",          # --muted light
@@ -143,60 +143,60 @@ _SEMANTIC_LIGHT: dict[str, str] = {
     "burnup_bug_area": "#FECACA",
     "burnup_task_fill": "#374151",
     "burnup_task_area": "#E5E7EB",
-    "ms_complete": "#006ea3",         # --accent light (updated)
-    "ms_incomplete": "#b51c3c",       # --node-pink light
-    "ms_on_track": "#16A34A",
+    "ms_complete": "#006ea3",         # --accent light
+    "ms_incomplete": "#b51c3c",       # --chart-4 Rose
+    "ms_on_track": "#1a7a62",         # --chart-7 Mint
     "ms_overdue": "#ff512f",          # --brand
-    "ms_highlight": "#F59E0B",
+    "ms_highlight": "#b06000",        # --chart-6 Amber
 
     # Grid details (zebra stripes etc.)
-    "surface_hover": "#dce3f0",       # slightly darker than new --bg #e8ecf5
+    "surface_hover": "#dce3f0",
 }
 
 _SEMANTIC_DARK: dict[str, str] = {
-    # Issue Types
-    "bug": "#e0566a",       # --node-pink (softened)
-    "feature": "#2bc870",   # green (toned, less neon)
-    "task": "#46a5f5",      # --node-cyan (softened)
-    "epic": "#be3dd4",      # --node-purple (toned)
+    # Issue Types — mapped to frontend-design chart palette (dark)
+    "bug": "#f5576c",       # --chart-4 Rose
+    "feature": "#56d4b0",   # --chart-7 Mint
+    "task": "#4facfe",      # --chart-1 Cyan
+    "epic": "#c76bff",      # --chart-3 Orchid
 
     # Status/Flow Stages
-    "active": "#2bc870",
-    "waiting": "#d4956b",   # warm amber (softened)
-    "completed": "#be3dd4", # --node-purple (toned)
-    "stale": "#e0566a",     # --node-pink (softened)
-    "opened": "#46a5f5",    # --node-cyan (softened)
-    "closed": "#2bc870",
+    "active": "#56d4b0",    # --chart-7 Mint
+    "waiting": "#f4a44a",   # --chart-6 Amber
+    "completed": "#c76bff", # --chart-3 Orchid
+    "stale": "#f5576c",     # --chart-4 Rose
+    "opened": "#4facfe",    # --chart-1 Cyan
+    "closed": "#56d4b0",    # --chart-7 Mint
 
     # UI/Domain Shared
     "primary": "#ff512f",   # --brand
-    "neutral": "#7a8fa8",   # --muted dark (updated)
+    "neutral": "#7a8fa8",   # --muted dark
 
-    # Severity — kept semantic (red→green scale)
+    # Severity — semantic red→orange→amber→green scale (not chart-indexed)
     "critical": "#e06565",
     "high": "#e88236",
-    "medium": "#e6ae20",
-    "low": "#2bc870",
+    "medium": "#f4a44a",    # --chart-6 Amber (natural fit for medium)
+    "low": "#56d4b0",       # --chart-7 Mint
     "unset": "#7a8fa8",     # --muted dark
 
     # Priority
-    "p1": "#dd2476",        # --brand-2
-    "p2": "#e6ae20",
-    "p3": "#2bc870",
+    "p1": "#dd2476",        # --brand-2 (kept — reserved brand color)
+    "p2": "#f4a44a",        # --chart-6 Amber
+    "p3": "#56d4b0",        # --chart-7 Mint
 
     # Chart Series specific
-    "scope_line": "#7a8fa8",          # --muted dark (updated)
+    "scope_line": "#7a8fa8",          # --muted dark
     "burnup_feature_fill": "#166534",
     "burnup_feature_area": "#a2e8bc",
     "burnup_bug_fill": "#991b1b",
     "burnup_bug_area": "#f5b0b0",
     "burnup_task_fill": "#0c1123",    # --bg-card
-    "burnup_task_area": "#46a5f5",    # --node-cyan (softened)
-    "ms_complete": "#00f2fe",         # --accent
-    "ms_incomplete": "#e0566a",       # --node-pink (softened)
-    "ms_on_track": "#2bc870",
+    "burnup_task_area": "#4facfe",    # --chart-1 Cyan
+    "ms_complete": "#00f2fe",         # --accent dark
+    "ms_incomplete": "#f5576c",       # --chart-4 Rose
+    "ms_on_track": "#56d4b0",         # --chart-7 Mint
     "ms_overdue": "#ff512f",          # --brand
-    "ms_highlight": "#e6ae20",
+    "ms_highlight": "#f4a44a",        # --chart-6 Amber
 
     # Grid details (zebra stripes etc.)
     "surface_hover": "#121c35",
@@ -420,9 +420,45 @@ def get_global_css() -> str:
     shadow = "rgba(0,0,0,0.50)" if mode == "dark" else "rgba(0,0,0,0.08)"
     shadow_hover = "rgba(0,0,0,0.80)" if mode == "dark" else "rgba(0,0,0,0.15)"
 
+    # Frontend-design chart palette (8 series)
+    if mode == "dark":
+        chart_vars = """
+    --chart-1: #4facfe;  /* Cyan   */
+    --chart-2: #ff7354;  /* Coral  */
+    --chart-3: #c76bff;  /* Orchid */
+    --chart-4: #f5576c;  /* Rose   */
+    --chart-5: #74c7f0;  /* Sky    */
+    --chart-6: #f4a44a;  /* Amber  */
+    --chart-7: #56d4b0;  /* Mint   */
+    --chart-8: #9f7bea;  /* Mauve  */
+    --chart-bg:          var(--bg-card, {secondary_bg});
+    --chart-grid:        rgba(255,255,255,0.06);
+    --chart-axis:        rgba(255,255,255,0.12);
+    --chart-label:       {_with_alpha(text_color, 0.55, "#7a8fa8")};
+    --chart-tooltip-bg:  rgba(12,17,35,0.95);"""
+    else:
+        chart_vars = """
+    --chart-1: #005e9e;
+    --chart-2: #d63e1a;
+    --chart-3: #8a0ea8;
+    --chart-4: #b51c3c;
+    --chart-5: #0079b3;
+    --chart-6: #b06000;
+    --chart-7: #1a7a62;
+    --chart-8: #5c2e9a;
+    --chart-bg:          var(--bg-card, {secondary_bg});
+    --chart-grid:        rgba(0,0,0,0.05);
+    --chart-axis:        rgba(0,0,0,0.12);
+    --chart-label:       {_with_alpha(text_color, 0.55, "#3d5370")};
+    --chart-tooltip-bg:  rgba(241,244,251,0.97);"""
+
     return f"""
 <style>
 @import url('{_GOOGLE_FONTS_URL}');
+
+/* ── Design tokens ──────────────────────────────────────────────────── */
+:root {{{chart_vars}
+}}
 
 /* ── Base font assignments ──────────────────────────────────────────── */
 /* Use body for inheritance — avoids breaking icon fonts on span/div    */

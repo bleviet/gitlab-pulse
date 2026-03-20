@@ -77,7 +77,7 @@ dataframeBorderColor = "#c8cbd3"
 dataframeHeaderBackgroundColor = "#dce3f0"
 linkColor = "#006ea3"
 codeBackgroundColor = "#dce3f0"
-chartCategoricalColors = ["#005e9e", "#b51c3c", "#8a0ea8", "#059669", "#ff512f", "#dd2476", "#d97706"]
+chartCategoricalColors = ["#005e9e", "#d63e1a", "#8a0ea8", "#b51c3c", "#0079b3", "#b06000", "#1a7a62", "#5c2e9a"]
 
 [theme.light.sidebar]
 primaryColor = "#ff512f"
@@ -98,7 +98,7 @@ dataframeBorderColor = "#1c2030"
 dataframeHeaderBackgroundColor = "#0e1525"
 linkColor = "#00f2fe"
 codeBackgroundColor = "#0e1525"
-chartCategoricalColors = ["#46a5f5", "#e0566a", "#be3dd4", "#2bc870", "#ff512f", "#dd2476", "#d4956b"]
+chartCategoricalColors = ["#4facfe", "#ff7354", "#c76bff", "#f5576c", "#74c7f0", "#f4a44a", "#56d4b0", "#9f7bea"]
 
 [theme.dark.sidebar]
 primaryColor = "#ff512f"
