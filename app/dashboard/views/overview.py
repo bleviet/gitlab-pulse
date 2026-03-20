@@ -283,26 +283,33 @@ def render_overview(
                 st.session_state[f"prev_sel_{source_chart}"] = []
             st.toast("No issues matched this selection.", icon="ℹ️")
 
-    # Open single native issue dialog if selected from the table
-    selected_url = st.session_state.get("selected_issue_url", "")
-    if selected_url and st.session_state.get("show_issue_dialog", False):
-        selected_row = _get_selected_original_row(df)
-        if selected_row is not None:
-            _show_issue_dialog(selected_row)
+    # Open single native issue dialog if selected from the table (not within filtered modal)
+    elif st.session_state.get("show_issue_dialog", False):
+        selected_url = st.session_state.get("selected_issue_url", "")
+        if selected_url:
+            selected_row = _get_selected_original_row(df)
+            if selected_row is not None:
+                _show_issue_dialog(selected_row)
 
 
 @st.dialog("Filtered Issues", width="large")
 def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
     """Render issue details grid in a dialog when a chart is clicked."""
+    selected_url = st.session_state.get("selected_issue_url", "")
+    if selected_url and st.session_state.get("show_issue_dialog", False):
+        selected_row = _get_selected_original_row(df)
+        if selected_row is not None:
+            _render_issue_details_content(selected_row, is_nested=True)
+            return
+
     if st.button("Close Modal", key="close_filtered_issues_modal"):
         st.session_state["show_filtered_issues_dialog"] = False
         st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
         st.session_state["filtered_issues_stage"] = None
         st.session_state["filtered_issues_state"] = None
         st.rerun()
-        
-    _render_issue_detail_grid(df, compact=False)
 
+    _render_issue_detail_grid(df, compact=False)
 
 def _get_selected_original_row(
     df: pd.DataFrame,
@@ -320,6 +327,10 @@ def _get_selected_original_row(
 @st.dialog("Issue Details", width="large")
 def _show_issue_dialog(row: pd.Series) -> None:
     """Render a native, read-only issue details dialog backed by the GitLab API."""
+    _render_issue_details_content(row, is_nested=False)
+
+
+def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> None:
     project_id_val = row.get("project_id")
     issue_iid_val = row.get("iid")
 
@@ -386,8 +397,13 @@ def _show_issue_dialog(row: pd.Series) -> None:
         st.caption("_No comments yet._")
 
     st.divider()
-    if st.button("Close", use_container_width=True):
+    
+    button_label = "Back to Filtered Issues" if is_nested else "Close"
+    if st.button(button_label, use_container_width=True):
         st.session_state["show_issue_dialog"] = False
+        st.session_state["selected_issue_url"] = ""
+        if "selected_issue_title" in st.session_state:
+            st.session_state["selected_issue_title"] = ""
         st.rerun()
 
 
