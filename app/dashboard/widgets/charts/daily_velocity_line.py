@@ -78,6 +78,7 @@ def daily_velocity_line(
         text=[v if v > 0 else "" for v in created_counts.values],
         textposition="top center",
         textfont=dict(color=text_color),
+        cliponaxis=False,
     ))
 
     fig.add_trace(go.Scatter(
@@ -91,6 +92,7 @@ def daily_velocity_line(
         text=[v if v > 0 else "" for v in closed_counts.values],
         textposition="top center",
         textfont=dict(color=text_color),
+        cliponaxis=False,
     ))
 
     fig.update_layout(
@@ -99,7 +101,7 @@ def daily_velocity_line(
             show_xgrid=False,
             show_ygrid=False,
             legend_pos="none",
-            margin=dict(l=0, r=0, t=10, b=0),
+            margin=dict(l=0, r=0, t=28, b=0),
         ),
     )
     
