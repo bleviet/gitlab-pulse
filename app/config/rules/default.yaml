@@ -139,62 +139,62 @@ validation:
 # 2) Theme-aware palette with `light` and `dark` sections
 colors:
   light:
-    # Issue Types — aligned with node palette (light)
-    bug:     "#cf2c48"   # --node-pink
+    # Issue Types — new light node values per brand spec
+    bug:     "#b51c3c"   # --node-pink light
     feature: "#059669"
-    task:    "#0079b3"   # --node-cyan
-    epic:    "#a110bd"   # --node-purple
+    task:    "#005e9e"   # --node-cyan light
+    epic:    "#8a0ea8"   # --node-purple light
 
     # Status / Flow
     active:    "#059669"
     waiting:   "#d97706"   # amber
-    completed: "#a110bd"   # --node-purple
-    stale:     "#cf2c48"   # --node-pink
+    completed: "#8a0ea8"   # --node-purple light
+    stale:     "#b51c3c"   # --node-pink light
 
     # General UI
     primary: "#ff512f"   # --brand
-    neutral: "#5a6a82"   # --muted
+    neutral: "#3d5370"   # --muted light (updated)
 
     # Severity — semantic red → amber → yellow → green scale
-    critical: "#dc2626"
-    high:     "#ea580c"
-    medium:   "#ca8a04"
-    low:      "#16a34a"
-    unset:    "#5a6a82"   # --muted
+    critical: "#F43F5E"   # rose-500
+    high:     "#FB923C"   # orange-400
+    medium:   "#FBBF24"   # amber-400
+    low:      "#34D399"   # emerald-400
+    unset:    "#3d5370"   # --muted light
 
     # Priority
-    p1: "#cf2c48"   # --node-pink
-    p2: "#ca8a04"   # amber/yellow
-    p3: "#16a34a"   # green
+    p1: "#b51c3c"   # --node-pink light
+    p2: "#FBBF24"   # amber-400
+    p3: "#34D399"   # emerald-400
 
   dark:
-    # Issue Types — aligned with node palette (dark)
-    bug:     "#F5576C"   # --node-pink
-    feature: "#4ade80"
-    task:    "#4facfe"   # --node-cyan
-    epic:    "#DA22FF"   # --node-purple
+    # Issue Types — aligned with node palette (dark, softened for readability)
+    bug:     "#e0566a"   # --node-pink (softened)
+    feature: "#2bc870"   # green (toned, less neon)
+    task:    "#46a5f5"   # --node-cyan (softened)
+    epic:    "#be3dd4"   # --node-purple (toned)
 
     # Status / Flow
-    active:    "#4ade80"
-    waiting:   "#e8a87c"   # warm amber
-    completed: "#DA22FF"   # --node-purple
-    stale:     "#F5576C"   # --node-pink
+    active:    "#2bc870"
+    waiting:   "#d4956b"   # warm amber (softened)
+    completed: "#be3dd4"   # --node-purple (toned)
+    stale:     "#e0566a"   # --node-pink (softened)
 
     # General UI
     primary: "#ff512f"   # --brand
-    neutral: "#8a9bb2"   # --muted
+    neutral: "#7a8fa8"   # --muted dark (updated)
 
     # Severity — semantic red → amber → yellow → green scale
-    critical: "#f87171"
-    high:     "#fb923c"
-    medium:   "#fbbf24"
-    low:      "#4ade80"
-    unset:    "#8a9bb2"   # --muted
+    critical: "#e06565"
+    high:     "#e88236"
+    medium:   "#e6ae20"
+    low:      "#2bc870"
+    unset:    "#7a8fa8"   # --muted dark
 
     # Priority
     p1: "#dd2476"   # --brand-2
-    p2: "#fbbf24"   # yellow
-    p3: "#4ade80"   # green
+    p2: "#e6ae20"   # amber (softened)
+    p3: "#2bc870"   # green (toned)
 
 # Capacity View Configuration
 capacity:

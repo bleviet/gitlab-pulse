@@ -81,9 +81,9 @@ def get_active_theme_mode() -> str:
     """
     try:
         import streamlit as st
-        return str(st.context.theme.get("type", "light"))
+        return str(st.context.theme.get("type", "dark"))
     except Exception:
-        return "light"
+        return "dark"
 
 
 def get_streamlit_theme_color(option_name: str, fallback: str) -> str:
@@ -105,98 +105,98 @@ def get_streamlit_theme_color(option_name: str, fallback: str) -> str:
 # --- Semantic Domain Palettes ---
 
 _SEMANTIC_LIGHT: dict[str, str] = {
-    # Issue Types
-    "bug": "#cf2c48",       # --node-pink
+    # Issue Types — new light node values per brand spec
+    "bug": "#b51c3c",       # --node-pink light
     "feature": "#059669",
-    "task": "#0079b3",      # --node-cyan
-    "epic": "#a110bd",      # --node-purple
+    "task": "#005e9e",      # --node-cyan light
+    "epic": "#8a0ea8",      # --node-purple light
 
     # Status/Flow Stages
     "active": "#059669",
     "waiting": "#d97706",
-    "completed": "#a110bd", # --node-purple
-    "stale": "#cf2c48",     # --node-pink
-    "opened": "#0079b3",    # --node-cyan
+    "completed": "#8a0ea8", # --node-purple light
+    "stale": "#b51c3c",     # --node-pink light
+    "opened": "#005e9e",    # --node-cyan light
     "closed": "#059669",
 
     # UI/Domain Shared
     "primary": "#ff512f",   # --brand (shared)
-    "neutral": "#5a6a82",   # --muted
+    "neutral": "#3d5370",   # --muted light (updated)
 
     # Severity — kept semantic (red→green scale)
     "critical": "#F43F5E",
     "high": "#FB923C",
     "medium": "#FBBF24",
     "low": "#34D399",
-    "unset": "#5a6a82",     # --muted
+    "unset": "#3d5370",     # --muted light
 
     # Priority
-    "p1": "#cf2c48",        # --node-pink
+    "p1": "#b51c3c",        # --node-pink light
     "p2": "#FBBF24",
     "p3": "#34D399",
 
     # Chart Series specific
-    "scope_line": "#5a6a82",          # --muted
+    "scope_line": "#3d5370",          # --muted light
     "burnup_feature_fill": "#166534",
     "burnup_feature_area": "#BBF7D0",
     "burnup_bug_fill": "#991B1B",
     "burnup_bug_area": "#FECACA",
     "burnup_task_fill": "#374151",
     "burnup_task_area": "#E5E7EB",
-    "ms_complete": "#0097c4",         # --accent
-    "ms_incomplete": "#cf2c48",       # --node-pink
+    "ms_complete": "#006ea3",         # --accent light (updated)
+    "ms_incomplete": "#b51c3c",       # --node-pink light
     "ms_on_track": "#16A34A",
     "ms_overdue": "#ff512f",          # --brand
     "ms_highlight": "#F59E0B",
 
     # Grid details (zebra stripes etc.)
-    "surface_hover": "#f0f2f7",
+    "surface_hover": "#dce3f0",       # slightly darker than new --bg #e8ecf5
 }
 
 _SEMANTIC_DARK: dict[str, str] = {
     # Issue Types
-    "bug": "#F5576C",       # --node-pink
-    "feature": "#4ade80",
-    "task": "#4facfe",      # --node-cyan
-    "epic": "#DA22FF",      # --node-purple
+    "bug": "#e0566a",       # --node-pink (softened)
+    "feature": "#2bc870",   # green (toned, less neon)
+    "task": "#46a5f5",      # --node-cyan (softened)
+    "epic": "#be3dd4",      # --node-purple (toned)
 
     # Status/Flow Stages
-    "active": "#4ade80",
-    "waiting": "#e8a87c",
-    "completed": "#DA22FF", # --node-purple
-    "stale": "#F5576C",     # --node-pink
-    "opened": "#4facfe",    # --node-cyan
-    "closed": "#4ade80",
+    "active": "#2bc870",
+    "waiting": "#d4956b",   # warm amber (softened)
+    "completed": "#be3dd4", # --node-purple (toned)
+    "stale": "#e0566a",     # --node-pink (softened)
+    "opened": "#46a5f5",    # --node-cyan (softened)
+    "closed": "#2bc870",
 
     # UI/Domain Shared
     "primary": "#ff512f",   # --brand
-    "neutral": "#8a9bb2",   # --muted
+    "neutral": "#7a8fa8",   # --muted dark (updated)
 
     # Severity — kept semantic (red→green scale)
-    "critical": "#f87171",
-    "high": "#fb923c",
-    "medium": "#fbbf24",
-    "low": "#4ade80",
-    "unset": "#8a9bb2",     # --muted
+    "critical": "#e06565",
+    "high": "#e88236",
+    "medium": "#e6ae20",
+    "low": "#2bc870",
+    "unset": "#7a8fa8",     # --muted dark
 
     # Priority
     "p1": "#dd2476",        # --brand-2
-    "p2": "#fbbf24",
-    "p3": "#4ade80",
+    "p2": "#e6ae20",
+    "p3": "#2bc870",
 
     # Chart Series specific
-    "scope_line": "#8a9bb2",          # --muted
+    "scope_line": "#7a8fa8",          # --muted dark (updated)
     "burnup_feature_fill": "#166534",
-    "burnup_feature_area": "#bbf7d0",
+    "burnup_feature_area": "#a2e8bc",
     "burnup_bug_fill": "#991b1b",
-    "burnup_bug_area": "#fecaca",
+    "burnup_bug_area": "#f5b0b0",
     "burnup_task_fill": "#0c1123",    # --bg-card
-    "burnup_task_area": "#4facfe",    # --node-cyan
+    "burnup_task_area": "#46a5f5",    # --node-cyan (softened)
     "ms_complete": "#00f2fe",         # --accent
-    "ms_incomplete": "#F5576C",       # --node-pink
-    "ms_on_track": "#4ade80",
+    "ms_incomplete": "#e0566a",       # --node-pink (softened)
+    "ms_on_track": "#2bc870",
     "ms_overdue": "#ff512f",          # --brand
-    "ms_highlight": "#fbbf24",
+    "ms_highlight": "#e6ae20",
 
     # Grid details (zebra stripes etc.)
     "surface_hover": "#121c35",
@@ -320,8 +320,8 @@ def get_plotly_font_color() -> str:
 def get_plotly_grid_color() -> str:
     """Return Plotly grid color derived from active Streamlit theme."""
     mode = get_active_theme_mode()
-    fallback_border = "#1e2129" if mode == "dark" else "#e2e3e5"
-    fallback_grid = "rgba(30,33,41,0.30)" if mode == "dark" else "rgba(226,227,229,0.50)"
+    fallback_border = "#1c2030" if mode == "dark" else "#c8cbd3"
+    fallback_grid = "rgba(28,32,48,0.30)" if mode == "dark" else "rgba(200,203,211,0.50)"
 
     border_color = get_streamlit_theme_color("borderColor", fallback_border)
     return _with_alpha(border_color, alpha=0.22, fallback=fallback_grid)
@@ -408,11 +408,11 @@ def get_global_css() -> str:
     mode = get_active_theme_mode()
 
     # Read from the active client theme (respects light/dark toggle)
-    bg = get_streamlit_theme_color("backgroundColor", "#050811" if mode == "dark" else "#f8f9fc")
-    secondary_bg = get_streamlit_theme_color("secondaryBackgroundColor", "#0c1123" if mode == "dark" else "#ffffff")
-    text_color = get_streamlit_theme_color("textColor", "#ffffff" if mode == "dark" else "#0d1120")
+    bg = get_streamlit_theme_color("backgroundColor", "#050811" if mode == "dark" else "#e8ecf5")
+    secondary_bg = get_streamlit_theme_color("secondaryBackgroundColor", "#0c1123" if mode == "dark" else "#f1f4fb")
+    text_color = get_streamlit_theme_color("textColor", "#d4deee" if mode == "dark" else "#0d1120")
     primary = get_streamlit_theme_color("primaryColor", "#ff512f" if mode == "dark" else "#ff512f")
-    border = get_streamlit_theme_color("borderColor", "#1e2129" if mode == "dark" else "#e2e3e5")
+    border = get_streamlit_theme_color("borderColor", "#1c2030" if mode == "dark" else "#c8cbd3")
 
     text_muted = _with_alpha(text_color, 0.7, "#8a9bb2" if mode == "dark" else "#5a6a82")
     primary_light = _with_alpha(primary, 0.15, "transparent")

@@ -6,7 +6,7 @@ enableXsrfProtection = false
 enableStaticServing = false
 
 [theme]
-base = "light"
+base = "dark"
 font = "Manrope"
 baseRadius = "0.5rem"
 buttonRadius = "full"
@@ -69,43 +69,43 @@ weight = 400
 
 [theme.light]
 primaryColor = "#ff512f"
-backgroundColor = "#f8f9fc"
-secondaryBackgroundColor = "#ffffff"
+backgroundColor = "#e8ecf5"
+secondaryBackgroundColor = "#f1f4fb"
 textColor = "#0d1120"
-borderColor = "#CBD5E1"
-dataframeBorderColor = "#CBD5E1"
-dataframeHeaderBackgroundColor = "#F1F5F9"
-linkColor = "#0079b3"
-codeBackgroundColor = "#e8eaf0"
-chartCategoricalColors = ["#0079b3", "#cf2c48", "#a110bd", "#059669", "#ff512f", "#dd2476", "#d97706"]
+borderColor = "#c8cbd3"
+dataframeBorderColor = "#c8cbd3"
+dataframeHeaderBackgroundColor = "#dce3f0"
+linkColor = "#006ea3"
+codeBackgroundColor = "#dce3f0"
+chartCategoricalColors = ["#005e9e", "#b51c3c", "#8a0ea8", "#059669", "#ff512f", "#dd2476", "#d97706"]
 
 [theme.light.sidebar]
 primaryColor = "#ff512f"
-backgroundColor = "#eef0f5"
-secondaryBackgroundColor = "#f8f9fc"
+backgroundColor = "#dde3f0"
+secondaryBackgroundColor = "#e8ecf5"
 textColor = "#0d1120"
-borderColor = "#CBD5E1"
-dataframeBorderColor = "#CBD5E1"
-dataframeHeaderBackgroundColor = "#F1F5F9"
+borderColor = "#c8cbd3"
+dataframeBorderColor = "#c8cbd3"
+dataframeHeaderBackgroundColor = "#dce3f0"
 
 [theme.dark]
 primaryColor = "#ff512f"
-backgroundColor = "#0F172A"
-secondaryBackgroundColor = "#111827"
-textColor = "#E5E7EB"
-borderColor = "#2A3447"
-dataframeBorderColor = "#2A3447"
-dataframeHeaderBackgroundColor = "#172033"
-linkColor = "#60A5FA"
-codeBackgroundColor = "#172033"
-chartCategoricalColors = ["#60A5FA", "#F59E0B", "#34D399", "#F87171", "#A78BFA", "#22D3EE", "#94A3B8"]
+backgroundColor = "#050811"
+secondaryBackgroundColor = "#0c1123"
+textColor = "#d4deee"
+borderColor = "#1c2030"
+dataframeBorderColor = "#1c2030"
+dataframeHeaderBackgroundColor = "#0e1525"
+linkColor = "#00f2fe"
+codeBackgroundColor = "#0e1525"
+chartCategoricalColors = ["#46a5f5", "#e0566a", "#be3dd4", "#2bc870", "#ff512f", "#dd2476", "#d4956b"]
 
 [theme.dark.sidebar]
 primaryColor = "#ff512f"
-backgroundColor = "#111827"
-secondaryBackgroundColor = "#0B1220"
-textColor = "#E5E7EB"
-borderColor = "#2A3447"
-dataframeBorderColor = "#2A3447"
-dataframeHeaderBackgroundColor = "#172033"
+backgroundColor = "#0c1123"
+secondaryBackgroundColor = "#050811"
+textColor = "#d4deee"
+borderColor = "#1c2030"
+dataframeBorderColor = "#1c2030"
+dataframeHeaderBackgroundColor = "#0e1525"
 
