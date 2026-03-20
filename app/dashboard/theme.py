@@ -652,12 +652,49 @@ def inject_theme_watcher() -> None:
             return compStyle.backgroundColor + ":" + compStyle.color;
         }
 
+        function injectPlotlyCursor() {
+            var iframes = parentDoc.querySelectorAll('iframe');
+            iframes.forEach(function(iframe) {
+                try {
+                    var idoc = iframe.contentDocument || iframe.contentWindow.document;
+                    // Check if it's a plotly iframe and hasn't been styled yet
+                    if (idoc && idoc.querySelector('.js-plotly-plot') && !idoc.getElementById('plotly-cursor-fix')) {
+                        var style = idoc.createElement('style');
+                        style.id = 'plotly-cursor-fix';
+                        style.innerHTML = `
+                            /* Change cursor to pointer for clickable bar charts */
+                            .js-plotly-plot .plotly .cursor-crosshair { cursor: pointer !important; }
+                            .js-plotly-plot .plotly .nsewdrag { cursor: pointer !important; }
+                            .js-plotly-plot .plotly rect { cursor: pointer !important; }
+                            .js-plotly-plot .plotly path { cursor: pointer !important; }
+                        `;
+                        idoc.head.appendChild(style);
+                    }
+                } catch(e) {
+                    // Ignore cross-origin errors if any
+                }
+            });
+            // Also apply to parent doc in case Streamlit renders it natively
+            if (!parentDoc.getElementById('st-plotly-cursor-fix')) {
+                var style = parentDoc.createElement('style');
+                style.id = 'st-plotly-cursor-fix';
+                style.innerHTML = `
+                    [data-testid="stPlotlyChart"] { cursor: pointer !important; }
+                    .js-plotly-plot .plotly .cursor-crosshair { cursor: pointer !important; }
+                    .js-plotly-plot .plotly .nsewdrag { cursor: pointer !important; }
+                `;
+                parentDoc.head.appendChild(style);
+            }
+        }
+
         // Wait 1.5s for Streamlit to fully render and apply CSS
         setTimeout(function() {
             var initialState = getThemeState();
+            injectPlotlyCursor();
             
             setInterval(function() {
                 var currentState = getThemeState();
+                injectPlotlyCursor();
                 
                 // If the state changes and it's not a transparent glitch, user toggled theme!
                 if (currentState !== initialState && currentState.indexOf("rgba(0, 0, 0, 0)") === -1 && currentState.indexOf("transparent") === -1) {
