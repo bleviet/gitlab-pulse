@@ -185,16 +185,9 @@ Replace `from app.dashboard.theme import PALETTE` and `PALETTE.get(key, default)
 The following files will have `colors: dict[str, str] | None = None` removed from their render signatures:
 
 - [overview.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/overview.py)
-- [capacity.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/capacity.py)
 - [hygiene.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/hygiene.py)
 
 If any view internally uses the `colors` dict, it will be replaced with `get_palette()` call.
-
-#### [MODIFY] [capacity.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/capacity.py)
-
-Additionally: replace the manual `font=dict(family=FONT_FAMILY, color=get_plotly_font_color())` Plotly layout with `plotly_layout()`.
-
----
 
 ### Component 5: `get_global_css()` Simplification
 

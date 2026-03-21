@@ -220,7 +220,6 @@ from app.dashboard.theme import get_palette, plotly_layout
 | `status_donut.py` | `get_palette`, `plotly_layout` |
 | `work_type_distribution.py` | `get_issue_type_colors`, `plotly_layout` |
 | `workload_distribution.py` | `get_palette`, `get_stage_colors`, `plotly_layout` |
-| `capacity.py` (view) | `plotly_layout` |
 
 ### Eliminated Patterns
 
@@ -286,7 +285,7 @@ sequenceDiagram
 | **Delete `_sync_semantic_palette_maps()`, `_reset_palette_to_defaults()`** | ✅ Removed |
 | **Remove `colors=colors` pass-through from `main.py` → views** | ✅ All 6 views updated |
 | **Remove `colors: dict` parameter from all view signatures** | ✅ No view accepts `colors` |
-| **All chart widgets use `plotly_layout()`** | ✅ All 11 widgets + `capacity.py` |
+| **All chart widgets use `plotly_layout()`** | ✅ All 11 widgets |
 | **`config.toml` owns UI chrome, Python owns semantic colors** | ✅ Clean separation |
 | **CSS reads from `st.context.theme` instead of hardcoded tokens** | ✅ Implemented |
 
@@ -314,7 +313,7 @@ sequenceDiagram
 | `utils.py` | Exposes `get_semantic_color()` helper | `get_palette` |
 | Chart widgets (11) | Use semantic palette + `plotly_layout()` | `get_palette`, `plotly_layout`, convenience accessors |
 | `issue_detail_grid.py` | Reads `surface_hover` for zebra stripes | `get_palette` |
-| Views (8) | No direct theme access (except `capacity.py` uses `plotly_layout`) | Minimal |
+| Views (7) | No direct theme access | Minimal |
 
 ---
 

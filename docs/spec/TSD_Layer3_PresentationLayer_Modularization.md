@@ -34,11 +34,10 @@ app/dashboard/
 │       ├── issue_detail_grid.py
 │       ├── stale_issues_list.py
 │       ├── quality_action_table.py
-│       └── capacity_grid.py
+│       └── issue_detail_grid.py
 └── views/
     ├── overview.py      # Uses widgets
     ├── release.py       # Uses widgets
-    ├── capacity.py      # Uses widgets
     ├── stats.py         # Uses widgets
     ├── aging.py         # Uses widgets
     └── hygiene.py       # Uses widgets

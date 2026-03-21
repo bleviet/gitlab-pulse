@@ -104,10 +104,10 @@ uv run python -m cProfile -s time app/processor/main.py
 
 ### Data Inclusion Logic
 **Q: Are quality issues included in "Open Issues" or "Bug Ratio" metrics?**
-**A:** No. The operational metrics shown in the Overview and Capacity pages are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect those metrics.
+**A:** No. The operational metrics shown in the Overview page are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect those metrics.
 
 **Q: Do the issue lists include quality issues?**
-**A:** No. The lists in the Overview and Capacity views show only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
+**A:** No. The list in the Overview view shows only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
 
 ### Flow View Metrics
 **Q: What does "Active WIP" mean?**

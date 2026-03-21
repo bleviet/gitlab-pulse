@@ -33,7 +33,7 @@ try:
     _ = features.ai_assistant
     print("✅ Widget attributes verified")
 
-    from app.dashboard.views import capacity, hygiene, overview, admin
+    from app.dashboard.views import hygiene, overview, admin
     print("✅ Views imported")
 
     print("\nAll modules loaded successfully.")

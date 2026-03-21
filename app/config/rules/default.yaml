@@ -200,10 +200,3 @@ colors:
     p1: "#dd2476"   # --brand-2 (reserved)
     p2: "#f4a44a"   # --chart-6 Amber
     p3: "#56d4b0"   # --chart-7 Mint
-
-# Capacity View Configuration
-capacity:
-  max_wip_per_person: 5
-  max_contexts_per_person: 2
-  anonymize_users: false
-  hidden_users: []

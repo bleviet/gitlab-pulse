@@ -178,7 +178,6 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
-        "⚖️ Capacity": "capacity",
         "🧹 Hygiene": "hygiene",
         "🎨 Custom": "custom",
     }
@@ -240,11 +239,6 @@ def main() -> None:
             timeline_df=pre_milestone_df,
             highlight_milestone=filters["milestone"],
         )
-    elif view_id == "capacity":
-        # Pass capacity config
-        capacity_config = default_rule.capacity.model_dump()
-        from app.dashboard.views.capacity import render_capacity_view
-        render_capacity_view(filtered_df, capacity_config=capacity_config)
     elif view_id == "hygiene":
         render_hygiene(filtered_df, quality_df, rule=default_rule)
     elif view_id == "custom":
