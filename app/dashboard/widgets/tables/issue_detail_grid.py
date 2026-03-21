@@ -72,6 +72,7 @@ def issue_detail_grid(
             - zebra_stripes: bool (default True)
             - zebra_color: CSS color for zebra rows
             - key: widget key
+            - height: table height in pixels (default 400)
 
     Returns:
         Selection object from st.dataframe
@@ -81,6 +82,7 @@ def issue_detail_grid(
     widget_key = config.get("key", "issue_detail_grid")
     selection_mode = config.get("selection_mode", "multi-row")
     zebra_stripes = config.get("zebra_stripes", True)
+    table_height = int(config.get("height", 400))
 
     t = _table_theme()
     zebra_color = config.get("zebra_color") or t["row_alt"]
@@ -116,10 +118,15 @@ def issue_detail_grid(
     # Track extra columns selected by the user via the Filters expander
     extra_cols_selected: list[str] = []
 
+    caller_styler_state: dict[str, Any] | None = None
+
     if is_styler:
-        # If Styler, we assume pre-processing (filtering/sorting) is done by caller
-        display_data = data
+        # If Styler, we assume pre-processing (filtering/sorting) is done by caller.
+        # Preserve the caller's style rules so we can re-apply them after the grid's
+        # base and zebra styles, letting view-specific highlights win.
         df = data.data  # Access underlying dataframe for column checks if needed
+        caller_styler_state = data.export()
+        display_data = df
     else:
         df = data
         if df.empty:
@@ -200,11 +207,7 @@ def issue_detail_grid(
         # We generally avoid hard-dropping columns.
     display_df = df.copy()
 
-    if is_styler:
-        # Styler path: caller has already prepared the DataFrame (e.g. overview.py with
-        # context-label highlighting). Column names are raw; we leave them untouched.
-        display_data = data
-    else:
+    if not is_styler:
         # Sort by hierarchy if available
         if "parent_id" in df.columns and "iid" in df.columns:
             display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
@@ -293,11 +296,14 @@ def issue_detail_grid(
     else:
         page_display = _apply_base_cell_styles(page_display.style, t["bg"], t["text"])
 
+    if caller_styler_state is not None:
+        page_display = page_display.use(caller_styler_state)
+
     # Render
     return st.dataframe(
         page_display,
         width="stretch",
-        height=400,
+        height=table_height,
         hide_index=True,
         column_config=final_col_config,
         column_order=final_column_order,

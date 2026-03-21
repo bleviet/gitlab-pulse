@@ -37,6 +37,66 @@ class _IssueDetailsData(TypedDict):
     web_url: str
 
 
+def _priority_color_key(value: object) -> str | None:
+    """Normalize a displayed priority/severity value into a palette key."""
+    if value is None or pd.isna(value):
+        return "unset"
+
+    normalized = str(value).strip().lower()
+    if normalized in {"", "nan", "none", "<na>", "unset"}:
+        return "unset"
+
+    aliases = {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+        "p1": "p1",
+        "p2": "p2",
+        "p3": "p3",
+        "1": "p1",
+        "2": "p2",
+        "3": "p3",
+        "priority::1": "p1",
+        "priority::2": "p2",
+        "priority::3": "p3",
+    }
+    return aliases.get(normalized)
+
+
+def _text_color_for_background(color: str) -> str:
+    """Choose a readable text color for a hex background."""
+    normalized = color.strip().lstrip("#")
+    if len(normalized) == 3:
+        normalized = "".join(ch * 2 for ch in normalized)
+    if len(normalized) != 6:
+        return "#ffffff"
+
+    red = int(normalized[0:2], 16)
+    green = int(normalized[2:4], 16)
+    blue = int(normalized[4:6], 16)
+    luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
+    return "#0d1120" if luminance > 0.62 else "#ffffff"
+
+
+def _priority_cell_style(value: object) -> str | None:
+    """Return CSS for the filtered-issues priority cell background."""
+    color_key = _priority_color_key(value)
+    if color_key is None:
+        return None
+
+    palette = get_palette()
+    background = palette.get(color_key)
+    if not background:
+        return None
+
+    return (
+        f"background-color: {background}; "
+        f"color: {_text_color_for_background(background)}; "
+        "font-weight: 700;"
+    )
+
+
 def _selection_mask_for_value(df: pd.DataFrame, value: str) -> pd.Series:
     """Build a chart-selection mask against the overview DataFrame."""
     normalized_value = value.strip()
@@ -805,10 +865,11 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         "milestone": st.column_config.TextColumn("Milestone", width="medium"),
     }
 
-    # Apply styling if Context column exists
+    # Apply styling if context or priority columns are present.
     styler = None
-    if "context" in display_df.columns:
+    if "context" in display_df.columns or "severity" in display_df.columns:
         from app.dashboard.data_loader import load_labels
+
         label_styles = load_labels()
 
         def highlight_context(val: object) -> str | None:
@@ -821,7 +882,11 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
                 return f'background-color: {bg_color}; color: {text_color}'
             return None
 
-        styler = display_df.style.map(highlight_context, subset=["context"])
+        styler = display_df.style
+        if "context" in display_df.columns:
+            styler = styler.map(highlight_context, subset=["context"])
+        if "severity" in display_df.columns:
+            styler = styler.map(_priority_cell_style, subset=["severity"])
 
     # Compact mode: title + assignee only (stage/priority context via chart clicks)
     if compact:
@@ -865,6 +930,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         config={
             "column_config": column_config,
             "column_order": column_order,
+            "height": 640 if not compact else 400,
             "selection_mode": "single-row",
             "key": "issue_drilldown_table",
             "minimize_columns": False,

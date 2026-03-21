@@ -8,6 +8,8 @@ from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
     _build_local_issue_details,
     _is_local_issue_url,
+    _priority_cell_style,
+    _priority_color_key,
     _selection_mask_for_value,
 )
 from tools.local_data_manager import delete_local_projects, discover_local_projects
@@ -105,6 +107,23 @@ def test_build_local_issue_details_uses_seeded_row_data() -> None:
     assert details["description"] == "Local description"
     assert details["web_url"].endswith("issue_iid=3")
     assert details["notes"] == []
+
+
+def test_priority_color_key_normalizes_severity_and_priority_labels() -> None:
+    """Priority cell styling should accept both severity and priority values."""
+    assert _priority_color_key("High") == "high"
+    assert _priority_color_key("P2") == "p2"
+    assert _priority_color_key("priority::3") == "p3"
+    assert _priority_color_key(None) == "unset"
+
+
+def test_priority_cell_style_uses_palette_defaults_for_known_values() -> None:
+    """Priority cell styling should resolve to semantic palette colors."""
+    style = _priority_cell_style("High")
+
+    assert style is not None
+    assert "background-color:" in style
+    assert "font-weight: 700;" in style
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:
