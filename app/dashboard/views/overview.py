@@ -40,6 +40,9 @@ class _IssueDetailsData(TypedDict):
     web_url: str
 
 
+_ISSUE_DIALOG_TOP_MARKER_ID = "issue-details-dialog-top"
+
+
 def _priority_color_key(value: object) -> str | None:
     """Normalize a displayed priority/severity value into a palette key."""
     if value is None or pd.isna(value):
@@ -594,6 +597,11 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     iid = _fmt(row.get("iid"))
     title = _fmt(issue_details["title"] or row.get("title"))
 
+    st.markdown(
+        f'<div id="{_ISSUE_DIALOG_TOP_MARKER_ID}"></div>',
+        unsafe_allow_html=True,
+    )
+
     header_col, action_col = st.columns([0.65, 0.35], gap="small")
     with header_col:
         st.markdown(f"### #{iid} — {_cell(title)}")
@@ -659,6 +667,52 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
         if "selected_issue_title" in st.session_state:
             st.session_state["selected_issue_title"] = ""
         st.rerun()
+
+    _scroll_issue_dialog_to_top()
+
+
+def _scroll_issue_dialog_to_top() -> None:
+    """Scroll the active issue details dialog back to its top anchor."""
+    import streamlit.components.v1 as components
+
+    components.html(_issue_dialog_scroll_script(), height=0, width=0)
+
+
+def _issue_dialog_scroll_script() -> str:
+    """Build the parent-document script that scrolls the dialog to the top."""
+    return f"""
+    <script>
+    (function() {{
+        const parentDoc = window.parent.document;
+        const markerId = "{_ISSUE_DIALOG_TOP_MARKER_ID}";
+
+        function scrollDialogToTop() {{
+            const marker = parentDoc.getElementById(markerId);
+            const dialog = (marker && marker.closest('[role="dialog"]'))
+                || parentDoc.querySelector('[data-testid="stDialog"] [role="dialog"]')
+                || parentDoc.querySelector('[role="dialog"]');
+
+            if (marker) {{
+                marker.scrollIntoView({{ block: 'start', inline: 'nearest' }});
+            }}
+
+            if (!dialog) {{
+                return;
+            }}
+
+            [dialog, ...dialog.querySelectorAll('section, div')].forEach((node) => {{
+                if (node.scrollHeight > node.clientHeight + 24) {{
+                    node.scrollTop = 0;
+                }}
+            }});
+        }}
+
+        [0, 120, 300, 600].forEach((delay) => {{
+            window.setTimeout(scrollDialogToTop, delay);
+        }});
+    }})();
+    </script>
+    """
 
 
 def _chip_html(text: str, bg: str, fg: str) -> str:

@@ -13,6 +13,7 @@ from app.dashboard.views.overview import (
     _normalize_issue_labels,
     _priority_cell_style,
     _priority_color_key,
+    _issue_dialog_scroll_script,
     _selection_mask_for_value,
 )
 from tools.local_data_manager import delete_local_projects, discover_local_projects
@@ -197,6 +198,15 @@ def test_dialog_meta_item_html_adds_separator_and_escapes_content() -> None:
     assert "border-bottom:1px solid rgba(255,255,255,0.14)" in html_markup
     assert "Stage &lt;Current&gt;" in html_markup
     assert "Review &amp; QA" in html_markup
+
+
+def test_issue_dialog_scroll_script_targets_dialog_top_marker() -> None:
+    """Issue dialog scroll helper should target the top marker in the modal."""
+    script = _issue_dialog_scroll_script()
+
+    assert 'const markerId = "issue-details-dialog-top"' in script
+    assert "scrollIntoView" in script
+    assert "node.scrollTop = 0" in script
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:
