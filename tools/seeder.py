@@ -22,6 +22,13 @@ DEFAULT_PROJECT_IDS: Final[list[int]] = [101, 102, 103]
 DEFAULT_ASSIGNMENT_RATE: Final[float] = 0.95
 DEFAULT_MAX_TEAM_MEMBERS: Final[int] = 12
 DEFAULT_DASHBOARD_URL_BASE: Final[str] = "http://localhost:8501"
+NOTE_AUTHOR_POOL: Final[list[tuple[str, str]]] = [
+    ("Alex Rivera", "arivera"),
+    ("Sam Patel", "spatel"),
+    ("Jordan Kim", "jkim"),
+    ("Taylor Nguyen", "tnguyen"),
+    ("Chris Morgan", "cmorgan"),
+]
 
 # Label pools
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
@@ -169,6 +176,14 @@ def generate_issues(
             "milestone_id": milestone_id,
             "milestone_due_date": milestone_due_date,
             "milestone_start_date": milestone_start_date,
+            "notes": _generate_activity_notes(
+                labels=labels,
+                created_at=created_at,
+                updated_at=updated_at,
+                closed_at=closed_at,
+                assignee=assignees[i],
+                state=state,
+            ),
         }
         issues.append(issue)
 
@@ -428,6 +443,107 @@ Related to: {fake.word()} refactoring initiative.
         ]
     
     return random.choice(templates)
+
+
+def _format_note_timestamp(value: datetime) -> str:
+    """Return a stable UTC-like timestamp string for seeded notes."""
+    return value.replace(microsecond=0).isoformat() + "Z"
+
+
+def _build_seeded_note(
+    author_name: str,
+    author_username: str,
+    body: str,
+    created_at: datetime,
+    system: bool = False,
+) -> dict[str, object]:
+    """Build a seeded issue note matching the dashboard dialog schema."""
+    return {
+        "author_name": author_name,
+        "author_username": author_username,
+        "body": body,
+        "created_at": _format_note_timestamp(created_at),
+        "system": system,
+    }
+
+
+def _generate_activity_notes(
+    labels: list[str],
+    created_at: datetime,
+    updated_at: datetime,
+    closed_at: datetime | None,
+    assignee: str | None,
+    state: str,
+) -> list[dict[str, object]]:
+    """Generate synthetic issue activity notes for the local details dialog."""
+    note_count = random.randint(2, 4)
+    timeline_end = closed_at or updated_at
+    if timeline_end < created_at:
+        timeline_end = created_at
+
+    note_times = sorted(
+        _random_date(created_at, timeline_end)
+        for _ in range(note_count)
+    )
+    workflow_labels = [label for label in labels if label.startswith("workflow::")]
+
+    notes: list[dict[str, object]] = []
+    if assignee and random.random() < 0.85:
+        notes.append(
+            _build_seeded_note(
+                author_name="GitLab",
+                author_username="gitlab",
+                body=f"assigned to @{assignee}",
+                created_at=min(created_at + timedelta(hours=2), timeline_end),
+                system=True,
+            )
+        )
+
+    if workflow_labels and random.random() < 0.75:
+        notes.append(
+            _build_seeded_note(
+                author_name="GitLab",
+                author_username="gitlab",
+                body=f"added {workflow_labels[0]}",
+                created_at=min(created_at + timedelta(hours=6), timeline_end),
+                system=True,
+            )
+        )
+
+    comment_templates = [
+        "Investigated the latest repro steps and narrowed this down to the {topic} path.",
+        "Pushed a small follow-up for the {topic} scenario and would like another pass.",
+        "Documented the current behavior so QA can validate the {topic} flow.",
+        "I can reproduce this consistently when exercising the {topic} case.",
+        "Added more context from the logs around the {topic} failure mode.",
+    ]
+    topic = "security flow" if "cve" in labels or "security" in labels else fake.word()
+
+    for note_time in note_times:
+        author_name, author_username = random.choice(NOTE_AUTHOR_POOL)
+        notes.append(
+            _build_seeded_note(
+                author_name=author_name,
+                author_username=author_username,
+                body=random.choice(comment_templates).format(topic=topic),
+                created_at=note_time,
+                system=False,
+            )
+        )
+
+    if state == "closed" and closed_at is not None:
+        notes.append(
+            _build_seeded_note(
+                author_name="GitLab",
+                author_username="gitlab",
+                body="closed",
+                created_at=closed_at,
+                system=True,
+            )
+        )
+
+    notes.sort(key=lambda note: str(note["created_at"]))
+    return notes
 
 
 def seed_data(

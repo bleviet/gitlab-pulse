@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from app.dashboard.utils import normalize_assignee_labels
@@ -45,6 +46,23 @@ def test_generate_issues_allows_unassigned_issues() -> None:
     )
 
     assert df["assignee"].isna().all()
+
+
+def test_generate_issues_adds_example_activity_notes() -> None:
+    """Seeder should attach sample activity notes to generated issues."""
+    df = generate_issues(
+        count=10,
+        project_ids=[101],
+        seed=21,
+        assignment_rate=1.0,
+        max_team_members=3,
+    )
+
+    notes = df["notes"].iloc[0]
+
+    assert isinstance(notes, list)
+    assert notes
+    assert {"author_name", "author_username", "body", "created_at", "system"} <= set(notes[0])
 
 
 def test_normalize_assignee_labels_maps_missing_values_to_unassigned() -> None:
@@ -100,6 +118,18 @@ def test_build_local_issue_details_uses_seeded_row_data() -> None:
             "title": "Seeded issue",
             "description": "Local description",
             "web_url": build_local_issue_url(101, 3),
+            "notes": np.array(
+                [
+                    {
+                        "author_name": "Alex Rivera",
+                        "author_username": "arivera",
+                        "body": "Checked the latest repro.",
+                        "created_at": "2024-01-02T10:00:00Z",
+                        "system": False,
+                    }
+                ],
+                dtype=object,
+            ),
         }
     )
 
@@ -108,7 +138,8 @@ def test_build_local_issue_details_uses_seeded_row_data() -> None:
     assert details["title"] == "Seeded issue"
     assert details["description"] == "Local description"
     assert details["web_url"].endswith("issue_iid=3")
-    assert details["notes"] == []
+    assert len(details["notes"]) == 1
+    assert details["notes"][0]["author_username"] == "arivera"
 
 
 def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:

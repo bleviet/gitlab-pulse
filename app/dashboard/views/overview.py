@@ -139,8 +139,36 @@ def _build_local_issue_details(row: pd.Series) -> _IssueDetailsData:
         "title": str(row.get("title") or ""),
         "description": str(row.get("description") or "").strip(),
         "web_url": str(row.get("web_url") or ""),
-        "notes": [],
+        "notes": _normalize_local_issue_notes(row.get("notes")),
     }
+
+
+def _normalize_local_issue_notes(raw_notes: object) -> list[_IssueNoteData]:
+    """Normalize seeded local-issue notes from parquet into dialog note records."""
+    if raw_notes is None:
+        return []
+
+    values = raw_notes.tolist() if hasattr(raw_notes, "tolist") else raw_notes
+    if isinstance(values, dict):
+        values = [values]
+    if not isinstance(values, list | tuple):
+        return []
+
+    notes: list[_IssueNoteData] = []
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        notes.append(
+            {
+                "author_name": str(value.get("author_name") or ""),
+                "author_username": str(value.get("author_username") or ""),
+                "body": str(value.get("body") or ""),
+                "created_at": str(value.get("created_at") or ""),
+                "system": bool(value.get("system", False)),
+            }
+        )
+
+    return notes
 
 
 def _sync_local_issue_query_selection(df: pd.DataFrame) -> None:
@@ -763,7 +791,7 @@ def _dialog_meta_item_html(
         f'<div style="padding:0.1rem 0 0.7rem 0;'
         f'margin-bottom:0.7rem;border-bottom:1px solid {divider_color};">'
         f'<div style="font-size:0.72rem;letter-spacing:0.08em;'
-        f'text-transform:uppercase;font-weight:700;color:{label_color};'>
+        f'text-transform:uppercase;font-weight:700;color:{label_color};">'
         f"{safe_label}</div>"
         f'<div style="margin-top:0.28rem;font-size:0.98rem;line-height:1.35;'
         f'font-weight:600;color:{value_color};">{safe_value}</div>'
