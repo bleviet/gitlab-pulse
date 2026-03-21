@@ -80,32 +80,37 @@ workflow:
     - name: "Architecture"
       labels: ["workflow::architecture", "status::design"]
       type: "active"
-      description: "Initial design and architectural decisions"
+      description: "Discovery, solution design, and architectural decision-making"
     - name: "Implementation"
       labels: ["workflow::implementation", "status::coding"]
       type: "active"
-      description: "Writing code and implementing features"
+      description: "Building the solution and iterating on the implementation"
     - name: "Review"
       labels: ["workflow::review", "status::mr_open"]
       type: "waiting"
-      description: "Code review and merge request feedback"
+      description: "Peer review, merge request feedback, and approval"
     - name: "Testing"
       labels: ["workflow::test", "status::validation"]
-      type: "active"
-      description: "Quality assurance and testing"
+      type: "waiting"
+      description: "Verification, QA, and release-readiness checks"
     - name: "Done"
       labels: ["workflow::done", "status::released"]
       type: "completed"
-      description: "Work is done and released"
-    # Custom Workflow Example (Uncomment to use)
-    - name: "In Progress"
-      # Matches iteration labels like "iteration-42", "iteration-10"
-      labels: ['regex:^iteration-\d+$']
-      type: "active"
-    - name: "Verification"
-      # Matches dynamic verification label (e.g., iteration-42::verify)
-      labels: ['regex:^iteration-\d+::verify$']
-      type: "waiting"
+      description: "Work is complete, merged, and considered finished"
+
+    # Regex-based label matching is also supported when stages are represented
+    # by dynamic labels instead of fixed workflow names.
+    #
+    # Example:
+    # - name: "Implementation"
+    #   labels: ["regex:^iteration-\\d+$", "regex:^sprint-\\d+$"]
+    #   type: "active"
+    #   description: "Matches iteration-style labels such as iteration-42."
+    #
+    # - name: "Testing"
+    #   labels: ["regex:^iteration-\\d+::verify$", "regex:^qa::.+$"]
+    #   type: "waiting"
+    #   description: "Matches dynamic verification labels such as iteration-42::verify."
 
 validation:
   # Master switch — set to false to bypass all hygiene checks.
