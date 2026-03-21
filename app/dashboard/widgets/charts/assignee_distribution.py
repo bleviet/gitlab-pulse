@@ -96,7 +96,7 @@ def assignee_distribution(
         ),
     )
 
-    fig.update_xaxes(showgrid=False, title="", tickangle=-18, automargin=True)
+    fig.update_xaxes(showgrid=False, title="", tickangle=0, automargin=True)
     fig.update_yaxes(
         showgrid=False,
         title="",
