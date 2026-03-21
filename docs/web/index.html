@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitLabInsight | by bahonavi</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* =========================================
+           BAHONAVI BRAND TOKENS
+           ========================================= */
+        :root {
+            /* Dark Theme (Default) */
+            --bg: #050811;
+            --bg-card: #0c1123;
+            --surface: rgba(255, 255, 255, 0.05);
+            --line: rgba(255, 255, 255, 0.08);
+            --text: #d4deee;
+            --muted: #7a8fa8;
+            --accent: #00f2fe;
+            --nav-bg: rgba(5, 8, 17, 0.84);
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+
+            /* Brand Colors (Universal) */
+            --brand: #ff512f;
+            --brand-2: #dd2476;
+            --grad: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);
+
+            /* Nodes */
+            --node-cyan: #4facfe;
+            --node-pink: #f5576c;
+            --node-purple: #da22ff;
+
+            /* Charts - Dark Theme */
+            --chart-1: #4facfe;
+            --chart-2: #ff7354;
+            --chart-3: #c76bff;
+            --chart-4: #f5576c;
+            --chart-5: #74c7f0;
+            --chart-6: #f4a44a;
+            --chart-7: #56d4b0;
+            --chart-8: #9f7bea;
+            --chart-bg: var(--bg-card);
+            --chart-grid: rgba(255, 255, 255, 0.06);
+            --chart-axis: rgba(255, 255, 255, 0.12);
+            --chart-label: var(--muted);
+            --chart-tooltip-bg: rgba(12, 17, 35, 0.95);
+
+            /* Layout Tokens */
+            --r: 20px;
+            --max: 1140px;
+
+            /* Animation timings */
+            --stagger: 0.15s;
+        }
+
+        [data-theme="light"] {
+            --bg: #e8ecf5;
+            --bg-card: #f1f4fb;
+            --surface: rgba(0, 0, 0, 0.07);
+            --line: rgba(0, 0, 0, 0.14);
+            --text: #0d1120;
+            --muted: #3d5370;
+            --accent: #006ea3;
+            --nav-bg: rgba(232, 236, 245, 0.93);
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+
+            --node-cyan: #005e9e;
+            --node-pink: #b51c3c;
+            --node-purple: #8a0ea8;
+
+            /* Charts - Light Theme */
+            --chart-1: #005e9e;
+            --chart-2: #d63e1a;
+            --chart-3: #8a0ea8;
+            --chart-4: #b51c3c;
+            --chart-5: #0079b3;
+            --chart-6: #b06000;
+            --chart-7: #1a7a62;
+            --chart-8: #5c2e9a;
+            --chart-grid: rgba(0, 0, 0, 0.05);
+            --chart-axis: rgba(0, 0, 0, 0.12);
+            --chart-tooltip-bg: rgba(241, 244, 251, 0.97);
+        }
+
+        /* =========================================
+           BASE RESET & TYPOGRAPHY
+           ========================================= */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Manrope", system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        .display-font {
+            font-family: "Space Grotesk", system-ui, sans-serif;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.05;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        a:hover {
+            opacity: 0.8;
+        }
+
+        .container {
+            width: min(var(--max), calc(100% - 2.5rem));
+            margin: 0 auto;
+        }
+
+        .section-label {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--accent);
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        /* =========================================
+           UTILITIES & COMPONENTS
+           ========================================= */
+        .grad-text {
+            background: var(--grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline-block;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.8rem 1.8rem;
+            border-radius: var(--r);
+            font-family: "Space Grotesk", sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: none;
+            outline: none;
+        }
+
+        .btn-primary {
+            background: var(--grad);
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(255, 81, 47, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(255, 81, 47, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--line);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            border-color: var(--muted);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--r);
+            padding: 2.5rem;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* =========================================
+           LAYOUT & SECTIONS
+           ========================================= */
+        /* Navbar */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .nav-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 80px;
+        }
+
+        .logo {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-mark {
+            width: 24px;
+            height: 24px;
+            background: var(--grad);
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--line);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--surface);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 180px 0 100px;
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Ambient Glows */
+        .hero-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.15;
+            animation: float-glow 10s infinite alternate ease-in-out;
+        }
+
+        .hero-glow-1 {
+            top: -10%;
+            left: -10%;
+            background: var(--node-purple);
+        }
+
+        .hero-glow-2 {
+            bottom: 10%;
+            right: 0%;
+            background: var(--node-cyan);
+            animation-delay: -5s;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: clamp(3rem, 5vw, 4.5rem);
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-content p {
+            font-size: 1.25rem;
+            color: var(--muted);
+            margin-bottom: 2.5rem;
+            max-width: 90%;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Animated Dashboard Abstraction */
+        .dash-mockup {
+            background: var(--bg-card);
+            border: 1px solid var(--line);
+            border-radius: var(--r);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            transform: perspective(1000px) rotateY(-5deg) rotateX(5deg);
+            transform-style: preserve-3d;
+            animation: float 6s infinite ease-in-out;
+        }
+
+        .dash-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 1rem;
+        }
+
+        .dash-skeleton-title {
+            width: 120px;
+            height: 16px;
+            background: var(--surface);
+            border-radius: 4px;
+        }
+
+        .dash-skeleton-nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .dash-skeleton-nav div {
+            width: 40px;
+            height: 16px;
+            background: var(--surface);
+            border-radius: 4px;
+        }
+
+        .dash-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Abstract Donut Chart */
+        .mock-donut-card {
+            background: var(--surface);
+            border-radius: calc(var(--r) / 2);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid var(--line);
+        }
+
+        .donut-ring {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(var(--chart-1) 0% 60%,
+                    var(--chart-6) 60% 85%,
+                    var(--chart-4) 85% 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            animation: spin-in 2s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+        }
+
+        .donut-hole {
+            width: 65%;
+            height: 65%;
+            background: var(--bg-card);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .donut-val {
+            font-family: "Space Grotesk";
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--text);
+        }
+
+        .donut-sub {
+            font-size: 0.6rem;
+            color: var(--muted);
+        }
+
+        /* Abstract Bar Chart */
+        .mock-bar-card {
+            background: var(--surface);
+            border-radius: calc(var(--r) / 2);
+            padding: 1.5rem;
+            grid-column: span 2;
+            border: 1px solid var(--line);
+        }
+
+        .bar-chart-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            height: 120px;
+            margin-top: 1rem;
+            border-bottom: 1px solid var(--chart-grid);
+        }
+
+        .bar {
+            flex: 1;
+            background: var(--chart-1);
+            border-radius: 4px 4px 0 0;
+            transform-origin: bottom;
+            animation: grow-up 1.5s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+        }
+
+        .bar:nth-child(1) {
+            height: 40%;
+            background: var(--chart-7);
+            animation-delay: 0.2s;
+        }
+
+        .bar:nth-child(2) {
+            height: 65%;
+            background: var(--chart-2);
+            animation-delay: 0.3s;
+        }
+
+        .bar:nth-child(3) {
+            height: 30%;
+            background: var(--chart-6);
+            animation-delay: 0.4s;
+        }
+
+        .bar:nth-child(4) {
+            height: 90%;
+            background: var(--chart-1);
+            animation-delay: 0.5s;
+        }
+
+        /* Highlight */
+        .bar:nth-child(5) {
+            height: 50%;
+            background: var(--chart-5);
+            animation-delay: 0.6s;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 242, 254, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            color: var(--accent);
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card p {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .card-accent-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--grad);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover .card-accent-line {
+            opacity: 1;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--line);
+            padding: 3rem 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: 4rem;
+        }
+
+        /* =========================================
+           ANIMATIONS
+           ========================================= */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fade-in-up 0.8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+        }
+
+        .delay-1 {
+            animation-delay: calc(var(--stagger) * 1);
+        }
+
+        .delay-2 {
+            animation-delay: calc(var(--stagger) * 2);
+        }
+
+        .delay-3 {
+            animation-delay: calc(var(--stagger) * 3);
+        }
+
+        @keyframes fade-in-up {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: perspective(1000px) rotateY(-5deg) rotateX(5deg) translateY(0);
+            }
+
+            50% {
+                transform: perspective(1000px) rotateY(-5deg) rotateX(5deg) translateY(-15px);
+            }
+        }
+
+        @keyframes float-glow {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(30px, -30px) scale(1.1);
+            }
+        }
+
+        @keyframes spin-in {
+            from {
+                transform: rotate(-90deg) scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: rotate(0deg) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes grow-up {
+            from {
+                transform: scaleY(0);
+                opacity: 0;
+            }
+
+            to {
+                transform: scaleY(1);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-actions {
+                justify-content: center;
+            }
+
+            .hero-content p {
+                margin: 0 auto 2.5rem;
+            }
+
+            .dash-mockup {
+                transform: none !important;
+                animation: none;
+                max-width: 600px;
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav>
+        <div class="container nav-inner">
+            <div class="logo">
+                <span class="logo-mark"></span>
+                bahonavi
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#dashboard">Dashboard</a>
+                <a href="#integration">GitLab Integration</a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle Theme">
+                    <!-- Sun Icon (visible in dark mode typically, but let's just use a generic toggle icon) -->
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-glow hero-glow-1"></div>
+        <div class="hero-glow hero-glow-2"></div>
+
+        <div class="container hero-grid">
+            <div class="hero-content">
+                <span class="section-label reveal">GitLabInsight App</span>
+                <h1 class="reveal delay-1">Turn GitLab Chaos into <span class="grad-text">Engineering Clarity.</span>
+                </h1>
+                <p class="reveal delay-2">Powerful analytics, intelligent workflow tracking, and delivery snapshots.
+                    Built to help engineering leaders see the matrix of their repositories instantly.</p>
+                <div class="hero-actions reveal delay-3">
+                    <button class="btn btn-primary">Deploy Dashboard</button>
+                    <button class="btn btn-secondary">View Live Demo</button>
+                </div>
+            </div>
+
+            <!-- Dashboard Abstract Mockup -->
+            <div class="dash-mockup reveal delay-2">
+                <div class="dash-header">
+                    <div class="dash-skeleton-title"></div>
+                    <div class="dash-skeleton-nav">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="mock-donut-card">
+                        <div class="donut-ring">
+                            <div class="donut-hole">
+                                <span class="donut-val">1339</span>
+                                <span class="donut-sub">OPEN</span>
+                            </div>
+                        </div>
+                        <div
+                            style="margin-top: 1rem; width: 60px; height: 8px; background: var(--line); border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div class="mock-donut-card">
+                        <div class="donut-ring"
+                            style="animation-delay: 0.2s; background: conic-gradient(var(--chart-7) 0% 80%, var(--chart-2) 80% 100%);">
+                            <div class="donut-hole">
+                                <span class="donut-val">3095</span>
+                                <span class="donut-sub">CLOSED</span>
+                            </div>
+                        </div>
+                        <div
+                            style="margin-top: 1rem; width: 60px; height: 8px; background: var(--line); border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div class="mock-bar-card">
+                        <div style="width: 100px; height: 12px; background: var(--line); border-radius: 4px;"></div>
+                        <div class="bar-chart-container">
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div style="text-align: center;">
+                <span class="section-label reveal">Core Capabilities</span>
+                <h2 class="display-font reveal delay-1" style="font-size: 2.5rem; margin-bottom: 1rem;">Everything you
+                    need to ship faster.</h2>
+                <p class="reveal delay-2" style="color: var(--muted); max-width: 600px; margin: 0 auto;">GitLabInsight
+                    connects directly to your repositories to extract real-time metrics, workflow states, and milestone
+                    health without any configuration.</p>
+            </div>
+
+            <div class="features-grid">
+                <!-- Card 1 -->
+                <div class="card reveal delay-1">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                        </svg>
+                    </div>
+                    <h3>Velocity Tracking</h3>
+                    <p>Monitor daily open vs. closed issues to instantly identify bottlenecks and track the momentum of
+                        your engineering sprints.</p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="card reveal delay-2">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="9" y1="21" x2="9" y2="9"></line>
+                        </svg>
+                    </div>
+                    <h3>Workflow States</h3>
+                    <p>Visualize issues distributed across architecture, implementation, review, and testing phases to
+                        balance workload.</p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="card reveal delay-3">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Delivery Snapshot</h3>
+                    <p>Keep milestones in check. View overdue releases, milestone timelines, and unassigned critical
+                        issues in one focused view.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="logo" style="justify-content: center; margin-bottom: 1rem; opacity: 0.8;">
+                <span class="logo-mark" style="width: 16px; height: 16px;"></span>
+                bahonavi
+            </div>
+            <p>&copy; 2026 Back Home Navigation. Designed according to bahonavi brand guidelines.</p>
+        </div>
+    </footer>
+
+    <!-- Interactive Scripts -->
+    <script>
+        // Theme Toggle Logic
+        const toggleBtn = document.getElementById('themeToggle');
+        const htmlDoc = document.documentElement;
+
+        toggleBtn.addEventListener('click', () => {
+            const currentTheme = htmlDoc.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                htmlDoc.setAttribute('data-theme', 'light');
+            } else {
+                htmlDoc.setAttribute('data-theme', 'dark');
+            }
+        });
+
+        // Intersection Observer for scroll animations (re-trigger reveals if needed, or simply let CSS handle initial load)
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: "0px 0px -50px 0px"
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Elements are already animated on load via CSS, 
+                    // but if they were hidden, we could add a class here.
+                    // For this landing page, the initial load handles the hero beautifully.
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach(el => {
+            // Optional: Pause animation until scroll into view
+            // el.style.animationPlayState = 'paused';
+            observer.observe(el);
+        });
+    </script>
+</body>
+
+</html>
