@@ -3,20 +3,25 @@
 Coordinates the full sync pipeline: REST → Raw → GraphQL → Transform → Parquet.
 """
 
+import argparse
 import logging
 import os
-from datetime import datetime
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Optional
 
 import pandas as pd
+from dotenv import load_dotenv
+from gitlab.exceptions import GitlabGetError
 
 from app.collector.gql_client import GqlClient
 from app.collector.rest_client import RestClient
 from app.collector.state import StateManager
-from app.shared.schemas import RawIssue
+from app.shared.schemas import RawIssue, RawLabel, RawMilestone
 
 logger = logging.getLogger(__name__)
+
+FAILED_SYNC = -1
+SKIPPED_LOCAL_PROJECT = -2
 
 
 class Orchestrator:
@@ -28,8 +33,8 @@ class Orchestrator:
 
     def __init__(
         self,
-        gitlab_url: Optional[str] = None,
-        private_token: Optional[str] = None,
+        gitlab_url: str | None = None,
+        private_token: str | None = None,
         data_path: Path = Path("data"),
     ) -> None:
         """Initialize the orchestrator.
@@ -57,7 +62,7 @@ class Orchestrator:
     def sync_project(
         self,
         project_id: int,
-        project_path: Optional[str] = None,
+        project_path: str | None = None,
         full_sync: bool = False,
     ) -> int:
         """Sync issues from a single GitLab project.
@@ -136,7 +141,7 @@ class Orchestrator:
 
     def sync_all(
         self,
-        project_ids: Optional[list[int]] = None,
+        project_ids: list[int] | None = None,
         full_sync: bool = False,
     ) -> dict[int, int]:
         """Sync issues from multiple projects.
@@ -168,11 +173,46 @@ class Orchestrator:
             try:
                 count = self.sync_project(project_id, full_sync=full_sync)
                 results[project_id] = count
+            except GitlabGetError as e:
+                if self._should_skip_missing_project(project_id, e):
+                    results[project_id] = SKIPPED_LOCAL_PROJECT
+                    continue
+
+                logger.error(f"Failed to sync project {project_id}: {e}")
+                results[project_id] = FAILED_SYNC
             except Exception as e:
                 logger.error(f"Failed to sync project {project_id}: {e}")
-                results[project_id] = -1
+                results[project_id] = FAILED_SYNC
 
         return results
+
+    def _should_skip_missing_project(
+        self,
+        project_id: int,
+        error: GitlabGetError,
+    ) -> bool:
+        """Return True when a missing remote project should be treated as local-only.
+
+        Synthetic test data is seeded directly into `data/processed/` without
+        creating a matching GitLab project. If the user leaves those seeded IDs in
+        `PROJECT_IDS`, the collector should preserve the local data and continue
+        syncing real projects instead of reporting a hard failure.
+        """
+        if error.response_code != 404:
+            return False
+
+        local_issues_path = self.processed_path / f"issues_{project_id}.parquet"
+        if not local_issues_path.exists():
+            return False
+
+        logger.warning(
+            "Skipping project %s: remote GitLab project was not found, but local "
+            "processed data already exists at %s. This usually means the project "
+            "ID came from synthetic seeded data rather than a live GitLab project.",
+            project_id,
+            local_issues_path,
+        )
+        return True
 
     def _persist_processed(self, project_id: int, issues: list[RawIssue]) -> None:
         """Persist validated issues to Parquet (Layer 1 output).
@@ -204,10 +244,8 @@ class Orchestrator:
             # Explicitly cast all-NA columns in new_df to match existing_df types where possible
             for col in new_df.columns:
                 if col in existing_df.columns and new_df[col].isna().all():
-                    try:
+                    with suppress(Exception):
                         new_df[col] = new_df[col].astype(existing_df[col].dtype)
-                    except Exception:
-                        pass # Keep as is if cast fails
 
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
             combined_df = combined_df.drop_duplicates(subset=["id"], keep="last")
@@ -221,13 +259,15 @@ class Orchestrator:
 
         logger.info(f"Persisted {len(issues)} issues to {filepath}")
 
-    def _persist_milestones(self, project_id: int, milestones: list) -> None:
+    def _persist_milestones(
+        self,
+        project_id: int,
+        milestones: list[RawMilestone],
+    ) -> None:
         """Persist milestones to Parquet (Layer 1 output).
 
         Replaces entire file (milestones are lightweight, no incremental needed).
         """
-        from app.shared.schemas import RawMilestone
-
         filepath = self.processed_path / f"milestones_{project_id}.parquet"
 
         # Convert to DataFrame
@@ -245,7 +285,11 @@ class Orchestrator:
 
         logger.info(f"Persisted {len(milestones)} milestones to {filepath}")
 
-    def _persist_labels(self, project_id: int, labels: list) -> None:
+    def _persist_labels(
+        self,
+        project_id: int,
+        labels: list[RawLabel],
+    ) -> None:
         """Persist labels to Parquet (Layer 1 output).
 
         Replaces entire file.
@@ -253,7 +297,7 @@ class Orchestrator:
         filepath = self.processed_path / f"labels_{project_id}.parquet"
 
         # Convert to DataFrame
-        df = pd.DataFrame([l.model_dump() for l in labels])
+        df = pd.DataFrame([label.model_dump() for label in labels])
 
         # Atomic write
         tmp_filepath = filepath.with_suffix(".tmp")
@@ -265,9 +309,6 @@ class Orchestrator:
 
 def main() -> None:
     """CLI entry point for the collector."""
-    import argparse
-    from dotenv import load_dotenv
-
     load_dotenv()
 
 
@@ -292,7 +333,12 @@ def main() -> None:
 
     print("\nSync Results:")
     for project_id, count in results.items():
-        status = f"{count} issues" if count >= 0 else "FAILED"
+        if count == SKIPPED_LOCAL_PROJECT:
+            status = "SKIPPED (local seeded data)"
+        elif count == FAILED_SYNC:
+            status = "FAILED"
+        else:
+            status = f"{count} issues"
         print(f"  Project {project_id}: {status}")
 
 

@@ -12,6 +12,9 @@ uv sync --dev
 # Generate synthetic test data (Local)
 uv run python tools/seeder.py --count 1000 --inject-errors
 
+# Or manage local synthetic projects interactively
+uv run python tools/local_data_manager.py
+
 # Or seed a live GitLab project (Remote)
 uv run python tools/gitlab_seeder.py --project-id <YOUR_PROJECT_ID> --count 50 --inject-errors
 
@@ -38,8 +41,72 @@ uv run streamlit run app/dashboard/main.py
 ```bash
 export GITLAB_URL="https://gitlab.com"
 export GITLAB_TOKEN="your-token"
-export PROJECT_IDS="101,102,103"
+export PROJECT_IDS="12345,67890"
 ```
+
+`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not create live GitLab projects. Keep `PROJECT_IDS` limited to real GitLab project IDs when running `app/collector/orchestrator.py`.
+
+### Reset and Recreate Local Seeded Data
+
+If you want to discard the synthetic local dataset and generate a fresh one with more realistic totals, delete the seeded outputs and run the seeder again:
+
+```bash
+# Remove seeded Layer 1 files
+rm -f data/processed/issues_101.parquet data/processed/issues_102.parquet data/processed/issues_103.parquet
+
+# Optionally clear Layer 2 analytics output
+rm -f data/analytics/*.parquet
+
+# Optionally reset collector sync state
+rm -f data/state/sync_state.json
+
+# Recreate local seeded data with more volume
+uv run python tools/seeder.py --count 5000 --projects 101,102,103 --inject-errors --seed 42
+
+# Rebuild analytics
+uv run python app/processor/main.py
+```
+
+Increasing `--count` gives you more total tickets. By default, the seeder assigns an assignee to roughly 95% of generated issues, and you can override that with `--assignment-rate`.
+
+### Local Data Manager
+
+For faster testing and validation, use the terminal manager:
+
+```bash
+uv run python tools/local_data_manager.py
+```
+
+It can:
+- detect local projects from `data/processed/issues_*.parquet`
+- show per-project counts, open/closed totals, assigned totals, and unique assignees
+- create or reseed local projects with different options
+- delete selected local projects or all detected local data
+- rebuild analytics after changes
+- reset, reseed, and rebuild in one flow
+
+You can also use it non-interactively:
+
+```bash
+# List detected local projects
+uv run python tools/local_data_manager.py --action list
+
+# Create or reseed specific projects
+uv run python tools/local_data_manager.py \
+  --action seed \
+  --project-ids 101,102,103 \
+  --count 5000 \
+  --assignment-rate 1.0 \
+  --max-team-members 8 \
+  --seed 42
+
+# Delete specific local projects
+uv run python tools/local_data_manager.py --action delete --project-ids 101,102,103
+```
+
+The seeder now supports:
+- `--assignment-rate` to control how many issues get an assignee
+- `--max-team-members` to cap the number of distinct assignees and simulate a realistic team size
 
 ### Rules Configuration
 
@@ -96,6 +163,9 @@ uv run pytest tests/ -v
 # Generate test data with errors
 uv run python tools/seeder.py --count 10000 --inject-errors
 
+# Generate test data with a bounded team size
+uv run python tools/seeder.py --count 10000 --assignment-rate 1.0 --max-team-members 8
+
 # Profile Layer 2 performance
 uv run python -m cProfile -s time app/processor/main.py
 ```
@@ -109,38 +179,13 @@ uv run python -m cProfile -s time app/processor/main.py
 **Q: Do the issue lists include quality issues?**
 **A:** No. The list in the Overview view shows only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
 
-### Flow View Metrics
-**Q: What does "Active WIP" mean?**
-**A:** It counts issues currently in a stage defined as `type: "active"` (e.g., *Architecture*, *Implementation*, *Testing*) in your `rules.yaml`. It represents work actively being processed, excluding items in "waiting" states (like *Review*).
-
-**Q: What is "Flow Efficiency"?**
-**A:** It is the ratio of meaningful work time vs. total time in the system.
-$$ \text{Flow Efficiency} = \frac{\text{Active Items}}{\text{Active Items} + \text{Waiting Items}} \times 100 $$
-A low efficiency (e.g., < 20%) indicates that work spends most of its time waiting (e.g., for Code Review) rather than being developed.
-
 **Q: What are "Backlog" items?**
 **A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
-
-**Q: How do I interpret the "Days in Stage (Aging)" graph?**
-**A:** This **Box Plot** visualizes the distribution of time (in days) that issues have spent in their *current* stage without an update.
-- **X-Axis:** Workflow Stages (e.g., *Implementation*, *Review*).
-- **Y-Axis:** Days in current stage.
-- **Box & Whiskers:** Shows the median time (line inside box) and variability.
-- **Dots:** Outliers—issues that have been stuck significantly longer than others in the same stage.
-Use this to identify **stalled work** or process bottlenecks.
-
-### Interactive Flow Features
-**Q: How do I filter the Flow charts?**
-**A:** The **Work by Stage** and **Days in Stage** charts are interactive:
-- **Click**: Select a single stage or segment to filter the Issue Drill-down table.
-- **Shift+Click**: Select multiple segments for combined analysis.
-- **Double-Click**: Reset the selection to show all data.
-- **Tabs**: Switch between "Work by Stage" (Full Width) and "Days in Stage" (Full Width) to delve into different aspects of the flow without visual clutter.
 
 ### Multi-Context Issues
 **Q: What if an issue belongs to multiple contexts (e.g., "R&D" and "Customer")?**
 **A:**
-- **Metrics & Charts**: The issue is counted **only once** (deduplicated) in global metrics like "Active WIP" and the "Work by Stage" to ensure accurate counts.
+- **Metrics & Charts**: The issue is counted **only once** (deduplicated).
 - **Issue Table**: The issue appears **twice** (or more), once for each context, allowing you to see it in every relevant slice.
 
 ### Help & Descriptions

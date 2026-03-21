@@ -9,7 +9,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Final, cast
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,9 @@ from faker import Faker
 
 logger = logging.getLogger(__name__)
 fake = Faker()
+DEFAULT_PROJECT_IDS: Final[list[int]] = [101, 102, 103]
+DEFAULT_ASSIGNMENT_RATE: Final[float] = 0.95
+DEFAULT_MAX_TEAM_MEMBERS: Final[int] = 12
 
 # Label pools
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
@@ -39,10 +42,12 @@ WORK_ITEM_TYPES = ["ISSUE", "TASK"]
 
 def generate_issues(
     count: int = 1000,
-    project_ids: Optional[list[int]] = None,
+    project_ids: list[int] | None = None,
     years: int = 2,
     inject_errors: bool = False,
-    seed: Optional[int] = None,
+    seed: int | None = None,
+    assignment_rate: float = DEFAULT_ASSIGNMENT_RATE,
+    max_team_members: int = DEFAULT_MAX_TEAM_MEMBERS,
 ) -> pd.DataFrame:
     """Generate synthetic issue data.
 
@@ -52,6 +57,8 @@ def generate_issues(
         years: Years of history to simulate
         inject_errors: Whether to inject quality errors
         seed: Random seed for reproducibility
+        assignment_rate: Ratio of issues assigned to a team member
+        max_team_members: Maximum number of distinct team members
 
     Returns:
         DataFrame with RawIssue schema
@@ -62,12 +69,20 @@ def generate_issues(
         Faker.seed(seed)
 
     if project_ids is None:
-        project_ids = [101, 102, 103]
+        project_ids = DEFAULT_PROJECT_IDS.copy()
+
+    if not 0.0 <= assignment_rate <= 1.0:
+        raise ValueError("assignment_rate must be between 0.0 and 1.0")
+
+    if max_team_members < 1:
+        raise ValueError("max_team_members must be at least 1")
 
     now = datetime.now()
     start_date = now - timedelta(days=years * 365)
+    team_members = _build_team_members(max_team_members)
+    assignees = _build_assignee_sequence(count, team_members, assignment_rate)
 
-    issues: list[dict] = []
+    issues: list[dict[str, object]] = []
 
     for i in range(count):
         issue_id = 10000 + i
@@ -103,32 +118,30 @@ def generate_issues(
         work_item_type = random.choices(WORK_ITEM_TYPES, weights=[0.8, 0.2])[0]
 
         # Hierarchy (only for tasks)
-        parent_id: Optional[int] = None
-        if work_item_type == "TASK":
-            # 90% of tasks have a parent
-            if random.random() < 0.9:
-                # Sometimes reference existing issue, sometimes orphan
-                if inject_errors and random.random() < 0.02:
-                    parent_id = 99999  # Zombie: non-existent parent
-                elif i > 0:
-                    parent_id = 10000 + random.randint(0, max(0, i - 1))
+        parent_id: int | None = None
+        if work_item_type == "TASK" and random.random() < 0.9:
+            # Sometimes reference existing issue, sometimes orphan
+            if inject_errors and random.random() < 0.02:
+                parent_id = 99999  # Zombie: non-existent parent
+            elif i > 0:
+                parent_id = 10000 + random.randint(0, max(0, i - 1))
 
         # Milestone generation
-        milestone: Optional[str] = None
-        milestone_id: Optional[int] = None
-        milestone_due_date: Optional[datetime] = None
-        milestone_start_date: Optional[datetime] = None
-        
+        milestone: str | None = None
+        milestone_id: int | None = None
+        milestone_due_date: datetime | None = None
+        milestone_start_date: datetime | None = None
+
         if random.random() < 0.6:
             ms_ver = random.randint(1, 5)
             milestone = f"v1.{ms_ver}"
             milestone_id = 500 + ms_ver
-            
+
             # Simulated schedule: v1.1 starts Jan 1st 2025, each lasts 30 days
             base_date = datetime(2025, 1, 1)
             ms_start = base_date + timedelta(days=(ms_ver - 1) * 30)
             ms_due = ms_start + timedelta(days=28)
-            
+
             milestone_start_date = ms_start
             milestone_due_date = ms_due
 
@@ -147,7 +160,7 @@ def generate_issues(
             "parent_id": parent_id,
             "child_ids": [],
             "web_url": f"https://gitlab.example.com/project/-/issues/{i + 1}",
-            "assignee": fake.user_name() if random.random() < 0.8 else None,
+            "assignee": assignees[i],
             "milestone": milestone,
             "milestone_id": milestone_id,
             "milestone_due_date": milestone_due_date,
@@ -160,14 +173,68 @@ def generate_issues(
     issue_map = {issue["id"]: issue for issue in issues}
 
     for issue in issues:
-        parent_id = issue.get("parent_id")
-        if parent_id and parent_id in issue_map:
-            parent = issue_map[parent_id]
-            if "child_ids" not in parent:
-                parent["child_ids"] = []
-            parent["child_ids"].append(issue["iid"])  # linking by IID as per schema
+        issue_parent_id = issue.get("parent_id")
+        if isinstance(issue_parent_id, int) and issue_parent_id in issue_map:
+            parent = issue_map[issue_parent_id]
+            child_ids = parent.get("child_ids")
+            if isinstance(child_ids, list):
+                typed_child_ids = cast(list[int], child_ids)
+            else:
+                typed_child_ids = []
+                parent["child_ids"] = typed_child_ids
+
+            child_iid = issue.get("iid")
+            if isinstance(child_iid, int):
+                typed_child_ids.append(child_iid)  # linking by IID as per schema
 
     return pd.DataFrame(issues)
+
+
+def _build_team_members(max_team_members: int) -> list[str]:
+    """Create a bounded pool of realistic team-member usernames."""
+    team_members: list[str] = []
+    seen: set[str] = set()
+
+    while len(team_members) < max_team_members:
+        username = fake.user_name()
+        if username in seen:
+            continue
+        seen.add(username)
+        team_members.append(username)
+
+    return team_members
+
+
+def _build_assignee_sequence(
+    count: int,
+    team_members: list[str],
+    assignment_rate: float,
+) -> list[str | None]:
+    """Build a deterministic-length assignee list for generated issues."""
+    assignees: list[str | None] = [None] * count
+    assigned_count = min(count, round(count * assignment_rate))
+
+    if assigned_count == 0:
+        return assignees
+
+    assigned_indexes = random.sample(range(count), assigned_count)
+    random.shuffle(assigned_indexes)
+
+    guaranteed_members = team_members.copy()
+    random.shuffle(guaranteed_members)
+    guaranteed_count = min(len(guaranteed_members), assigned_count)
+
+    for member, index in zip(
+        guaranteed_members[:guaranteed_count],
+        assigned_indexes[:guaranteed_count],
+        strict=True,
+    ):
+        assignees[index] = member
+
+    for index in assigned_indexes[guaranteed_count:]:
+        assignees[index] = random.choice(team_members)
+
+    return assignees
 
 
 def _random_date(start: datetime, end: datetime) -> datetime:
@@ -252,10 +319,10 @@ def _generate_title(labels: list[str]) -> str:
             f"Task: {fake.sentence(nb_words=4)}",
             f"Clean up {fake.word()} code",
             # Context-specific templates
-            f"Investigate vulnerability report", # for Security
+            "Investigate vulnerability report",  # for Security
             f"Review CVE-2024-{random.randint(1000,9999)}",
         ]
-    
+
     # Inject keywords randomly for Context testing
     if random.random() < 0.3:
         keywords = ["Go", "SQL", "Postgres", "Database", "Vulnerability", "Exploit"]
@@ -344,10 +411,12 @@ Related to: {fake.word()} refactoring initiative.
 
 def seed_data(
     count: int = 1000,
-    project_ids: Optional[list[int]] = None,
+    project_ids: list[int] | None = None,
     inject_errors: bool = False,
     output_path: Path = Path("data/processed"),
-    seed: Optional[int] = None,
+    seed: int | None = None,
+    assignment_rate: float = DEFAULT_ASSIGNMENT_RATE,
+    max_team_members: int = DEFAULT_MAX_TEAM_MEMBERS,
 ) -> None:
     """Generate and save synthetic data to Parquet.
 
@@ -357,19 +426,30 @@ def seed_data(
         inject_errors: Whether to inject quality errors
         output_path: Output directory for Parquet files
         seed: Random seed
+        assignment_rate: Ratio of issues assigned to a team member
+        max_team_members: Maximum number of distinct team members
     """
     if project_ids is None:
-        project_ids = [101, 102, 103]
+        project_ids = DEFAULT_PROJECT_IDS.copy()
 
     output_path.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Generating {count} synthetic issues for projects {project_ids}")
+    logger.info(
+        "Generating %s synthetic issues for projects %s "
+        "(assignment_rate=%s, max_team_members=%s)",
+        count,
+        project_ids,
+        assignment_rate,
+        max_team_members,
+    )
 
     df = generate_issues(
         count=count,
         project_ids=project_ids,
         inject_errors=inject_errors,
         seed=seed,
+        assignment_rate=assignment_rate,
+        max_team_members=max_team_members,
     )
 
     # Save per-project files (like Layer 1 output)
@@ -398,6 +478,18 @@ def main() -> None:
     parser.add_argument("--inject-errors", action="store_true", help="Inject quality errors")
     parser.add_argument("--output", type=str, default="data/processed", help="Output directory")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser.add_argument(
+        "--assignment-rate",
+        type=float,
+        default=DEFAULT_ASSIGNMENT_RATE,
+        help="Ratio of issues assigned to a team member (0.0 to 1.0)",
+    )
+    parser.add_argument(
+        "--max-team-members",
+        type=int,
+        default=DEFAULT_MAX_TEAM_MEMBERS,
+        help="Maximum number of distinct team members used as assignees",
+    )
     args = parser.parse_args()
 
     project_ids = [int(p.strip()) for p in args.projects.split(",")]
@@ -408,11 +500,15 @@ def main() -> None:
         inject_errors=args.inject_errors,
         output_path=Path(args.output),
         seed=args.seed,
+        assignment_rate=args.assignment_rate,
+        max_team_members=args.max_team_members,
     )
 
     print(f"\n✅ Generated {args.count} synthetic issues")
     print(f"   Projects: {project_ids}")
     print(f"   Errors injected: {args.inject_errors}")
+    print(f"   Assignment rate: {args.assignment_rate}")
+    print(f"   Max team members: {args.max_team_members}")
     print(f"   Output: {args.output}/")
 
 

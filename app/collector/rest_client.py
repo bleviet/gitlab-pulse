@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import gitlab
 from gitlab.v4.objects import ProjectIssue
@@ -27,8 +27,8 @@ class RestClient:
 
     def __init__(
         self,
-        gitlab_url: Optional[str] = None,
-        private_token: Optional[str] = None,
+        gitlab_url: str | None = None,
+        private_token: str | None = None,
         raw_data_path: Path = Path("data/raw"),
     ) -> None:
         """Initialize the REST client.
@@ -51,7 +51,7 @@ class RestClient:
     def fetch_issues(
         self,
         project_id: int,
-        updated_after: Optional[datetime] = None,
+        updated_after: datetime | None = None,
         persist_raw: bool = True,
     ) -> list[RawIssue]:
         """Fetch issues from a GitLab project.
@@ -130,7 +130,7 @@ class RestClient:
     def get_project_path(self, project_id: int) -> str:
         """Fetch the full project path (namespace/name)."""
         project = self.gl.projects.get(project_id)
-        return project.path_with_namespace
+        return str(project.path_with_namespace)
 
     def fetch_milestones(self, project_id: int) -> list[RawMilestone]:
         """Fetch all milestones from a GitLab project.
