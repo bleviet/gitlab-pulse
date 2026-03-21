@@ -696,21 +696,15 @@ def _render_dialog_meta(row: pd.Series) -> None:
     """Render metadata fields in the right column of the dialog body."""
     days = row.get("days_in_stage")
     age = row.get("age_days")
-    cycle = row.get("cycle_time")
-
-    if pd.notna(days):
-        st.metric("Days in Stage", f"{int(days)}d")
-    if pd.notna(age):
-        st.metric("Age", f"{int(age)}d")
-    if pd.notna(cycle):
-        st.metric("Cycle Time", f"{int(cycle)}d")
 
     text_fields: list[tuple[str, str]] = [
+        ("Stage", _fmt(row.get("stage"))),
         ("State", _fmt(row.get("state"))),
         ("Assignee", _fmt(row.get("assignee"))),
-        ("Team", _fmt(row.get("team"))),
         ("Milestone", _fmt(row.get("milestone"))),
         ("Context", _fmt(row.get("context"))),
+        ("Days in Stage", _fmt(row.get("days_in_stage")) if pd.notna(row.get("days_in_stage")) else "—"),
+        ("Age", _fmt(row.get("age_days")) if pd.notna(row.get("age_days")) else "—"),
     ]
     for label, value in text_fields:
         if value != "—":
