@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.dashboard.views.overview import _build_local_issue_details, _is_local_issue_url
+from app.dashboard.utils import normalize_assignee_labels
+from app.dashboard.views.overview import (
+    _build_local_issue_details,
+    _is_local_issue_url,
+    _selection_mask_for_value,
+)
 from tools.local_data_manager import delete_local_projects, discover_local_projects
 from tools.seeder import build_local_issue_url, generate_issues, seed_data
 
@@ -36,6 +41,38 @@ def test_generate_issues_allows_unassigned_issues() -> None:
     )
 
     assert df["assignee"].isna().all()
+
+
+def test_normalize_assignee_labels_maps_missing_values_to_unassigned() -> None:
+    """Dashboard assignee labels should treat missing values consistently."""
+    labels = normalize_assignee_labels(
+        pd.Series([None, "", "  ", "nan", "<NA>", "None", "alice"])
+    )
+
+    assert labels.tolist() == [
+        "Unassigned",
+        "Unassigned",
+        "Unassigned",
+        "Unassigned",
+        "Unassigned",
+        "Unassigned",
+        "alice",
+    ]
+
+
+def test_selection_mask_matches_unassigned_assignee_rows() -> None:
+    """Clicking the Unassigned assignee bar should match null and blank assignees."""
+    df = pd.DataFrame(
+        [
+            {"id": 1, "assignee": None, "stage": "Todo", "severity": None, "state": "opened"},
+            {"id": 2, "assignee": "", "stage": "Doing", "severity": "medium", "state": "opened"},
+            {"id": 3, "assignee": "alice", "stage": "Done", "severity": "high", "state": "closed"},
+        ]
+    )
+
+    mask = _selection_mask_for_value(df, "Unassigned")
+
+    assert mask.tolist() == [True, True, False]
 
 
 def test_build_local_issue_url_uses_dashboard_query_params() -> None:

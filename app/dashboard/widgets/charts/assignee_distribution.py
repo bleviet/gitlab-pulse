@@ -7,6 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 from app.dashboard.theme import get_palette, get_plotly_font_color, plotly_layout
+from app.dashboard.utils import normalize_assignee_labels
 
 
 def assignee_distribution(
@@ -37,20 +38,7 @@ def assignee_distribution(
         st.info("No issue data.")
         return None
 
-    assignee_labels = (
-        display_df["assignee"]
-        .fillna("Unassigned")
-        .astype(str)
-        .str.strip()
-        .replace(
-            {
-                "": "Unassigned",
-                "nan": "Unassigned",
-                "<NA>": "Unassigned",
-                "None": "Unassigned",
-            }
-        )
-    )
+    assignee_labels = normalize_assignee_labels(display_df["assignee"])
     agg_df = (
         assignee_labels.value_counts()
         .head(limit)

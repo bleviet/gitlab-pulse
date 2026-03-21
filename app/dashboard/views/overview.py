@@ -14,7 +14,7 @@ import streamlit as st
 from gitlab.exceptions import GitlabError
 
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
-from app.dashboard.utils import sort_hierarchy
+from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
 from app.dashboard.widgets import charts, tables
 
 
@@ -35,6 +35,29 @@ class _IssueDetailsData(TypedDict):
     notes: list[_IssueNoteData]
     title: str
     web_url: str
+
+
+def _selection_mask_for_value(df: pd.DataFrame, value: str) -> pd.Series:
+    """Build a chart-selection mask against the overview DataFrame."""
+    normalized_value = value.strip()
+    severity_mask = df["severity"].astype(str).str.contains(
+        normalized_value, case=False, na=False
+    )
+    if normalized_value.lower() == "low":
+        severity_mask = severity_mask | df["severity"].isna() | df["severity"].astype(
+            str
+        ).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
+
+    assignee_mask = normalize_assignee_labels(df["assignee"]).str.contains(
+        normalized_value, case=False, na=False
+    )
+
+    return (
+        df["stage"].astype(str).str.contains(normalized_value, case=False, na=False)
+        | assignee_mask
+        | severity_mask
+        | df["state"].astype(str).str.contains(normalized_value, case=False, na=False)
+    )
 
 
 def _is_local_issue_url(url: object) -> bool:
@@ -389,18 +412,8 @@ def render_overview(
                 else:
                     # Simple loose string matching for any column
                     val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
-                    
-                    # In charts, missing/none severity is coerced to "Low". Include them if searching for "Low".
-                    sev_mask = (filtered_df["severity"].astype(str).str.contains(val, case=False, na=False))
-                    if val.lower() == "low":
-                        sev_mask = sev_mask | filtered_df["severity"].isna() | filtered_df["severity"].astype(str).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
-                    
-                    mask = (
-                        (filtered_df["stage"].astype(str).str.contains(val, case=False, na=False)) |
-                        (filtered_df["assignee"].astype(str).str.contains(val, case=False, na=False)) |
-                        sev_mask |
-                        (filtered_df["state"].astype(str).str.contains(val, case=False, na=False))
-                    )
+
+                    mask = _selection_mask_for_value(filtered_df, val)
                     if mask.any():
                         filtered_df = filtered_df[mask]
                     else:

@@ -3,6 +3,23 @@ import pandas as pd
 from app.dashboard.theme import get_palette
 
 
+def normalize_assignee_labels(series: pd.Series) -> pd.Series:
+    """Normalize assignee values for display and filtering."""
+    return (
+        series.fillna("Unassigned")
+        .astype(str)
+        .str.strip()
+        .replace(
+            {
+                "": "Unassigned",
+                "nan": "Unassigned",
+                "<NA>": "Unassigned",
+                "None": "Unassigned",
+            }
+        )
+    )
+
+
 def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str = "id", title_col: str = "title") -> pd.DataFrame:
     """Sort DataFrame hierarchically: Parent followed by Children.
 
@@ -30,7 +47,6 @@ def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str 
 
     for idx, row in df.iterrows():
         pid = row[parent_col]
-        iid = row[id_col]
 
         # If parent is NaN or not in the current dataset, treat as root
         if pd.isna(pid) or pid not in all_ids:
