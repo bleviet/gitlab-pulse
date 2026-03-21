@@ -29,12 +29,11 @@ try:
     # Verify specific attributes
     print("Checking widget attributes...")
     _ = charts.milestone_timeline
-    _ = charts.milestone_burnup
     _ = tables.issue_detail_grid
     _ = features.ai_assistant
     print("✅ Widget attributes verified")
 
-    from app.dashboard.views import capacity, release, hygiene, overview, stats, aging, admin
+    from app.dashboard.views import capacity, hygiene, overview, admin
     print("✅ Views imported")
 
     print("\nAll modules loaded successfully.")

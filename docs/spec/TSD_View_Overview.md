@@ -66,7 +66,7 @@ The **"Overview"** view provides insights into process health.
     *   **Descriptions:** Tooltips show stage descriptions from config.
     *   **Interaction:** Click to filter, Shift+Click to multi-select, Double-Click to reset.
 
-### **3.2. Days in Stage (Aging)**
+### **3.2. Days in Stage**
 *   **Type:** Boxplot.
 *   **Layout:** Full-width Tab ("Days in Stage").
 *   **Data:** Unique issues (deduplicated).

@@ -1,6 +1,6 @@
 # GitLabInsight
 
-A versatile analytics platform for GitLab issue data. Extracts, validates, and visualizes project metrics like Aging and Throughput using a **Clean Architecture** and **Medallion Data Pattern**.
+A versatile analytics platform for GitLab issue data. Extracts, validates, and visualizes workflow health and throughput using a **Clean Architecture** and **Medallion Data Pattern**.
 
 ## Quick Start
 
@@ -104,10 +104,10 @@ uv run python -m cProfile -s time app/processor/main.py
 
 ### Data Inclusion Logic
 **Q: Are quality issues included in "Open Issues" or "Bug Ratio" metrics?**
-**A:** No. All metrics in the Overview, Release, Capacity, Stats, and Aging pages are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect operational metrics.
+**A:** No. The operational metrics shown in the Overview and Capacity pages are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect those metrics.
 
 **Q: Do the issue lists include quality issues?**
-**A:** No. The lists in Overview, Release, Capacity, and Aging views show only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
+**A:** No. The lists in the Overview and Capacity views show only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
 
 ### Flow View Metrics
 **Q: What does "Active WIP" mean?**

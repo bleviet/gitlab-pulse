@@ -150,10 +150,9 @@ These 7 widgets already use `plotly_layout()`. They only need import changes:
 
 #### Widgets with manual Plotly layouts — moderate change
 
-These 4 widgets build `fig.update_layout(font=dict(family=FONT_FAMILY, color=get_plotly_font_color()), ...)` manually. They will be refactored to use `plotly_layout()`:
+These 3 widgets build `fig.update_layout(font=dict(family=FONT_FAMILY, color=get_plotly_font_color()), ...)` manually. They will be refactored to use `plotly_layout()`:
 
 - [burnup_velocity.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/widgets/charts/burnup_velocity.py) — replace manual layout with `plotly_layout()`; drop `FONT_FAMILY`, `get_plotly_font_color` imports
-- [milestone_burnup.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/widgets/charts/milestone_burnup.py) — same treatment
 - [milestone_timeline.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/widgets/charts/milestone_timeline.py) — same treatment
 - [stage_distribution.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/widgets/charts/stage_distribution.py) — replace `PALETTE as COLORS` + manual font references; use `plotly_layout()` + `get_palette()`
 
@@ -186,10 +185,7 @@ Replace `from app.dashboard.theme import PALETTE` and `PALETTE.get(key, default)
 The following files will have `colors: dict[str, str] | None = None` removed from their render signatures:
 
 - [overview.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/overview.py)
-- [stats.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/stats.py)
 - [capacity.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/capacity.py)
-- [daily.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/daily.py)
-- [aging.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/aging.py)
 - [hygiene.py](file:///home/balevision/workspace/bleviet/gitlab-insight/app/dashboard/views/hygiene.py)
 
 If any view internally uses the `colors` dict, it will be replaced with `get_palette()` call.
@@ -265,11 +261,8 @@ print(f'Palette has {len(palette)} keys')
 uv run python -c "
 import importlib, sys
 modules = [
-    'app.dashboard.widgets.charts.aging_boxplot',
     'app.dashboard.widgets.charts.burnup_velocity',
-    'app.dashboard.widgets.charts.daily_activity_bar',
     'app.dashboard.widgets.charts.error_distribution',
-    'app.dashboard.widgets.charts.milestone_burnup',
     'app.dashboard.widgets.charts.milestone_timeline',
     'app.dashboard.widgets.charts.quality_gauge',
     'app.dashboard.widgets.charts.stage_distribution',

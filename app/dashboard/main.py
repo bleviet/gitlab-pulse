@@ -20,10 +20,8 @@ from app.dashboard.data_loader import (
     load_quality_issues,
     load_valid_issues,
 )
-from app.dashboard.views.aging import render_aging
 from app.dashboard.views.overview import render_overview
 from app.dashboard.views.hygiene import render_hygiene
-from app.dashboard.views.stats import render_stats_view
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
 from app.dashboard.theme import apply_rule_color_overrides, get_global_css
@@ -180,11 +178,7 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
-        "🚀 Release": "release",
-        "📋 Daily": "daily",
         "⚖️ Capacity": "capacity",
-        "📈 Stats": "stats",
-        "⏱️ Aging": "aging",
         "🧹 Hygiene": "hygiene",
         "🎨 Custom": "custom",
     }
@@ -246,22 +240,11 @@ def main() -> None:
             timeline_df=pre_milestone_df,
             highlight_milestone=filters["milestone"],
         )
-    elif view_id == "stats":
-        # Stats is the old overview (KPIs, Burnup)
-        render_stats_view(filtered_df)
     elif view_id == "capacity":
         # Pass capacity config
         capacity_config = default_rule.capacity.model_dump()
         from app.dashboard.views.capacity import render_capacity_view
         render_capacity_view(filtered_df, capacity_config=capacity_config)
-    elif view_id == "release":
-        from app.dashboard.views.release import render_release_view
-        render_release_view(filtered_df)
-    elif view_id == "daily":
-        from app.dashboard.views.daily import render_daily_report
-        render_daily_report(filtered_df)
-    elif view_id == "aging":
-        render_aging(filtered_df)
     elif view_id == "hygiene":
         render_hygiene(filtered_df, quality_df, rule=default_rule)
     elif view_id == "custom":

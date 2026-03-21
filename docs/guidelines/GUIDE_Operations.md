@@ -93,7 +93,7 @@ The Collector also fetches **milestones** independently from issues.
 
 - **Storage:** `data/processed/milestones_{project_id}.parquet`
 - **Sync Behavior:** Always full refresh (lightweight, no incremental needed)
-- **Dashboard:** Milestones appear in the Release view with status indicators (On Track, Due Soon, Overdue)
+- **Dashboard:** Milestone data remains available for downstream analytics and future dashboard extensions.
 
 ---
 

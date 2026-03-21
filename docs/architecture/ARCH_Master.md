@@ -6,7 +6,7 @@ Scope: Universal End-to-End Data Pipeline (Ingestion to Visualization)
 
 ## **1\. Executive Summary**
 
-**GitLabInsight** is a versatile analytics platform designed to extract, validate, and visualize GitLab issue data for any user—from individual developers and open-source maintainers to large-scale organizations. It follows a **Clean Architecture** and a **[Medallion Data Pattern](../glossary/GLOSSARY.md)** to ensure that raw technical data is transformed into meaningful metrics (like Aging and Throughput) without being restricted to any specific workflow or environment.
+**GitLabInsight** is a versatile analytics platform designed to extract, validate, and visualize GitLab issue data for any user—from individual developers and open-source maintainers to large-scale organizations. It follows a **Clean Architecture** and a **[Medallion Data Pattern](../glossary/GLOSSARY.md)** to ensure that raw technical data is transformed into meaningful workflow metrics without being restricted to any specific workflow or environment.
 
 ## **2\. Data Strategy & Storage Decisions**
 
@@ -28,12 +28,7 @@ The system uses a tiered storage approach, moving from high-volume raw files to 
 ### 3. Overview (Flow)
 Tracks the *efficiency* of the process (Cycle Time, Lead Time).
 - **Key Metric:** Days in Stage, Flow Efficiency.
-- **View:** "Overview" Dashboard (Work by Stage, Aging).
-
-### 4. Release Tracking (Scope)
-Tracks the *effectiveness* of delivering the plan (Milestones).
-- **Key Metric:** Release Burn-up, Scope Completion %.
-- **View:** "Release" Dashboard (Readiness, Scope Creep).
+- **View:** "Overview" Dashboard (Work by Stage, Days in Stage).
 
 ## Data Pipeline Layers
 * **Idempotency:** If the processing logic in Layer 1 changes (e.g., adding a new field), you can re-run the pipeline using the Raw files instead of re-querying GitLab. This prevents unnecessary network load and respects API rate limits.
@@ -99,7 +94,7 @@ Layer 2 "explodes" the dataset. One physical issue becomes multiple logical rows
 ### **5.2. UX Persona Strategy**
 
 * **Strategic View:** High-level trends (Inflow vs. Outflow) and project velocity.  
-* **Operational View:** Aging Boxplots (identifying bottlenecks) and the Stale Issue list to keep projects moving.  
+* **Operational View:** Days-in-stage analysis and the Stale Issue list to keep projects moving.  
 * **Health & Hygiene View:** A dedicated screen showing the "Clean-up list" from the Quality layer, helping maintainers improve their project metadata.
 
 ### **5.3. ADR: Why Streamlit?**
@@ -121,20 +116,19 @@ This is a pivot from a **Static Reporting Tool** (developer-defined layouts) to 
 
 | Component | Role | Location |
 | :-------- | :--- | :------- |
-| **Widget Registry** | Catalog of 16 widgets (KPIs, Charts, Tables). | `app/dashboard/registry.py` |
+| **Widget Registry** | Catalog of 12 widgets (KPIs, Charts, Tables). | `app/dashboard/registry.py` |
 | **Widget Library** | Individual widget files organized by type. | `app/dashboard/widgets/{kpis,charts,tables}/` |
 | **Layout Store** | JSON persistence for custom layouts. | `data/config/layouts/*.json` |
 | **Grid Engine** | Layout CRUD and widget rendering. | `app/dashboard/engine.py` |
 
-**Widget Registry (16 widgets):**
+**Widget Registry (12 widgets):**
 ```python
 WidgetRegistry._registry = {
     "kpi_flow_metrics": flow_metrics,
-    "kpi_stats": stats_kpis,
     "chart_stage_distribution": stage_distribution,
-    "chart_aging_boxplot": aging_boxplot,
+    "chart_milestone_timeline": milestone_timeline,
     "table_issue_detail_grid": issue_detail_grid,
-    # (Consolidated Table Widget replacing capacity, stale, and quality tables)
+    # (Additional KPI and chart widgets omitted for brevity)
 }
 ```
 

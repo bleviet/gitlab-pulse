@@ -212,11 +212,8 @@ from app.dashboard.theme import get_palette, plotly_layout
 | `main.py` | `apply_rule_color_overrides`, `get_global_css`, `inject_theme_watcher` |
 | `utils.py` | `get_palette` |
 | `issue_detail_grid.py` | `get_palette` |
-| `aging_boxplot.py` | `get_palette`, `get_stage_colors`, `plotly_layout` |
 | `burnup_velocity.py` | `get_palette`, `plotly_layout` |
-| `daily_activity_bar.py` | `get_palette`, `plotly_layout` |
 | `error_distribution.py` | `plotly_layout` |
-| `milestone_burnup.py` | `get_palette`, `plotly_layout` |
 | `milestone_timeline.py` | `get_palette`, `plotly_layout` |
 | `quality_gauge.py` | `get_palette`, `plotly_layout` |
 | `stage_distribution.py` | `get_palette`, `plotly_bar_trace_style`, `plotly_layout` |

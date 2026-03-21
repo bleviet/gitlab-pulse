@@ -23,7 +23,7 @@ Layouts stored in `data/config/layouts/*.json`. Uses a 12-column Grid System.
   "name": "Management View",
   "layout": [
     // Mosaic Layout: Tall widget on left, stacked widgets on right
-    {"i": "w1", "type": "chart_aging_boxplot", "x": 0, "y": 0, "w": 6, "h": 4},
+    {"i": "w1", "type": "chart_stage_distribution", "x": 0, "y": 0, "w": 6, "h": 4},
     {"i": "w2", "type": "kpi_flow_metrics",    "x": 6, "y": 0, "w": 6, "h": 2},
     {"i": "w3", "type": "kpi_quality_score",   "x": 6, "y": 2, "w": 6, "h": 2}
   ]

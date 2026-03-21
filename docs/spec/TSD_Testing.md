@@ -22,11 +22,11 @@ Goal: Generate 100,000+ realistic issue records in \< 5 seconds to stress-test t
 
 ### **2.1. Generation Logic Specification**
 
-#### **A. Temporal Distribution (Realistic Aging)**
+#### **A. Temporal Distribution (Realistic Stage Age)**
 
 * **Creation:** Distribute creation dates randomly over N years.  
 * **Closure:** Do not use uniform distribution. Use **Exponential Distribution** for time\_to\_close.  
-  * *Why:* Real projects have many "quick fixes" (1-3 days) and few "long-term bugs" (100+ days). Uniform random noise does not test the "Aging Boxplots" effectively.  
+  * *Why:* Real projects have many "quick fixes" (1-3 days) and few "long-term bugs" (100+ days). Uniform random noise does not test the "Days in Stage" visualization effectively.  
 * **Staleness:** Ensure 10-15% of open issues have updated\_at \< (now \- 30 days) to verify the "Stale Issue" logic in Layer 2\.
 
 #### **B. Error Injection (Quality Testing)**
@@ -63,7 +63,7 @@ The testing suite passes if the following benchmarks are met on standard hardwar
 
 * **Cold Start (Load Data):** \< 1.0 second (reading 50k rows from Parquet).  
 * **Interaction (Filter Change):** \< 200ms (Pandas in-memory filtering).  
-* **Constraint:** The UI must not "freeze" when rendering the Aging Boxplot for 50k points.
+* **Constraint:** The UI must not "freeze" when rendering the Days in Stage visualization for 50k points.
 
 ## **4\. Test Scenarios**
 
