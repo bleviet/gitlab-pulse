@@ -853,7 +853,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             width="large",
             help="Click to open the issue URL",
         ),
-        "assignee": st.column_config.TextColumn("Assignee", width="small"),
+        "assignee": st.column_config.TextColumn("Assignee", width="medium"),
         "stage": st.column_config.TextColumn("Stage", width="small"),
         "days_in_stage": st.column_config.NumberColumn(
             "Days in Stage",
@@ -862,7 +862,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         ),
         "severity": st.column_config.TextColumn("Priority", width="small"),
         "context": st.column_config.TextColumn("Context", width="small"),
-        "milestone": st.column_config.TextColumn("Milestone", width="medium"),
+        "milestone": st.column_config.TextColumn("Milestone", width="small"),
     }
 
     # Apply styling if context or priority columns are present.
