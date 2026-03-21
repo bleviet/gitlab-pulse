@@ -5,6 +5,7 @@ Refactored to use Widget Registry where applicable.
 """
 
 import ast
+import html
 import os
 import re
 from typing import Any, TypedDict, cast
@@ -721,8 +722,9 @@ def _render_tag_chips(row: pd.Series) -> None:
 
 def _render_dialog_meta(row: pd.Series) -> None:
     """Render metadata fields in the right column of the dialog body."""
-    days = row.get("days_in_stage")
-    age = row.get("age_days")
+    divider_color = with_alpha(get_plotly_font_color(), 0.14)
+    label_color = with_alpha(get_plotly_font_color(), 0.72)
+    value_color = get_plotly_font_color()
 
     text_fields: list[tuple[str, str]] = [
         ("Stage", _fmt(row.get("stage"))),
@@ -735,7 +737,38 @@ def _render_dialog_meta(row: pd.Series) -> None:
     ]
     for label, value in text_fields:
         if value != "—":
-            st.markdown(f"**{label}**  \n{value}")
+            st.markdown(
+                _dialog_meta_item_html(
+                    label=label,
+                    value=value,
+                    divider_color=divider_color,
+                    label_color=label_color,
+                    value_color=value_color,
+                ),
+                unsafe_allow_html=True,
+            )
+
+
+def _dialog_meta_item_html(
+    label: str,
+    value: str,
+    divider_color: str,
+    label_color: str,
+    value_color: str,
+) -> str:
+    """Build HTML for a single dialog metadata section with a separator."""
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
+    return (
+        f'<div style="padding:0.1rem 0 0.7rem 0;'
+        f'margin-bottom:0.7rem;border-bottom:1px solid {divider_color};">'
+        f'<div style="font-size:0.72rem;letter-spacing:0.08em;'
+        f'text-transform:uppercase;font-weight:700;color:{label_color};'>
+        f"{safe_label}</div>"
+        f'<div style="margin-top:0.28rem;font-size:0.98rem;line-height:1.35;'
+        f'font-weight:600;color:{value_color};">{safe_value}</div>'
+        "</div>"
+    )
 
 
 def _fmt(val: object) -> str:

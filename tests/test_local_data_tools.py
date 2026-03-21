@@ -7,6 +7,7 @@ import pandas as pd
 from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
     _build_local_issue_details,
+    _dialog_meta_item_html,
     _is_local_issue_url,
     _normalize_issue_labels,
     _priority_cell_style,
@@ -150,6 +151,21 @@ def test_priority_cell_style_uses_palette_defaults_for_known_values() -> None:
     assert style is not None
     assert "background-color:" in style
     assert "font-weight: 700;" in style
+
+
+def test_dialog_meta_item_html_adds_separator_and_escapes_content() -> None:
+    """Dialog metadata sections should render dividers with escaped text."""
+    html_markup = _dialog_meta_item_html(
+        label="Stage <Current>",
+        value="Review & QA",
+        divider_color="rgba(255,255,255,0.14)",
+        label_color="rgba(255,255,255,0.72)",
+        value_color="#d4deee",
+    )
+
+    assert "border-bottom:1px solid rgba(255,255,255,0.14)" in html_markup
+    assert "Stage &lt;Current&gt;" in html_markup
+    assert "Review &amp; QA" in html_markup
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:
