@@ -306,6 +306,7 @@ dependencies = [
     { name = "requests" },
     { name = "streamlit" },
     { name = "streamlit-elements" },
+    { name = "streamlit-keyup" },
 ]
 
 [package.optional-dependencies]
@@ -341,6 +342,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "streamlit", specifier = ">=1.30" },
     { name = "streamlit-elements", specifier = ">=0.1.0" },
+    { name = "streamlit-keyup", specifier = ">=0.3.0" },
 ]
 provides-extras = ["dev"]
 
@@ -1488,6 +1490,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8d/53/6ecfba409b61cdf246d4138bd9c1bef4b79a03fbeeee513ab0c7d43f18cb/streamlit-elements-0.1.0.tar.gz", hash = "sha256:5f9f116f22df3ce4a8636b1dee7c2fd3dc3cb0c66267fd28c3e0314aa1d303a7", size = 6649428, upload-time = "2022-04-25T18:32:53.523Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/0d/eecce69faeb4aec152f4036afe8a0f4f67b0af4fe0ff709243591ad2533d/streamlit_elements-0.1.0-py3-none-any.whl", hash = "sha256:593c4b88c399c55879aa76f7f42970f30106f66acaa4baada6338ae5571790df", size = 7833353, upload-time = "2022-04-25T18:32:49.447Z" },
+]
+
+[[package]]
+name = "streamlit-keyup"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/88/25/d153babd6d8dff72ee2e56976862ec7fdd7856ec7da2cb6ffd4b3b12f336/streamlit_keyup-0.3.0.tar.gz", hash = "sha256:8595a14892423243669e5d50e982853ffb7eb201b65952a48676133ab9bbc937", size = 7387, upload-time = "2025-01-02T14:48:40.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/ed/facce225c0d360b9bfa053c827029312e1b255e84d79320bda3539417b50/streamlit_keyup-0.3.0-py3-none-any.whl", hash = "sha256:ec7221617b1c832526db52859196c417578d6b4285942fbd10a0b2ff313899b3", size = 7493, upload-time = "2025-01-02T14:48:35.414Z" },
 ]
 
 [[package]]

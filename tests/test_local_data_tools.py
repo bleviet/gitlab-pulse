@@ -7,10 +7,12 @@ import pandas as pd
 
 from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
+    _build_issue_search_mask,
     _build_local_issue_details,
     _dialog_meta_item_html,
     _is_local_issue_url,
     _normalize_issue_labels,
+    _normalize_issue_search_text,
     _priority_cell_style,
     _priority_color_key,
     _issue_dialog_scroll_script,
@@ -207,6 +209,67 @@ def test_issue_dialog_scroll_script_targets_dialog_top_marker() -> None:
     assert 'const markerId = "issue-details-dialog-top"' in script
     assert "scrollIntoView" in script
     assert "node.scrollTop = 0" in script
+
+
+def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None:
+    """Grid search should match assignee, context, milestone, and severity cells."""
+    df = pd.DataFrame(
+        [
+            {
+                "iid": 11,
+                "title": "Stabilize auth redirect",
+                "stage": "Review",
+                "days_in_stage": 4,
+                "severity": "high",
+                "context": "customer",
+                "milestone": "v1.2",
+                "assignee": "alex",
+            },
+            {
+                "iid": 12,
+                "title": "Refine local search indexing",
+                "stage": "In Progress",
+                "days_in_stage": 9,
+                "severity": "medium",
+                "context": "platform",
+                "milestone": "v1.3",
+                "assignee": "sam",
+            },
+        ]
+    )
+
+    mask = _build_issue_search_mask(df, "alex customer v1.2 high")
+
+    assert mask.tolist() == [True, False]
+
+
+def test_build_issue_search_mask_supports_fuzzy_matches() -> None:
+    """Grid search should tolerate minor typos against table cell values."""
+    df = pd.DataFrame(
+        [
+            {
+                "iid": 21,
+                "title": "Improve milestone summary",
+                "stage": "Testing",
+                "days_in_stage": 2,
+                "severity": "critical",
+                "context": "security",
+                "milestone": "Release 24",
+                "assignee": "taylor",
+            }
+        ]
+    )
+
+    mask = _build_issue_search_mask(df, "critcal")
+
+    assert mask.tolist() == [True]
+
+
+def test_normalize_issue_search_text_flattens_collection_values() -> None:
+    """Grid search normalization should flatten lists and remove label separators."""
+    normalized = _normalize_issue_search_text(["priority::1", "workflow::review"])
+
+    assert normalized == "priority 1 workflow review"
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:

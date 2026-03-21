@@ -21,6 +21,7 @@ dependencies = [
   "plotly>=5.18",
   "python-dotenv>=1.0",
   "streamlit-elements>=0.1.0",
+  "streamlit-keyup>=0.3.0",
 ]
 
 [project.optional-dependencies]

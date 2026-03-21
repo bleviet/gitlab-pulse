@@ -8,6 +8,7 @@ import ast
 import html
 import os
 import re
+from difflib import SequenceMatcher
 from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlparse
 
@@ -15,6 +16,7 @@ import gitlab
 import pandas as pd
 import streamlit as st
 from gitlab.exceptions import GitlabError
+from st_keyup import st_keyup
 
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
@@ -41,6 +43,16 @@ class _IssueDetailsData(TypedDict):
 
 
 _ISSUE_DIALOG_TOP_MARKER_ID = "issue-details-dialog-top"
+_ISSUE_GRID_SEARCH_COLUMNS = (
+    "iid",
+    "title",
+    "stage",
+    "days_in_stage",
+    "severity",
+    "context",
+    "milestone",
+    "assignee",
+)
 
 
 def _priority_color_key(value: object) -> str | None:
@@ -889,40 +901,15 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         detail card lookup).
     """
 
-    popover_label = "⚙️ Filters"
-
-    filter_controls_col, filter_popover_col = st.columns([0.72, 0.28], gap="small")
-
-    with filter_controls_col:
-        title_search = st.text_input(
-            "Search Title",
-            placeholder="Type to search issue titles...",
-            key="filter_title",
-            label_visibility="collapsed",
-        )
-
-    # --- Column Filters (Popover) ---
-    with filter_popover_col, st.popover(popover_label, use_container_width=True):
-        if "assignee" in df.columns:
-            available_assignees = sorted(df["assignee"].dropna().unique().tolist())
-            selected_assignees = st.multiselect(
-                "Assignee",
-                options=available_assignees,
-                default=[],
-                key="filter_assignee"
-            )
-        else:
-            selected_assignees = []
+    search_query = st_keyup(
+        "",
+        placeholder="Search title, assignee, context, milestone, priority, stage...",
+        key="filter_title",
+        debounce=150,
+    )
 
     # --- Apply Filters ---
     display_df = df.copy()
-
-    # Title search (case-insensitive)
-    if title_search:
-        display_df = display_df[display_df["title"].str.contains(title_search, case=False, na=False)]
-
-    if selected_assignees:
-        display_df = display_df[display_df["assignee"].isin(selected_assignees)]
 
     # Sort by Hierarchy (Parent -> Child) or Staleness
     if "parent_id" in display_df.columns:
@@ -938,6 +925,9 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     cols = [c for c in cols_to_show if c in display_df.columns]
 
     display_df = display_df[cols]
+
+    if search_query:
+        display_df = display_df[_build_issue_search_mask(display_df, search_query)]
 
     # Reset index to ensure uniqueness for styling
     display_df = display_df.reset_index(drop=True)
@@ -1075,3 +1065,87 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     )
 
     return display_df
+
+
+def _build_issue_search_mask(
+    df: pd.DataFrame,
+    query: str,
+    search_columns: tuple[str, ...] = _ISSUE_GRID_SEARCH_COLUMNS,
+) -> pd.Series:
+    """Build a fuzzy search mask across the filtered-issues table columns."""
+    normalized_query = _normalize_issue_search_text(query)
+    if not normalized_query:
+        return pd.Series(True, index=df.index)
+
+    active_columns = [column for column in search_columns if column in df.columns]
+    if not active_columns:
+        return pd.Series(True, index=df.index)
+
+    searchable_df = df[active_columns].apply(lambda column: column.map(_normalize_issue_search_text))
+    row_text = searchable_df.agg(" ".join, axis=1).str.replace(r"\s+", " ", regex=True).str.strip()
+    query_tokens = normalized_query.split()
+
+    token_mask = pd.Series(True, index=df.index)
+    for token in query_tokens:
+        token_mask &= row_text.str.contains(re.escape(token), case=False, na=False, regex=True)
+
+    threshold = _issue_search_threshold(normalized_query)
+    fuzzy_cell_mask = searchable_df.apply(
+        lambda column: column.map(
+            lambda value: _is_fuzzy_issue_search_match(value, normalized_query, threshold)
+        )
+    ).any(axis=1)
+
+    return token_mask | fuzzy_cell_mask
+
+
+def _normalize_issue_search_text(value: object) -> str:
+    """Normalize a cell value into plain lowercase text for issue-grid search."""
+    if isinstance(value, dict):
+        return " ".join(
+            normalized
+            for normalized in (_normalize_issue_search_text(item) for item in value.values())
+            if normalized
+        )
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(
+            normalized
+            for normalized in (_normalize_issue_search_text(item) for item in value)
+            if normalized
+        )
+    if value is None:
+        return ""
+
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
+
+    text = str(value).replace("_", " ").replace("::", " ")
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _is_fuzzy_issue_search_match(value: str, normalized_query: str, threshold: float) -> bool:
+    """Return whether a normalized cell value is a close fuzzy match."""
+    if not value:
+        return False
+    if normalized_query in value:
+        return True
+
+    token_scores = [
+        SequenceMatcher(None, normalized_query, token).ratio()
+        for token in value.split()
+    ]
+    best_score = max([SequenceMatcher(None, normalized_query, value).ratio(), *token_scores])
+    return best_score >= threshold
+
+
+def _issue_search_threshold(normalized_query: str) -> float:
+    """Return a typo-tolerant search threshold based on query length."""
+    query_length = len(normalized_query)
+    if query_length <= 4:
+        return 0.9
+    if query_length <= 8:
+        return 0.82
+    return 0.72
