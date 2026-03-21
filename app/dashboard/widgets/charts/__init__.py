@@ -9,6 +9,7 @@ from app.dashboard.widgets.charts.burnup_velocity import burnup_velocity
 from app.dashboard.widgets.charts.daily_activity_bar import daily_activity_bar
 from app.dashboard.widgets.charts.daily_velocity_line import daily_velocity_line
 from app.dashboard.widgets.charts.error_distribution import error_distribution
+from app.dashboard.widgets.charts.issue_state_bar import issue_state_bar
 from app.dashboard.widgets.charts.milestone_burndown import milestone_burndown
 from app.dashboard.widgets.charts.milestone_burnup import milestone_burnup
 from app.dashboard.widgets.charts.milestone_timeline import milestone_timeline
@@ -30,6 +31,7 @@ __all__ = [
     "status_donut",
     "quality_gauge",
     "error_distribution",
+    "issue_state_bar",
     "milestone_timeline",
     "milestone_burnup",
     "daily_activity_bar",

@@ -124,7 +124,7 @@ def render_overview(
             st.session_state[prev_key] = []
 
     # ROW 1
-    st.markdown("##### OVERVIEW & HEALTH")
+    st.markdown("##### OVERVIEW")
     r1c1, r1c2, r1c3 = st.columns([1, 1, 3])
     with r1c1:
         with st.container(border=True):
@@ -187,29 +187,47 @@ def render_overview(
 
     # ROW 3
     st.markdown("##### RELEASE TIMELINE")
-    with st.container(border=True):
-        key_suffix = st.session_state.get("timeline_reset_counter", 0)
-        sel4 = charts.milestone_timeline(
-            _timeline_source,
-            config={
-                "key": f"row3_timeline_{key_suffix}",
-                "height": 120,
-                "highlight_milestone": _active_ms,
-            },
-        )
-        
-        if sel4 and sel4.get("selection", {}).get("points"):
-            pts = sel4["selection"]["points"]
-            if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
-                selected_ms = pts[0]["customdata"][2]
-                
-                if selected_ms == _active_ms:
-                    st.session_state["overview_milestone_reset"] = True
-                else:
-                    st.session_state["overview_milestone_pending"] = selected_ms
-                    
-                st.session_state.timeline_reset_counter = st.session_state.get("timeline_reset_counter", 0) + 1
-                st.rerun()
+    r3c1, r3c2 = st.columns([1, 3])
+    with r3c1:
+        with st.container(border=True):
+            st.markdown(
+                "<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN VS. CLOSED ISSUES</div>",
+                unsafe_allow_html=True,
+            )
+            sel4 = charts.issue_state_bar(
+                unique_df,
+                config={
+                    "height": 96,
+                    "key": f"row3_issue_state_{chart_reset_suffix}",
+                },
+            )
+            handle_selection(sel4, chart_id="issue_state_chart")
+    with r3c2:
+        with st.container(border=True):
+            key_suffix = st.session_state.get("timeline_reset_counter", 0)
+            sel5 = charts.milestone_timeline(
+                _timeline_source,
+                config={
+                    "key": f"row3_timeline_{key_suffix}",
+                    "height": 120,
+                    "highlight_milestone": _active_ms,
+                },
+            )
+
+            if sel5 and sel5.get("selection", {}).get("points"):
+                pts = sel5["selection"]["points"]
+                if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
+                    selected_ms = pts[0]["customdata"][2]
+
+                    if selected_ms == _active_ms:
+                        st.session_state["overview_milestone_reset"] = True
+                    else:
+                        st.session_state["overview_milestone_pending"] = selected_ms
+
+                    st.session_state.timeline_reset_counter = (
+                        st.session_state.get("timeline_reset_counter", 0) + 1
+                    )
+                    st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -255,6 +273,25 @@ def render_overview(
                             filtered_df = filtered_df[(col_dates == selected_date) & (filtered_df["state"] == target_state)]
                     except Exception:
                         pass
+                elif source_chart == "issue_state_chart":
+                    selected_state = None
+                    customdata = pt.get("customdata")
+                    if isinstance(customdata, list) and customdata:
+                        candidate_state = str(customdata[0]).strip().lower()
+                        if candidate_state in {"opened", "closed"}:
+                            selected_state = candidate_state
+
+                    if selected_state is None:
+                        normalized_val = val.strip().lower()
+                        if "open" in normalized_val:
+                            selected_state = "opened"
+                        elif "closed" in normalized_val:
+                            selected_state = "closed"
+
+                    if selected_state is not None:
+                        filtered_df = filtered_df[filtered_df["state"] == selected_state]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
                 else:
                     # Simple loose string matching for any column
                     val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
