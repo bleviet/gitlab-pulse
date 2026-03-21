@@ -16,9 +16,7 @@ trigger: always_on
   Apply these settings consistently in all generated code.
 
 ## 2. Version Control Protocol
-- **No Auto-Commit:** You are strictly FORBIDDEN from running `git commit`, `git push`, or `git merge` autonomously.
-- **Review First:** You may `git add` files to stage them, but you must ask for explicit user confirmation before committing.
-- **Commit Messages:** When requested to commit, always draft the commit message for the user to review first.
+- **No Auto-Push:** You are strictly FORBIDDEN from running `git push`, or `git merge` autonomously.
 
 ## 3. Python and Streamlit Bestpractices
 - Always refer to `python.md`
