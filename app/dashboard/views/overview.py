@@ -4,8 +4,6 @@ Visualizes flow efficiency, bottlenecks, and aging.
 Refactored to use Widget Registry where applicable.
 """
 
-import hashlib
-import json
 import os
 from typing import TypedDict
 
@@ -14,6 +12,7 @@ import pandas as pd
 import streamlit as st
 from gitlab.exceptions import GitlabError
 
+from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
 
@@ -106,6 +105,8 @@ def render_overview(
     _active_ms = highlight_milestone if highlight_milestone and highlight_milestone != "All" else None
 
     chart_reset_suffix = st.session_state.get("chart_reset_counter", 0)
+    palette = get_palette()
+    panel_label_color = with_alpha(get_plotly_font_color(), 0.72)
 
     def handle_selection(selection_dict, chart_id, stage_filter=None, state_filter=None):
         if selection_dict and selection_dict.get("selection", {}).get("points"):
@@ -123,33 +124,51 @@ def render_overview(
             prev_key = f"prev_sel_{chart_id}"
             st.session_state[prev_key] = []
 
+    def render_panel_header(title: str, meta: str | None = None) -> None:
+        """Render a compact, theme-aware panel heading."""
+        meta_html = ""
+        if meta:
+            meta_html = (
+                f"<span style='font-size:0.68rem; font-weight:700; "
+                f"letter-spacing:0.14em; text-transform:uppercase; "
+                f"color:{palette['primary']};'>{meta}</span>"
+            )
+
+        st.markdown(
+            (
+                "<div style='display:flex; align-items:center; justify-content:space-between; "
+                "gap:0.75rem; margin-bottom:0.55rem;'>"
+                f"<span style='font-size:0.78rem; font-weight:700; letter-spacing:0.12em; "
+                f"text-transform:uppercase; color:{panel_label_color};'>{title}</span>"
+                f"{meta_html}</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+
     # ROW 1
     st.markdown("##### OVERVIEW")
     r1c1, r1c2, r1c3 = st.columns([1, 1, 3])
-    with r1c1:
-        with st.container(border=True):
-            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
-            sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False})
-            handle_selection(sel1, chart_id="open_donut", state_filter="opened")
-    with r1c2:
-        with st.container(border=True):
-            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>CLOSED ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
-            sel2 = charts.priority_donut(
-                unique_df, 
-                config={
-                    "height": 200, 
-                    "key": f"row1_priority_closed_{chart_reset_suffix}", 
-                    "show_legend": False, 
-                    "state_filter": "closed", 
-                    "center_text": "CLOSED<br>ISSUES"
-                }
-            )
-            handle_selection(sel2, chart_id="closed_donut", state_filter="closed")
-    with r1c3:
-        with st.container(border=True):
-            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
-            sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"})
-            handle_selection(sel3, chart_id="velocity_chart")
+    with r1c1, st.container(border=True):
+        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+        sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False})
+        handle_selection(sel1, chart_id="open_donut", state_filter="opened")
+    with r1c2, st.container(border=True):
+        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>CLOSED ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+        sel2 = charts.priority_donut(
+            unique_df, 
+            config={
+                "height": 200, 
+                "key": f"row1_priority_closed_{chart_reset_suffix}", 
+                "show_legend": False, 
+                "state_filter": "closed", 
+                "center_text": "CLOSED<br>ISSUES"
+            }
+        )
+        handle_selection(sel2, chart_id="closed_donut", state_filter="closed")
+    with r1c3, st.container(border=True):
+        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
+        sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"})
+        handle_selection(sel3, chart_id="velocity_chart")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -186,48 +205,55 @@ def render_overview(
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ROW 3
-    st.markdown("##### RELEASE TIMELINE")
-    r3c1, r3c2 = st.columns([1, 3])
-    with r3c1:
-        with st.container(border=True):
-            st.markdown(
-                "<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN VS. CLOSED ISSUES</div>",
-                unsafe_allow_html=True,
-            )
-            sel4 = charts.issue_state_bar(
-                unique_df,
-                config={
-                    "height": 96,
-                    "key": f"row3_issue_state_{chart_reset_suffix}",
-                },
-            )
-            handle_selection(sel4, chart_id="issue_state_chart")
-    with r3c2:
-        with st.container(border=True):
-            key_suffix = st.session_state.get("timeline_reset_counter", 0)
-            sel5 = charts.milestone_timeline(
-                _timeline_source,
-                config={
-                    "key": f"row3_timeline_{key_suffix}",
-                    "height": 120,
-                    "highlight_milestone": _active_ms,
-                },
-            )
+    st.markdown("##### DELIVERY SNAPSHOT")
+    r3c1, r3c2, r3c3 = st.columns([2.2, 1.1, 1.4])
+    with r3c1, st.container(border=True):
+        render_panel_header("Release Timeline", meta="Milestones")
+        key_suffix = st.session_state.get("timeline_reset_counter", 0)
+        sel4 = charts.milestone_timeline(
+            _timeline_source,
+            config={
+                "key": f"row3_timeline_{key_suffix}",
+                "height": 150,
+                "highlight_milestone": _active_ms,
+            },
+        )
 
-            if sel5 and sel5.get("selection", {}).get("points"):
-                pts = sel5["selection"]["points"]
-                if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
-                    selected_ms = pts[0]["customdata"][2]
+        if sel4 and sel4.get("selection", {}).get("points"):
+            pts = sel4["selection"]["points"]
+            if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
+                selected_ms = pts[0]["customdata"][2]
 
-                    if selected_ms == _active_ms:
-                        st.session_state["overview_milestone_reset"] = True
-                    else:
-                        st.session_state["overview_milestone_pending"] = selected_ms
+                if selected_ms == _active_ms:
+                    st.session_state["overview_milestone_reset"] = True
+                else:
+                    st.session_state["overview_milestone_pending"] = selected_ms
 
-                    st.session_state.timeline_reset_counter = (
-                        st.session_state.get("timeline_reset_counter", 0) + 1
-                    )
-                    st.rerun()
+                st.session_state.timeline_reset_counter = (
+                    st.session_state.get("timeline_reset_counter", 0) + 1
+                )
+                st.rerun()
+    with r3c2, st.container(border=True):
+        render_panel_header("Open vs. Closed Issues")
+        sel5 = charts.issue_state_bar(
+            unique_df,
+            config={
+                "height": 150,
+                "key": f"row3_issue_state_{chart_reset_suffix}",
+            },
+        )
+        handle_selection(sel5, chart_id="issue_state_chart")
+    with r3c3, st.container(border=True):
+        render_panel_header("Issue Distribution by Assignee", meta="Top 5")
+        sel6 = charts.assignee_distribution(
+            unique_df,
+            config={
+                "height": 150,
+                "key": f"row3_assignee_{chart_reset_suffix}",
+                "limit": 5,
+            },
+        )
+        handle_selection(sel6, chart_id="assignee_chart")
 
     st.markdown("<br>", unsafe_allow_html=True)
 

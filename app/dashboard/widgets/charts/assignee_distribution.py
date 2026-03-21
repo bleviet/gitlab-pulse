@@ -13,7 +13,7 @@ def assignee_distribution(
     df: pd.DataFrame,
     config: dict[str, Any] | None = None
 ) -> dict | None:
-    """Render vertical bar chart of open issues by assignee.
+    """Render a top-N vertical bar chart of issue counts by assignee.
 
     Args:
         df: DataFrame of issues
@@ -24,42 +24,65 @@ def assignee_distribution(
     """
     config = config or {}
     height = config.get("height", 250)
+    limit = int(config.get("limit", 5))
     widget_key = config.get("key", "assignee_distribution")
 
     if df.empty or "assignee" not in df.columns:
         st.info("No assignee data.")
         return None
 
-    work_df = df[df["state"] == "opened"].copy() if "state" in df.columns else df.copy()
+    display_df = df.drop_duplicates(subset=["id"]).copy() if "id" in df.columns else df.copy()
 
-    if work_df.empty:
-        st.info("No open issues.")
+    if display_df.empty:
+        st.info("No issue data.")
         return None
 
-    # Group by Assignee
-    agg_df = work_df.groupby("assignee").size().reset_index(name="count")
-    agg_df = agg_df.sort_values(by="count", ascending=False)
-    
-    # Take top 6
-    agg_df = agg_df.head(6)
+    assignee_labels = (
+        display_df["assignee"]
+        .fillna("Unassigned")
+        .astype(str)
+        .str.strip()
+        .replace(
+            {
+                "": "Unassigned",
+                "nan": "Unassigned",
+                "<NA>": "Unassigned",
+                "None": "Unassigned",
+            }
+        )
+    )
+    agg_df = (
+        assignee_labels.value_counts()
+        .head(limit)
+        .rename_axis("assignee")
+        .reset_index(name="count")
+    )
+
+    if agg_df.empty:
+        st.info("No assignee data.")
+        return None
 
     palette = get_palette()
-    bar_color = palette.get("primary", "#1abc9c")
+    bar_colors = [palette["primary"]] + [palette["opened"]] * max(len(agg_df) - 1, 0)
+    max_count = max(int(agg_df["count"].max()), 1)
 
     fig = px.bar(
         agg_df,
         x="assignee",
         y="count",
         orientation="v",
+        text="count",
+        category_orders={"assignee": agg_df["assignee"].tolist()},
     )
-    
+
     fig.update_traces(
-        marker_color=bar_color,
+        marker_color=bar_colors,
         marker_line_width=0,
-        text=[f"<b>{c}</b><br>Open" for c in agg_df["count"]],
-        textposition="inside",
-        insidetextanchor="middle",
-        textfont=dict(color="#ffffff") 
+        texttemplate="<b>%{text}</b>",
+        textposition="outside",
+        textfont={"color": get_plotly_font_color(), "size": 12},
+        cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>Issues: %{y}<extra></extra>",
     )
 
     fig.update_layout(
@@ -67,12 +90,19 @@ def assignee_distribution(
             height=height,
             show_xgrid=False,
             show_ygrid=False,
-            margin=dict(l=0, r=0, t=10, b=0),
+            margin=dict(l=0, r=0, t=12, b=16),
+            bargap=0.34,
+            legend_pos="none",
         ),
     )
-    
-    fig.update_xaxes(showgrid=False, title="")
-    fig.update_yaxes(showgrid=False, title="", showticklabels=False)
+
+    fig.update_xaxes(showgrid=False, title="", tickangle=-18, automargin=True)
+    fig.update_yaxes(
+        showgrid=False,
+        title="",
+        showticklabels=False,
+        range=[0, max_count * 1.22],
+    )
 
     show_modebar = st.session_state.get("show_chart_controls", False)
 
