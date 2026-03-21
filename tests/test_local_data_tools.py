@@ -8,6 +8,7 @@ from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
     _build_local_issue_details,
     _is_local_issue_url,
+    _normalize_issue_labels,
     _priority_cell_style,
     _priority_color_key,
     _selection_mask_for_value,
@@ -107,6 +108,31 @@ def test_build_local_issue_details_uses_seeded_row_data() -> None:
     assert details["description"] == "Local description"
     assert details["web_url"].endswith("issue_iid=3")
     assert details["notes"] == []
+
+
+def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:
+    """Issue label chips should split numpy-style string arrays into values."""
+    raw = (
+        "['type::bug' 'severity::critical' 'priority::1' "
+        "'cve' 'project::B' 'workflow::architecture']"
+    )
+
+    assert _normalize_issue_labels(raw) == [
+        "type::bug",
+        "severity::critical",
+        "priority::1",
+        "cve",
+        "project::B",
+        "workflow::architecture",
+    ]
+
+
+def test_normalize_issue_labels_preserves_real_label_lists() -> None:
+    """Issue label chips should keep already-materialized label lists intact."""
+    assert _normalize_issue_labels(["type::bug", "severity::critical", ""]) == [
+        "type::bug",
+        "severity::critical",
+    ]
 
 
 def test_priority_color_key_normalizes_severity_and_priority_labels() -> None:

@@ -4,7 +4,9 @@ Visualizes flow efficiency, bottlenecks, and aging.
 Refactored to use Widget Registry where applicable.
 """
 
+import ast
 import os
+import re
 from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlparse
 
@@ -639,6 +641,43 @@ def _chip_html(text: str, bg: str, fg: str) -> str:
     )
 
 
+def _normalize_issue_labels(raw_labels: object) -> list[str]:
+    """Normalize labels from parquet/array/string forms into individual values."""
+    if raw_labels is None:
+        return []
+
+    def _clean_labels(values: list[object]) -> list[str]:
+        return [
+            str(value).strip()
+            for value in values
+            if str(value).strip().lower() not in ("", "nan", "none", "<na>")
+        ]
+
+    if isinstance(raw_labels, list):
+        return _clean_labels(raw_labels)
+
+    raw = str(raw_labels).strip()
+    if raw.lower() in ("", "nan", "none", "[]", "<na>"):
+        return []
+
+    try:
+        parsed = ast.literal_eval(raw)
+    except (ValueError, SyntaxError):
+        parsed = None
+
+    quoted_values = re.findall(r"'([^']+)'|\"([^\"]+)\"", raw)
+    if len(quoted_values) > 1:
+        return _clean_labels([first or second for first, second in quoted_values])
+
+    if isinstance(parsed, list):
+        return _clean_labels(parsed)
+
+    if isinstance(parsed, tuple):
+        return _clean_labels(list(parsed))
+
+    return [raw]
+
+
 def _render_tag_chips(row: pd.Series) -> None:
     """Render priority, issue type, stage, and GitLab label chips inline."""
     from app.dashboard.data_loader import load_labels as _load_labels
@@ -664,19 +703,7 @@ def _render_tag_chips(row: pd.Series) -> None:
         bg, fg = color_map.get(val.lower(), ("#e0e0e0", "#333333"))
         chips_html.append(_chip_html(val, bg, fg))
 
-    raw_labels = row.get("labels")
-    label_list: list[str] = []
-    if isinstance(raw_labels, list):
-        label_list = [
-            str(lb).strip()
-            for lb in raw_labels
-            if str(lb).strip().lower() not in ("nan", "none", "")
-        ]
-    elif raw_labels is not None:
-        raw = str(raw_labels).strip()
-        if raw not in ("nan", "None", "[]", ""):
-            label_list = [raw]
-
+    label_list = _normalize_issue_labels(row.get("labels"))
     for lb in label_list:
         style = label_styles.get(lb, {})
         bg = style.get("color", "#e0e0e0")
