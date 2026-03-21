@@ -5,8 +5,9 @@ Supports View Mode (locked) and Edit Mode (draggable/resizable).
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 import streamlit as st
@@ -16,6 +17,111 @@ from app.dashboard.registry import WidgetRegistry
 
 # Layout storage directory
 LAYOUTS_DIR = Path("data/config/layouts")
+GRID_COLUMNS = 12
+
+
+GridRenderer = Callable[[], None]
+
+
+@dataclass(frozen=True)
+class StreamlitGridCell:
+    """A single span-based cell in the shared Streamlit grid renderer."""
+
+    key: str
+    span: int
+    render: GridRenderer
+
+
+@dataclass(frozen=True)
+class StreamlitGridRow:
+    """A single row in the shared Streamlit grid renderer."""
+
+    cells: tuple[StreamlitGridCell, ...]
+
+
+def _build_streamlit_row_widths(
+    cells: tuple[StreamlitGridCell, ...],
+    total_columns: int = GRID_COLUMNS,
+) -> list[int]:
+    """Translate grid cell spans into Streamlit column widths.
+
+    Adds a trailing spacer column when a row does not consume the full grid so
+    items keep their intended span proportions while staying left-aligned.
+    """
+    used_columns = sum(cell.span for cell in cells)
+    if used_columns > total_columns:
+        raise ValueError(
+            f"Grid row uses {used_columns} columns but only {total_columns} are available."
+        )
+
+    widths = [cell.span for cell in cells]
+    remaining_columns = total_columns - used_columns
+    if remaining_columns:
+        widths.append(remaining_columns)
+    return widths
+
+
+def render_streamlit_grid(
+    rows: list[StreamlitGridRow],
+    total_columns: int = GRID_COLUMNS,
+    gap: str = "small",
+) -> None:
+    """Render reusable span-based rows using native Streamlit columns."""
+    for row in rows:
+        if not row.cells:
+            continue
+
+        widths = _build_streamlit_row_widths(row.cells, total_columns=total_columns)
+        columns = st.columns(widths, gap=gap)
+
+        for column, cell in zip(columns, row.cells):
+            with column:
+                cell.render()
+
+
+def _group_layout_items_by_row(layout_items: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Group persisted layout items into sorted Streamlit rows by y/x coordinates."""
+    grouped_items: dict[int, list[dict[str, Any]]] = {}
+    for item in sorted(layout_items, key=lambda current: (int(current["y"]), int(current["x"]))):
+        grouped_items.setdefault(int(item["y"]), []).append(item)
+
+    return [
+        sorted(grouped_items[row_y], key=lambda current: int(current["x"]))
+        for row_y in sorted(grouped_items)
+    ]
+
+
+def _build_layout_grid_rows(
+    layout_items: list[dict[str, Any]],
+    df: pd.DataFrame,
+    quality_df: pd.DataFrame | None = None,
+    widget_data_overrides: dict[str, pd.DataFrame] | None = None,
+    key_suffix: str = "",
+    global_config: dict[str, Any] | None = None,
+) -> list[StreamlitGridRow]:
+    """Convert persisted layout items into reusable Streamlit grid rows."""
+    rows: list[StreamlitGridRow] = []
+
+    for row_items in _group_layout_items_by_row(layout_items):
+        cells: list[StreamlitGridCell] = []
+        for item in row_items:
+            item_df = widget_data_overrides.get(item["i"], df) if widget_data_overrides else df
+            cell = StreamlitGridCell(
+                key=str(item["i"]),
+                span=max(1, int(item["w"])),
+                render=lambda item=item, item_df=item_df: _render_single_widget(
+                    item,
+                    item_df,
+                    quality_df,
+                    key_suffix=key_suffix,
+                    global_config=global_config,
+                ),
+            )
+            cells.append(cell)
+
+        rows.append(StreamlitGridRow(cells=tuple(cells)))
+
+    return rows
 
 
 def load_layout(name: str = "default") -> dict:
@@ -308,45 +414,18 @@ def render_grid(
 
         return None
 
-    # --- VIEW MODE: Native Streamlit (Row-based Rendering) ---
-
-    # Sort items by Y, then X to process top-to-bottom, left-to-right
-    sorted_items = sorted(layout_items, key=lambda x: (int(x["y"]), int(x["x"])))
-
-    # Group items by Y-coordinate for row-based rendering
-    y_groups = {}
-    for item in sorted_items:
-        y = int(item["y"])
-        if y not in y_groups:
-            y_groups[y] = []
-        y_groups[y].append(item)
-
-    # Process each row group independently
-    for row_y in sorted(y_groups.keys()):
-        row_items = y_groups[row_y]
-
-        if not row_items:
-            continue
-
-        # Sort by X position
-        row_items = sorted(row_items, key=lambda x: int(x["x"]))
-
-        # Create columns based on widths
-        widths = [int(item["w"]) for item in row_items]
-
-        # If only one item with w>=12, render full width (no columns needed)
-        if len(row_items) == 1 and widths[0] >= 12:
-            item = row_items[0]
-            item_df = widget_data_overrides.get(item["i"], df) if widget_data_overrides else df
-            _render_single_widget(item, item_df, quality_df, key_suffix=key_suffix, global_config=global_config)
-        else:
-            # Multiple items in this row - create columns
-            active_cols = st.columns(widths)
-
-            for col, item in zip(active_cols, row_items):
-                with col:
-                    item_df = widget_data_overrides.get(item["i"], df) if widget_data_overrides else df
-                    _render_single_widget(item, item_df, quality_df, key_suffix=key_suffix, global_config=global_config)
+    # --- VIEW MODE: Native Streamlit via Shared Span Grid ---
+    render_streamlit_grid(
+        _build_layout_grid_rows(
+            layout_items,
+            df,
+            quality_df=quality_df,
+            widget_data_overrides=widget_data_overrides,
+            key_suffix=key_suffix,
+            global_config=global_config,
+        ),
+        total_columns=GRID_COLUMNS,
+    )
 
     return None
 

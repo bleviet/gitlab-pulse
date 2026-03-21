@@ -9,7 +9,7 @@ import html
 import os
 import re
 from difflib import SequenceMatcher
-from typing import Any, TypedDict, cast
+from typing import Any, Callable, TypedDict, cast
 from urllib.parse import parse_qs, urlparse
 
 import gitlab
@@ -18,6 +18,12 @@ import streamlit as st
 from gitlab.exceptions import GitlabError
 from st_keyup import st_keyup
 
+from app.dashboard.engine import (
+    GRID_COLUMNS,
+    StreamlitGridCell,
+    StreamlitGridRow,
+    render_streamlit_grid,
+)
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
 from app.dashboard.widgets import charts, tables
@@ -342,70 +348,107 @@ def render_overview(
             unsafe_allow_html=True,
         )
 
-    # ROW 1
-    st.markdown("##### OVERVIEW")
-    r1c1, r1c2, r1c3 = st.columns([1, 1, 3])
-    with r1c1, st.container(border=True):
-        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>OPEN ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
-        sel1 = charts.priority_donut(unique_df, config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False})
+    def _panel_cell(
+        key: str,
+        span: int,
+        title: str,
+        render_body: Callable[[], None],
+        meta: str | None = None,
+    ) -> StreamlitGridCell:
+        """Build a reusable overview panel cell for the shared Streamlit grid."""
+
+        def _render_panel() -> None:
+            with st.container(border=True):
+                render_panel_header(title, meta=meta)
+                render_body()
+
+        return StreamlitGridCell(key=key, span=span, render=_render_panel)
+
+    def _render_open_priority_panel() -> None:
+        sel1 = charts.priority_donut(
+            unique_df,
+            config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False},
+        )
         handle_selection(sel1, chart_id="open_donut", state_filter="opened")
-    with r1c2, st.container(border=True):
-        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>CLOSED ISSUES BY PRIORITY</div>", unsafe_allow_html=True)
+
+    def _render_closed_priority_panel() -> None:
         sel2 = charts.priority_donut(
-            unique_df, 
+            unique_df,
             config={
-                "height": 200, 
-                "key": f"row1_priority_closed_{chart_reset_suffix}", 
-                "show_legend": False, 
-                "state_filter": "closed", 
-                "center_text": "CLOSED<br>ISSUES"
-            }
+                "height": 200,
+                "key": f"row1_priority_closed_{chart_reset_suffix}",
+                "show_legend": False,
+                "state_filter": "closed",
+                "center_text": "CLOSED<br>ISSUES",
+            },
         )
         handle_selection(sel2, chart_id="closed_donut", state_filter="closed")
-    with r1c3, st.container(border=True):
-        st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#555;'>DAILY NEW VS. CLOSED ISSUES</div>", unsafe_allow_html=True)
-        sel3 = charts.daily_velocity_line(unique_df, config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"})
+
+    def _render_velocity_panel() -> None:
+        sel3 = charts.daily_velocity_line(
+            unique_df,
+            config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"},
+        )
         handle_selection(sel3, chart_id="velocity_chart")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ROW 2
-    st.markdown("##### ISSUES BY WORKFLOW STATE")
-    with st.container(border=True):
+    def _render_stage_distribution_panel() -> None:
         if "stage_order" in unique_df.columns:
             stages = unique_df.groupby("stage")["stage_order"].min().sort_values().index.tolist()
         else:
             stages = unique_df["stage"].unique().tolist() if "stage" in unique_df.columns else []
-            default_stage_order = ["Backlog", "To Do", "In Progress", "Review", "Testing", "Waiting for Release", "Done", "Closed"]
-            stages = sorted(stages, key=lambda s: default_stage_order.index(s) if s in default_stage_order else len(default_stage_order))
-        
-        # Only show stages that actually have open issues otherwise it wastes horizontal space
-        stages = [s for s in stages if not unique_df[(unique_df["stage"] == s) & (unique_df["state"] == "opened")].empty]
-        
-        if stages:
-            stage_cols = st.columns(len(stages))
-            for idx, stage_name in enumerate(stages):
-                with stage_cols[idx]:
-                    st.markdown(f"<div style='text-align:center; font-size:0.75rem; font-weight:bold; color:#777; margin-bottom:-10px;'>{stage_name.upper()}</div>", unsafe_allow_html=True)
-                    stage_df = unique_df[unique_df["stage"] == stage_name]
-                    sel = charts.priority_bar(
-                        stage_df,
-                        config={
-                            "height": 200,
-                            "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
-                        }
-                    )
-                    handle_selection(sel, chart_id=f"stage_bar_{idx}", stage_filter=stage_name)
-        else:
+            default_stage_order = [
+                "Backlog",
+                "To Do",
+                "In Progress",
+                "Review",
+                "Testing",
+                "Waiting for Release",
+                "Done",
+                "Closed",
+            ]
+            stages = sorted(
+                stages,
+                key=lambda stage_name: (
+                    default_stage_order.index(stage_name)
+                    if stage_name in default_stage_order
+                    else len(default_stage_order)
+                ),
+            )
+
+        stages = [
+            stage_name
+            for stage_name in stages
+            if not unique_df[
+                (unique_df["stage"] == stage_name) & (unique_df["state"] == "opened")
+            ].empty
+        ]
+
+        if not stages:
             st.info("No stage data available.")
+            return
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        stage_cols = st.columns(len(stages))
+        for idx, stage_name in enumerate(stages):
+            with stage_cols[idx]:
+                st.markdown(
+                    (
+                        "<div style='text-align:center; font-size:0.75rem; "
+                        "font-weight:bold; color:#777; margin-bottom:-10px;'>"
+                        f"{stage_name.upper()}</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+                stage_df = unique_df[unique_df["stage"] == stage_name]
+                sel = charts.priority_bar(
+                    stage_df,
+                    config={
+                        "height": 200,
+                        "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
+                    },
+                )
+                handle_selection(sel, chart_id=f"stage_bar_{idx}", stage_filter=stage_name)
 
-    # ROW 3
-    st.markdown("##### DELIVERY SNAPSHOT")
-    r3c1, r3c2, r3c3 = st.columns([2.2, 1.1, 1.4])
-    with r3c1, st.container(border=True):
-        render_panel_header("Release Timeline", meta="Milestones")
+    def _render_timeline_panel() -> None:
         key_suffix = st.session_state.get("timeline_reset_counter", 0)
         sel4 = charts.milestone_timeline(
             _timeline_source,
@@ -430,8 +473,8 @@ def render_overview(
                     st.session_state.get("timeline_reset_counter", 0) + 1
                 )
                 st.rerun()
-    with r3c2, st.container(border=True):
-        render_panel_header("Open vs. Closed Issues")
+
+    def _render_issue_state_panel() -> None:
         sel5 = charts.issue_state_bar(
             unique_df,
             config={
@@ -440,8 +483,8 @@ def render_overview(
             },
         )
         handle_selection(sel5, chart_id="issue_state_chart")
-    with r3c3, st.container(border=True):
-        render_panel_header("Issue Distribution by Assignee", meta="Top 5")
+
+    def _render_assignee_panel() -> None:
         sel6 = charts.assignee_distribution(
             unique_df,
             config={
@@ -451,6 +494,90 @@ def render_overview(
             },
         )
         handle_selection(sel6, chart_id="assignee_chart")
+
+    # ROW 1
+    st.markdown("##### OVERVIEW")
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_open_priority",
+                        span=3,
+                        title="Open Issues by Priority",
+                        render_body=_render_open_priority_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_closed_priority",
+                        span=3,
+                        title="Closed Issues by Priority",
+                        render_body=_render_closed_priority_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_velocity",
+                        span=6,
+                        title="Daily New vs. Closed Issues",
+                        render_body=_render_velocity_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ROW 2
+    st.markdown("##### ISSUES BY WORKFLOW STATE")
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_stage_distribution",
+                        span=GRID_COLUMNS,
+                        title="Issues by Workflow State",
+                        render_body=_render_stage_distribution_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ROW 3
+    st.markdown("##### DELIVERY SNAPSHOT")
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_timeline",
+                        span=6,
+                        title="Release Timeline",
+                        meta="Milestones",
+                        render_body=_render_timeline_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_issue_state",
+                        span=3,
+                        title="Open vs. Closed Issues",
+                        render_body=_render_issue_state_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_assignee_distribution",
+                        span=3,
+                        title="Issue Distribution by Assignee",
+                        meta="Top 5",
+                        render_body=_render_assignee_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
