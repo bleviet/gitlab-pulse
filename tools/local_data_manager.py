@@ -9,6 +9,7 @@ import pandas as pd
 from app.processor.main import Processor
 from tools.seeder import (
     DEFAULT_ASSIGNMENT_RATE,
+    DEFAULT_DASHBOARD_URL_BASE,
     DEFAULT_MAX_TEAM_MEMBERS,
     seed_data,
 )
@@ -142,6 +143,7 @@ def run_seed_action(
     seed: int | None,
     assignment_rate: float,
     max_team_members: int,
+    dashboard_url_base: str,
     data_path: Path = Path("data"),
 ) -> None:
     """Create or reseed local projects."""
@@ -153,6 +155,7 @@ def run_seed_action(
         seed=seed,
         assignment_rate=assignment_rate,
         max_team_members=max_team_members,
+        dashboard_url_base=dashboard_url_base,
     )
 
 
@@ -163,6 +166,7 @@ def run_reset_action(
     seed: int | None,
     assignment_rate: float,
     max_team_members: int,
+    dashboard_url_base: str,
     data_path: Path = Path("data"),
     rules_path: Path = Path("app/config/rules"),
 ) -> dict[str, int]:
@@ -180,6 +184,7 @@ def run_reset_action(
         seed=seed,
         assignment_rate=assignment_rate,
         max_team_members=max_team_members,
+        dashboard_url_base=dashboard_url_base,
         data_path=data_path,
     )
     return rebuild_analytics(data_path=data_path, rules_path=rules_path)
@@ -209,6 +214,12 @@ def main() -> None:
         type=int,
         default=DEFAULT_MAX_TEAM_MEMBERS,
         help="Maximum number of distinct team members used as assignees",
+    )
+    parser.add_argument(
+        "--dashboard-url-base",
+        type=str,
+        default=DEFAULT_DASHBOARD_URL_BASE,
+        help="Base dashboard URL used for synthetic issue links",
     )
     parser.add_argument("--data-path", type=str, default="data", help="Base data directory")
     parser.add_argument("--rules-path", type=str, default="app/config/rules", help="Rules directory")
@@ -256,6 +267,7 @@ def main() -> None:
             seed=args.seed,
             assignment_rate=args.assignment_rate,
             max_team_members=args.max_team_members,
+            dashboard_url_base=args.dashboard_url_base,
             data_path=data_path,
         )
         print_project_table(discover_local_projects(data_path))
@@ -279,6 +291,7 @@ def main() -> None:
             seed=args.seed,
             assignment_rate=args.assignment_rate,
             max_team_members=args.max_team_members,
+            dashboard_url_base=args.dashboard_url_base,
             data_path=data_path,
             rules_path=rules_path,
         )
@@ -316,6 +329,7 @@ def run_interactive_menu(
                 seed=seed_options.seed,
                 assignment_rate=seed_options.assignment_rate,
                 max_team_members=seed_options.max_team_members,
+                dashboard_url_base=seed_options.dashboard_url_base,
                 data_path=data_path,
             )
             print_project_table(discover_local_projects(data_path))
@@ -344,6 +358,7 @@ def run_interactive_menu(
                 seed=seed_options.seed,
                 assignment_rate=seed_options.assignment_rate,
                 max_team_members=seed_options.max_team_members,
+                dashboard_url_base=seed_options.dashboard_url_base,
                 data_path=data_path,
                 rules_path=rules_path,
             )
@@ -366,6 +381,7 @@ class SeedOptions:
     seed: int | None
     assignment_rate: float
     max_team_members: int
+    dashboard_url_base: str
 
 
 def _prompt_seed_options(projects: list[LocalProjectSummary]) -> SeedOptions:
@@ -383,6 +399,10 @@ def _prompt_seed_options(projects: list[LocalProjectSummary]) -> SeedOptions:
         maximum=1.0,
     )
     max_team_members = _prompt_int("Max team members", default=DEFAULT_MAX_TEAM_MEMBERS, minimum=1)
+    dashboard_url_base = (
+        input(f"Dashboard URL base [{DEFAULT_DASHBOARD_URL_BASE}]: ").strip()
+        or DEFAULT_DASHBOARD_URL_BASE
+    )
     return SeedOptions(
         project_ids=project_ids,
         count=count,
@@ -390,6 +410,7 @@ def _prompt_seed_options(projects: list[LocalProjectSummary]) -> SeedOptions:
         seed=seed,
         assignment_rate=assignment_rate,
         max_team_members=max_team_members,
+        dashboard_url_base=dashboard_url_base,
     )
 
 

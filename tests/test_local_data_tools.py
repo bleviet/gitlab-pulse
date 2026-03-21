@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from app.dashboard.views.overview import _build_local_issue_details, _is_local_issue_url
 from tools.local_data_manager import delete_local_projects, discover_local_projects
-from tools.seeder import generate_issues, seed_data
+from tools.seeder import build_local_issue_url, generate_issues, seed_data
 
 
 def test_generate_issues_respects_max_team_members() -> None:
@@ -21,6 +22,7 @@ def test_generate_issues_respects_max_team_members() -> None:
     unique_assignees = set(df["assignee"].dropna().tolist())
 
     assert len(unique_assignees) == 5
+    assert _is_local_issue_url(df["web_url"].iloc[0])
 
 
 def test_generate_issues_allows_unassigned_issues() -> None:
@@ -34,6 +36,38 @@ def test_generate_issues_allows_unassigned_issues() -> None:
     )
 
     assert df["assignee"].isna().all()
+
+
+def test_build_local_issue_url_uses_dashboard_query_params() -> None:
+    """Synthetic issue URLs should deep-link back into the local dashboard."""
+    url = build_local_issue_url(
+        project_id=101,
+        issue_iid=7,
+        dashboard_url_base="http://localhost:8501",
+    )
+
+    assert url == (
+        "http://localhost:8501/"
+        "?issue_source=local&issue_project_id=101&issue_iid=7"
+    )
+
+
+def test_build_local_issue_details_uses_seeded_row_data() -> None:
+    """Local issue detail rendering should come from the parquet row."""
+    row = pd.Series(
+        {
+            "title": "Seeded issue",
+            "description": "Local description",
+            "web_url": build_local_issue_url(101, 3),
+        }
+    )
+
+    details = _build_local_issue_details(row)
+
+    assert details["title"] == "Seeded issue"
+    assert details["description"] == "Local description"
+    assert details["web_url"].endswith("issue_iid=3")
+    assert details["notes"] == []
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:

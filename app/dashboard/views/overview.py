@@ -5,7 +5,8 @@ Refactored to use Widget Registry where applicable.
 """
 
 import os
-from typing import TypedDict
+from typing import Any, TypedDict, cast
+from urllib.parse import parse_qs, urlparse
 
 import gitlab
 import pandas as pd
@@ -34,6 +35,66 @@ class _IssueDetailsData(TypedDict):
     notes: list[_IssueNoteData]
     title: str
     web_url: str
+
+
+def _is_local_issue_url(url: object) -> bool:
+    """Return True when a URL points to a synthetic local dashboard issue."""
+    if not isinstance(url, str) or not url:
+        return False
+
+    parsed_url = urlparse(url)
+    query = parse_qs(parsed_url.query)
+    return query.get("issue_source", [""])[0] == "local"
+
+
+def _build_local_issue_details(row: pd.Series) -> _IssueDetailsData:
+    """Build issue details directly from a local seeded row."""
+    return {
+        "title": str(row.get("title") or ""),
+        "description": str(row.get("description") or "").strip(),
+        "web_url": str(row.get("web_url") or ""),
+        "notes": [],
+    }
+
+
+def _sync_local_issue_query_selection(df: pd.DataFrame) -> None:
+    """Sync local issue query params into overview selection state."""
+    if "web_url" not in df.columns or "project_id" not in df.columns or "iid" not in df.columns:
+        return
+
+    issue_source = str(st.query_params.get("issue_source", "")).strip()
+    if issue_source != "local":
+        return
+
+    project_id_raw = str(st.query_params.get("issue_project_id", "")).strip()
+    issue_iid_raw = str(st.query_params.get("issue_iid", "")).strip()
+
+    try:
+        project_id = int(project_id_raw)
+        issue_iid = int(issue_iid_raw)
+    except ValueError:
+        return
+
+    matches = df[(df["project_id"] == project_id) & (df["iid"] == issue_iid)]
+    if matches.empty:
+        return
+
+    selected_row = matches.iloc[0]
+    selected_url = str(selected_row.get("web_url") or "")
+    if not selected_url:
+        return
+
+    if st.session_state.get("selected_issue_url") != selected_url:
+        st.session_state["selected_issue_url"] = selected_url
+        st.session_state["selected_issue_title"] = selected_row.get("title", "")
+        st.session_state["show_issue_dialog"] = True
+
+
+def _clear_local_issue_query_params() -> None:
+    """Clear local issue deep-link query params after dismissing a modal."""
+    for key in ("issue_source", "issue_project_id", "issue_iid"):
+        if key in st.query_params:
+            del st.query_params[key]
 
 
 @st.cache_resource
@@ -97,6 +158,8 @@ def render_overview(
         st.warning("No data available.")
         return
 
+    _sync_local_issue_query_selection(df)
+
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
     _timeline_source = (timeline_df if timeline_df is not None else df).drop_duplicates(
         subset=["id"]
@@ -108,7 +171,12 @@ def render_overview(
     palette = get_palette()
     panel_label_color = with_alpha(get_plotly_font_color(), 0.72)
 
-    def handle_selection(selection_dict, chart_id, stage_filter=None, state_filter=None):
+    def handle_selection(
+        selection_dict: dict[str, Any] | None,
+        chart_id: str,
+        stage_filter: str | None = None,
+        state_filter: str | None = None,
+    ) -> None:
         if selection_dict and selection_dict.get("selection", {}).get("points"):
             pts = selection_dict["selection"]["points"]
             prev_key = f"prev_sel_{chart_id}"
@@ -384,7 +452,7 @@ def _get_selected_original_row(
     matches = df[df["web_url"] == url]
     if matches.empty:
         return None
-    return matches.iloc[0]
+    return cast(pd.Series, matches.iloc[0])
 
 
 @st.dialog("Issue Details", width="large")
@@ -403,16 +471,20 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
 
     project_id = int(project_id_val)
     issue_iid = int(issue_iid_val)
+    is_local_issue = _is_local_issue_url(row.get("web_url"))
 
-    try:
-        with st.spinner("Loading issue details from GitLab..."):
-            issue_details = _load_issue_details(project_id, issue_iid)
-    except ValueError as exc:
-        st.error(str(exc))
-        return
-    except GitlabError as exc:
-        st.error(f"Failed to load issue details from GitLab: {exc}")
-        return
+    if is_local_issue:
+        issue_details = _build_local_issue_details(row)
+    else:
+        try:
+            with st.spinner("Loading issue details from GitLab..."):
+                issue_details = _load_issue_details(project_id, issue_iid)
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+        except GitlabError as exc:
+            st.error(f"Failed to load issue details from GitLab: {exc}")
+            return
 
     web_url = _fmt(issue_details["web_url"] or row.get("web_url"))
     iid = _fmt(row.get("iid"))
@@ -427,12 +499,14 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
             if st.button("Back", use_container_width=True, type="primary", key="btn_top_back"):
                 st.session_state["show_issue_dialog"] = False
                 st.session_state["selected_issue_url"] = ""
+                _clear_local_issue_query_params()
                 if "selected_issue_title" in st.session_state:
                     st.session_state["selected_issue_title"] = ""
                 st.rerun()
         with btn_col2:
             if web_url != "—":
-                st.link_button("Open in GitLab", web_url, type="primary", use_container_width=True)
+                button_label = "Open locally" if is_local_issue else "Open in GitLab"
+                st.link_button(button_label, web_url, type="primary", use_container_width=True)
 
     _render_tag_chips(row)
     st.divider()
@@ -447,6 +521,8 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
             st.markdown(description)
         else:
             st.caption("_No description provided._")
+        if is_local_issue:
+            st.caption("Local seeded issue details are rendered directly from parquet data.")
 
     with col_meta:
         _render_dialog_meta(row)
@@ -465,6 +541,8 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
                     st.markdown(note["body"])
                 else:
                     st.caption("_Empty comment._")
+    elif is_local_issue:
+        st.caption("_Local seeded issues do not include GitLab activity history._")
     else:
         st.caption("_No comments yet._")
 
@@ -473,6 +551,7 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     if st.button("Back", use_container_width=True, type="primary", key="btn_bottom_back"):
         st.session_state["show_issue_dialog"] = False
         st.session_state["selected_issue_url"] = ""
+        _clear_local_issue_query_params()
         if "selected_issue_title" in st.session_state:
             st.session_state["selected_issue_title"] = ""
         st.rerun()
@@ -514,7 +593,7 @@ def _render_tag_chips(row: pd.Series) -> None:
 
     raw_labels = row.get("labels")
     label_list: list[str] = []
-    if hasattr(raw_labels, "__iter__") and not isinstance(raw_labels, str):
+    if isinstance(raw_labels, list):
         label_list = [
             str(lb).strip()
             for lb in raw_labels
@@ -659,9 +738,19 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     ai_storage_path = Path("data/ai")
 
     def check_summary_status(issue_id: object) -> str:
-        if pd.isna(issue_id):
+        if issue_id is None:
             return "✨"
-        summary_file = ai_storage_path / f"chat_{int(issue_id)}.parquet"
+        if isinstance(issue_id, int):
+            issue_id_int = issue_id
+        elif (
+            isinstance(issue_id, str) and issue_id.isdigit()
+        ) or (
+            isinstance(issue_id, float) and issue_id.is_integer()
+        ):
+            issue_id_int = int(issue_id)
+        else:
+            return "✨"
+        summary_file = ai_storage_path / f"chat_{issue_id_int}.parquet"
         return "📝" if summary_file.exists() else "✨"
 
     display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
@@ -689,7 +778,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             "Title",
             display_text=r"#(.+)$",
             width="large",
-            help="Click to open in GitLab",
+            help="Click to open the issue URL",
         ),
         "assignee": st.column_config.TextColumn("Assignee", width="small"),
         "stage": st.column_config.TextColumn("Stage", width="small"),

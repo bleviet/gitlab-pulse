@@ -69,6 +69,8 @@ uv run python app/processor/main.py
 
 Increasing `--count` gives you more total tickets. By default, the seeder assigns an assignee to roughly 95% of generated issues, and you can override that with `--assignment-rate`.
 
+Synthetic issues now use local dashboard URLs by default, so clicking issue links during local testing stays inside your local environment instead of pointing at a fake GitLab host.
+
 ### Local Data Manager
 
 For faster testing and validation, use the terminal manager:
@@ -98,6 +100,7 @@ uv run python tools/local_data_manager.py \
   --count 5000 \
   --assignment-rate 1.0 \
   --max-team-members 8 \
+  --dashboard-url-base http://localhost:8501 \
   --seed 42
 
 # Delete specific local projects
@@ -107,6 +110,18 @@ uv run python tools/local_data_manager.py --action delete --project-ids 101,102,
 The seeder now supports:
 - `--assignment-rate` to control how many issues get an assignee
 - `--max-team-members` to cap the number of distinct assignees and simulate a realistic team size
+- `--dashboard-url-base` to control where synthetic issue links should open
+
+When you open a seeded issue from the dashboard, the overview details dialog now renders the issue from local parquet data instead of calling the GitLab API. This makes local feature testing possible even when the issue URL points back to your local dashboard.
+
+If your dashboard runs on a different host or port, regenerate the data with a matching base URL:
+
+```bash
+uv run python tools/seeder.py \
+  --count 5000 \
+  --projects 101,102,103 \
+  --dashboard-url-base http://192.168.1.50:8501
+```
 
 ### Rules Configuration
 

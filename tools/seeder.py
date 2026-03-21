@@ -10,6 +10,7 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, cast
+from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
@@ -20,6 +21,7 @@ fake = Faker()
 DEFAULT_PROJECT_IDS: Final[list[int]] = [101, 102, 103]
 DEFAULT_ASSIGNMENT_RATE: Final[float] = 0.95
 DEFAULT_MAX_TEAM_MEMBERS: Final[int] = 12
+DEFAULT_DASHBOARD_URL_BASE: Final[str] = "http://localhost:8501"
 
 # Label pools
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
@@ -48,6 +50,7 @@ def generate_issues(
     seed: int | None = None,
     assignment_rate: float = DEFAULT_ASSIGNMENT_RATE,
     max_team_members: int = DEFAULT_MAX_TEAM_MEMBERS,
+    dashboard_url_base: str = DEFAULT_DASHBOARD_URL_BASE,
 ) -> pd.DataFrame:
     """Generate synthetic issue data.
 
@@ -59,6 +62,7 @@ def generate_issues(
         seed: Random seed for reproducibility
         assignment_rate: Ratio of issues assigned to a team member
         max_team_members: Maximum number of distinct team members
+        dashboard_url_base: Base URL for locally opening seeded issues
 
     Returns:
         DataFrame with RawIssue schema
@@ -159,7 +163,7 @@ def generate_issues(
             "work_item_type": work_item_type,
             "parent_id": parent_id,
             "child_ids": [],
-            "web_url": f"https://gitlab.example.com/project/-/issues/{i + 1}",
+            "web_url": build_local_issue_url(project_id, i + 1, dashboard_url_base),
             "assignee": assignees[i],
             "milestone": milestone,
             "milestone_id": milestone_id,
@@ -188,6 +192,23 @@ def generate_issues(
                 typed_child_ids.append(child_iid)  # linking by IID as per schema
 
     return pd.DataFrame(issues)
+
+
+def build_local_issue_url(
+    project_id: int,
+    issue_iid: int,
+    dashboard_url_base: str = DEFAULT_DASHBOARD_URL_BASE,
+) -> str:
+    """Build a local dashboard deep link for a synthetic issue."""
+    base_url = dashboard_url_base.rstrip("/")
+    query_string = urlencode(
+        {
+            "issue_source": "local",
+            "issue_project_id": project_id,
+            "issue_iid": issue_iid,
+        }
+    )
+    return f"{base_url}/?{query_string}"
 
 
 def _build_team_members(max_team_members: int) -> list[str]:
@@ -417,6 +438,7 @@ def seed_data(
     seed: int | None = None,
     assignment_rate: float = DEFAULT_ASSIGNMENT_RATE,
     max_team_members: int = DEFAULT_MAX_TEAM_MEMBERS,
+    dashboard_url_base: str = DEFAULT_DASHBOARD_URL_BASE,
 ) -> None:
     """Generate and save synthetic data to Parquet.
 
@@ -428,6 +450,7 @@ def seed_data(
         seed: Random seed
         assignment_rate: Ratio of issues assigned to a team member
         max_team_members: Maximum number of distinct team members
+        dashboard_url_base: Base URL for locally opening seeded issues
     """
     if project_ids is None:
         project_ids = DEFAULT_PROJECT_IDS.copy()
@@ -450,6 +473,7 @@ def seed_data(
         seed=seed,
         assignment_rate=assignment_rate,
         max_team_members=max_team_members,
+        dashboard_url_base=dashboard_url_base,
     )
 
     # Save per-project files (like Layer 1 output)
@@ -490,6 +514,12 @@ def main() -> None:
         default=DEFAULT_MAX_TEAM_MEMBERS,
         help="Maximum number of distinct team members used as assignees",
     )
+    parser.add_argument(
+        "--dashboard-url-base",
+        type=str,
+        default=DEFAULT_DASHBOARD_URL_BASE,
+        help="Base dashboard URL used for synthetic issue links",
+    )
     args = parser.parse_args()
 
     project_ids = [int(p.strip()) for p in args.projects.split(",")]
@@ -502,6 +532,7 @@ def main() -> None:
         seed=args.seed,
         assignment_rate=args.assignment_rate,
         max_team_members=args.max_team_members,
+        dashboard_url_base=args.dashboard_url_base,
     )
 
     print(f"\n✅ Generated {args.count} synthetic issues")
@@ -509,6 +540,7 @@ def main() -> None:
     print(f"   Errors injected: {args.inject_errors}")
     print(f"   Assignment rate: {args.assignment_rate}")
     print(f"   Max team members: {args.max_team_members}")
+    print(f"   Dashboard URL base: {args.dashboard_url_base}")
     print(f"   Output: {args.output}/")
 
 
