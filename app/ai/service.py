@@ -1,7 +1,6 @@
-import json
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import TypedDict
 
 import pandas as pd
 import requests
@@ -9,6 +8,152 @@ import requests
 from app.ai.models import ChatMessage, IssueConversation
 
 logger = logging.getLogger(__name__)
+
+
+class _PromptNote(TypedDict):
+    """Normalized note data used to build the summary prompt."""
+
+    author: str
+    body: str
+    created_at: str
+    system: bool
+
+
+def _format_prompt_field(value: object, fallback: str) -> str:
+    """Return a normalized prompt field value."""
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    return text if text else fallback
+
+
+def _format_prompt_labels(labels: object) -> str:
+    """Return labels as a concise comma-separated string for the prompt."""
+    if labels is None:
+        return "None"
+    if isinstance(labels, str):
+        normalized_labels = [labels.strip()] if labels.strip() else []
+    elif hasattr(labels, "tolist"):
+        normalized_labels = [
+            str(label).strip()
+            for label in labels.tolist()
+            if str(label).strip()
+        ]
+    elif isinstance(labels, list | tuple | set):
+        normalized_labels = [str(label).strip() for label in labels if str(label).strip()]
+    else:
+        normalized_labels = [str(labels).strip()] if str(labels).strip() else []
+    return ", ".join(normalized_labels) if normalized_labels else "None"
+
+
+def _normalize_notes_for_prompt(raw_notes: object) -> list[_PromptNote]:
+    """Return prompt-ready note entries sorted in chronological order."""
+    if raw_notes is None:
+        return []
+
+    values = raw_notes.tolist() if hasattr(raw_notes, "tolist") else raw_notes
+    if isinstance(values, dict):
+        values = [values]
+    if not isinstance(values, list | tuple):
+        return []
+
+    normalized_notes: list[_PromptNote] = []
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        author = _format_prompt_field(
+            value.get("author_name") or value.get("author_username"),
+            "Unknown author",
+        )
+        normalized_notes.append(
+            {
+                "author": author,
+                "body": _format_prompt_field(value.get("body"), "(empty note)"),
+                "created_at": _format_prompt_field(value.get("created_at"), "Unknown time"),
+                "system": bool(value.get("system", False)),
+            }
+        )
+
+    return sorted(normalized_notes, key=_prompt_note_sort_key)
+
+
+def _prompt_note_sort_key(note: _PromptNote) -> tuple[int, str]:
+    """Build a stable sort key for prompt note ordering."""
+    parsed = pd.to_datetime(note["created_at"], utc=True, errors="coerce")
+    if pd.isna(parsed):
+        return (1, note["created_at"])
+    return (0, parsed.isoformat())
+
+
+def _format_notes_for_prompt(raw_notes: object) -> str:
+    """Render issue notes/comments for the summary prompt."""
+    notes = _normalize_notes_for_prompt(raw_notes)
+    if not notes:
+        return "- No notes or comments provided."
+
+    lines: list[str] = []
+    for index, note in enumerate(notes, start=1):
+        note_kind = "System note" if note["system"] else "Comment"
+        lines.append(
+            f"{index}. [{note['created_at']}] {note_kind} by {note['author']}: {note['body']}"
+        )
+    return "\n".join(lines)
+
+
+def _build_summary_prompt(issue_row: pd.Series) -> str:
+    """Build the issue-summary prompt from the full issue content."""
+    title = _format_prompt_field(issue_row.get("title"), "Unknown")
+    description = _format_prompt_field(
+        issue_row.get("description"),
+        "No description provided.",
+    )
+    labels = _format_prompt_labels(issue_row.get("labels"))
+    assignee = _format_prompt_field(issue_row.get("assignee"), "Unassigned")
+    milestone = _format_prompt_field(issue_row.get("milestone"), "None")
+    state = _format_prompt_field(issue_row.get("state"), "unknown")
+    created_at = _format_prompt_field(issue_row.get("created_at"), "Unknown")
+    updated_at = _format_prompt_field(issue_row.get("updated_at"), "Unknown")
+    notes = _format_notes_for_prompt(issue_row.get("notes"))
+
+    return f"""Summarize the following GitLab issue in a neutral, concise, and factual way. Use the entire issue content, including the title, description, system notes if relevant, and all user comments/notes. Do not ignore later comments, because they may update or contradict earlier information.
+
+Produce the output in this structure:
+
+Summary: 2 to 4 sentences describing the issue, current state, and most important context.
+
+Key points: 3 to 6 bullet points covering confirmed facts, decisions, blockers, status changes, and next steps.
+
+Open questions: bullet points only if unresolved questions remain.
+
+Requirements:
+
+- Be neutral and concise.
+- Do not invent facts or fill gaps with assumptions.
+- Prefer the most recent confirmed information when comments conflict.
+- Mention disagreements or uncertainty briefly if they affect the current status.
+- Do not repeat the same point from multiple comments.
+- Do not quote long passages.
+- Do not include praise, blame, or subjective judgment.
+- If the discussion is noisy, focus on decisions, actions, blockers, and current status.
+
+Here is the full issue content:
+
+Title: {title}
+
+Description:
+{description}
+
+Metadata:
+- Labels: {labels}
+- Assignee: {assignee}
+- Milestone: {milestone}
+- State: {state}
+- Created at: {created_at}
+- Updated at: {updated_at}
+
+Notes and comments in chronological order:
+{notes}
+"""
 
 
 class AIService:
@@ -27,7 +172,7 @@ class AIService:
         except requests.RequestException:
             return False
 
-    def get_available_models(self) -> List[str]:
+    def get_available_models(self) -> list[str]:
         """Fetch list of available models from Ollama."""
         try:
             response = requests.get(f"{self.endpoint}/api/tags", timeout=2.0)
@@ -40,7 +185,7 @@ class AIService:
             logger.error(f"Failed to fetch models: {e}")
             return []
 
-    def get_conversation(self, issue_id: int) -> Optional[IssueConversation]:
+    def get_conversation(self, issue_id: int) -> IssueConversation | None:
         """Load conversation for a specific issue from Parquet."""
         filepath = self.storage_path / f"chat_{issue_id}.parquet"
         if not filepath.exists():
@@ -79,80 +224,7 @@ class AIService:
 
     def generate_summary(self, issue_row: pd.Series, model: str = "llama3:latest") -> IssueConversation:
         """Generate a summary for an issue row."""
-        title = issue_row.get("title", "Unknown")
-        description = issue_row.get("description", "") or "No description provided."
-        labels = issue_row.get("labels", [])
-        assignee = issue_row.get("assignee", "Unassigned")
-        milestone = issue_row.get("milestone", "None")
-        state = issue_row.get("state", "unknown")
-
-        system_prompt = f"""
-You are an intelligent Project Assistant for GitLabInsight.
-Analyze the following GitLab issue and provide a structured, actionable summary.
-
-
-INPUT CONTEXT:
-- Title: {title}
-- Description: {description}
-- Labels: {labels}
-- Assignee: {assignee}
-- Milestone: {milestone}
-- State: {state}
-
-
-CORE PRINCIPLES:
-1. **Be Explicit and Concrete:** Extract only factual information present in the input. Never invent, assume, or extrapolate details [web:20][web:25].
-2. **Preserve Domain Language:** Use the exact terminology from the issue. Adapt your tone to match the domain (technical for engineering, business-focused for operations, creative for marketing) [web:25].
-3. **Never Explain Abbreviations:** Present all abbreviations exactly as written. Each organization has domain-specific meanings—do not attempt to expand or interpret them.
-4. **Output Format:** Use Markdown headers (###) with concise, scannable sections [web:21][web:22].
-
-
-ISSUE CLASSIFICATION (Infer from labels and content):
-Detect the issue type to shape your analysis [web:26][web:29]:
-- **Bug/Defect:** Focus on reproduction, impact, error details
-- **Feature/Enhancement:** Focus on requirements, user value, scope
-- **Task/Operations:** Focus on deliverables, dependencies, resources
-- **Support/Feedback:** Focus on user needs, resolution paths
-- **Documentation:** Focus on target audience, content gaps
-- **Process/Policy:** Focus on stakeholders, decision points, compliance
-
-
-REQUIRED OUTPUT SECTIONS:
-
-### Issue Classification
-State the detected issue type in one line (e.g., "Bug Report", "Feature Request", "Operational Task", "Marketing Campaign", "Legal Review").
-
-### Executive Summary
-Provide 2-3 sentences answering: What is being requested/reported? Why does it matter? Who is impacted?
-Focus on business value or technical impact, not procedural details.
-
-### Critical Information
-Extract factual data points in bullet format. Look for:
-- Specific identifiers (error codes, ticket IDs, system names, deadlines)
-- Quantifiable metrics (budget amounts, performance numbers, user counts)
-- Named entities (stakeholders, teams, external vendors, dependencies)
-- Concrete artifacts (URLs, file paths, document references)
-
-If no specific data exists, state: "No concrete data points provided."
-
-### Status & Dependencies
-- **Current State:** Describe progress based on labels and description
-- **Blockers:** Explicitly list blocking factors (approvals, external dependencies, technical constraints)
-- **Dependencies:** Note related issues, systems, or teams mentioned
-
-If no blockers exist, state: "No blockers identified."
-
-### Open Questions or Gaps
-List any ambiguities, missing information, or unresolved decisions that could delay resolution.
-If the issue is well-defined, state: "Issue appears well-defined."
-
-
-QUALITY STANDARDS:
-- Use active voice with varied sentence structure [web:22][web:25]
-- Keep each section under 5 bullet points or 4 sentences
-- Avoid generic statements—be specific to this issue
-- Do not create a summary or conclusion section [web:25]
-"""
+        system_prompt = _build_summary_prompt(issue_row)
 
 
         # Call Generate API
@@ -206,7 +278,12 @@ QUALITY STANDARDS:
             logger.error(f"Ollama Generate Error: {e}")
             raise
 
-    def _call_chat(self, model: str, messages: List[dict], stream: bool = False) -> str:
+    def _call_chat(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        stream: bool = False,
+    ) -> str:
         """Raw call to /api/chat."""
         try:
             payload = {"model": model, "messages": messages, "stream": stream}

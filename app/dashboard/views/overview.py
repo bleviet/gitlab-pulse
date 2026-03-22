@@ -8,8 +8,10 @@ import ast
 import html
 import os
 import re
+from collections.abc import Callable
+from contextlib import suppress
 from difflib import SequenceMatcher
-from typing import Any, Callable, TypedDict, cast
+from typing import Any, TypedDict, cast
 from urllib.parse import parse_qs, urlparse
 
 import gitlab
@@ -26,7 +28,7 @@ from app.dashboard.engine import (
 )
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
-from app.dashboard.widgets import charts, tables
+from app.dashboard.widgets import charts, features, tables
 
 
 class _IssueNoteData(TypedDict):
@@ -278,6 +280,19 @@ def _build_local_issue_details(row: pd.Series) -> _IssueDetailsData:
         "web_url": str(row.get("web_url") or ""),
         "notes": _normalize_local_issue_notes(row.get("notes")),
     }
+
+
+def _build_issue_ai_context_row(
+    row: pd.Series,
+    issue_details: _IssueDetailsData,
+) -> pd.Series:
+    """Merge loaded issue details into the selected row for AI context."""
+    ai_context_row = row.copy()
+    ai_context_row["description"] = issue_details["description"]
+    ai_context_row["notes"] = issue_details["notes"]
+    ai_context_row["title"] = issue_details["title"] or row.get("title")
+    ai_context_row["web_url"] = issue_details["web_url"] or row.get("web_url")
+    return ai_context_row
 
 
 def _normalize_local_issue_notes(raw_notes: object) -> list[_IssueNoteData]:
@@ -808,7 +823,7 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
             _render_issue_details_content(selected_row, is_nested=True)
             return
 
-    if st.button("Close Modal", key="close_filtered_issues_modal", type="primary", use_container_width=True):
+    if st.button("Close", key="close_filtered_issues_modal", type="primary", use_container_width=True):
         st.session_state["show_filtered_issues_dialog"] = False
         st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
         st.session_state["filtered_issues_stage"] = None
@@ -864,6 +879,8 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     web_url = _fmt(issue_details["web_url"] or row.get("web_url"))
     iid = _fmt(row.get("iid"))
     title = _fmt(issue_details["title"] or row.get("title"))
+    ai_context_row = _build_issue_ai_context_row(row, issue_details)
+    dialog_key_prefix = "filtered-issue-dialog" if is_nested else "issue-dialog"
 
     st.markdown(
         f'<div id="{_ISSUE_DIALOG_TOP_MARKER_ID}"></div>',
@@ -876,7 +893,12 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     with action_col:
         btn_col1, btn_col2 = st.columns(2)
         with btn_col1:
-            if st.button("Back", use_container_width=True, type="primary", key="btn_top_back"):
+            if st.button(
+                "Back",
+                use_container_width=True,
+                type="primary",
+                key=f"{dialog_key_prefix}-btn-top-back",
+            ):
                 st.session_state["show_issue_dialog"] = False
                 st.session_state["selected_issue_url"] = ""
                 _clear_local_issue_query_params()
@@ -893,44 +915,60 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
     _render_tag_chips(row, label_styles=label_styles)
     st.divider()
 
-    # ── BODY (70 / 30) ──────────────────────────────────────────────────────
-    col_content, col_meta = st.columns([0.7, 0.3], gap="medium")
+    _render_issue_dialog_tab_styles()
+    details_tab, activity_tab, ai_tab = st.tabs(
+        ["Details", "Activity", "🤖 AI Assistant"]
+    )
 
-    with col_content:
-        st.markdown("#### Description")
-        description = issue_details["description"].strip()
-        if description:
-            st.markdown(description)
+    with details_tab:
+        col_content, col_meta = st.columns([0.7, 0.3], gap="medium")
+
+        with col_content:
+            st.markdown("#### Description")
+            description = issue_details["description"].strip()
+            if description:
+                st.markdown(description)
+            else:
+                st.caption("_No description provided._")
+            if is_local_issue:
+                st.caption("Local seeded issue details are rendered directly from parquet data.")
+
+        with col_meta:
+            _render_dialog_meta(row)
+
+    with ai_tab:
+        st.caption("Generate a summary, check whether it is stale, and continue the issue-specific AI chat.")
+        features.ai_assistant(
+            ai_context_row,
+            widget_key_prefix=f"{dialog_key_prefix}-ai",
+        )
+
+    with activity_tab:
+        st.markdown("#### Activity")
+        if issue_details["notes"]:
+            for note in issue_details["notes"]:
+                author = note["author_name"] or note["author_username"] or "GitLab"
+                avatar = "📌" if note["system"] else "💬"
+                with st.chat_message("assistant", avatar=avatar):
+                    st.markdown(f"**{author}**")
+                    st.caption(_format_timestamp(note["created_at"], system_note=note["system"]))
+                    if note["body"].strip():
+                        st.markdown(note["body"])
+                    else:
+                        st.caption("_Empty comment._")
+        elif is_local_issue:
+            st.caption("_Local seeded issues do not include GitLab activity history._")
         else:
-            st.caption("_No description provided._")
-        if is_local_issue:
-            st.caption("Local seeded issue details are rendered directly from parquet data.")
-
-    with col_meta:
-        _render_dialog_meta(row)
-
-    # ── FOOTER ──────────────────────────────────────────────────────────────
-    st.divider()
-    st.markdown("#### Activity")
-    if issue_details["notes"]:
-        for note in issue_details["notes"]:
-            author = note["author_name"] or note["author_username"] or "GitLab"
-            avatar = "📌" if note["system"] else "💬"
-            with st.chat_message("assistant", avatar=avatar):
-                st.markdown(f"**{author}**")
-                st.caption(_format_timestamp(note["created_at"], system_note=note["system"]))
-                if note["body"].strip():
-                    st.markdown(note["body"])
-                else:
-                    st.caption("_Empty comment._")
-    elif is_local_issue:
-        st.caption("_Local seeded issues do not include GitLab activity history._")
-    else:
-        st.caption("_No comments yet._")
+            st.caption("_No comments yet._")
 
     st.divider()
 
-    if st.button("Back", use_container_width=True, type="primary", key="btn_bottom_back"):
+    if st.button(
+        "Back",
+        use_container_width=True,
+        type="primary",
+        key=f"{dialog_key_prefix}-btn-bottom-back",
+    ):
         st.session_state["show_issue_dialog"] = False
         st.session_state["selected_issue_url"] = ""
         _clear_local_issue_query_params()
@@ -939,6 +977,32 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
         st.rerun()
 
     _scroll_issue_dialog_to_top()
+
+
+def _render_issue_dialog_tab_styles() -> None:
+    """Apply a slightly stronger visual treatment to issue-dialog tabs."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stDialog"] [data-baseweb="tab-list"] {
+            gap: 0.75rem;
+            margin-top: -0.2rem;
+        }
+
+        [data-testid="stDialog"] [data-baseweb="tab"] {
+            padding-top: 0.22rem;
+            padding-bottom: 0.45rem;
+        }
+
+        [data-testid="stDialog"] [data-baseweb="tab"] p {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _scroll_issue_dialog_to_top() -> None:
@@ -1214,10 +1278,8 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     if ai_storage_path.is_dir():
         for entry in ai_storage_path.iterdir():
             if entry.name.startswith("chat_") and entry.suffix == ".parquet":
-                try:
+                with suppress(ValueError):
                     ai_issue_ids.add(int(entry.stem.removeprefix("chat_")))
-                except ValueError:
-                    pass
 
     def _safe_int(value: object) -> int | None:
         if isinstance(value, int):

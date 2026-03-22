@@ -1,27 +1,34 @@
 """Tests for local synthetic data tooling."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from app.ai.models import IssueConversation
 from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
-    _build_overview_quality_signal_df,
+    _build_issue_ai_context_row,
     _build_issue_search_mask,
     _build_local_issue_details,
+    _build_overview_quality_signal_df,
     _dialog_meta_item_html,
     _has_multiple_classification_labels,
-    _issue_quality_hints,
     _is_local_issue_url,
+    _issue_dialog_scroll_script,
+    _issue_quality_hints,
     _mixed_classification_hints,
     _normalize_issue_labels,
     _normalize_issue_search_text,
-    _selection_mask_for_quality_signal,
     _priority_cell_style,
     _priority_color_key,
-    _issue_dialog_scroll_script,
+    _selection_mask_for_quality_signal,
     _selection_mask_for_value,
+)
+from app.dashboard.widgets.features.ai_assistant import (
+    _conversation_is_stale,
+    _format_issue_labels,
 )
 from tools.local_data_manager import delete_local_projects, discover_local_projects
 from tools.seeder import build_local_issue_url, generate_issues, seed_data
@@ -150,6 +157,30 @@ def test_build_local_issue_details_uses_seeded_row_data() -> None:
     assert details["notes"][0]["author_username"] == "arivera"
 
 
+def test_build_issue_ai_context_row_prefers_loaded_details() -> None:
+    """AI context rows should use the loaded issue details inside the dialog."""
+    row = pd.Series(
+        {
+            "id": 42,
+            "title": "Table title",
+            "description": "",
+            "web_url": "https://gitlab.example.com/issues/42",
+        }
+    )
+    issue_details = {
+        "title": "Loaded title",
+        "description": "Loaded description",
+        "web_url": "https://gitlab.example.com/group/project/-/issues/42",
+        "notes": [],
+    }
+
+    ai_row = _build_issue_ai_context_row(row, issue_details)
+
+    assert ai_row["title"] == "Loaded title"
+    assert ai_row["description"] == "Loaded description"
+    assert ai_row["web_url"] == "https://gitlab.example.com/group/project/-/issues/42"
+
+
 def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:
     """Issue label chips should split numpy-style string arrays into values."""
     raw = (
@@ -214,6 +245,27 @@ def test_issue_dialog_scroll_script_targets_dialog_top_marker() -> None:
     assert 'const markerId = "issue-details-dialog-top"' in script
     assert "scrollIntoView" in script
     assert "node.scrollTop = 0" in script
+
+
+def test_conversation_is_stale_detects_newer_issue_updates() -> None:
+    """AI status should mark summaries stale when the source issue changed."""
+    row = pd.Series({"updated_at": "2024-01-03T12:00:00Z"})
+    conversation = IssueConversation(
+        issue_id=1,
+        project_id=101,
+        ref_issue_updated_at=datetime(2024, 1, 2, 12, 0, tzinfo=UTC),
+        summary_short="Summary",
+    )
+
+    assert _conversation_is_stale(row, conversation) is True
+
+
+def test_format_issue_labels_handles_iterables_and_empty_values() -> None:
+    """AI metadata should render labels predictably for display."""
+    assert _format_issue_labels(["type::bug", "", "priority::1"]) == (
+        "`type::bug` `priority::1`"
+    )
+    assert _format_issue_labels(None) == "_No labels_"
 
 
 def test_has_multiple_classification_labels_detects_duplicate_type_family() -> None:
