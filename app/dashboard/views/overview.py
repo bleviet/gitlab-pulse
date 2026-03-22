@@ -496,7 +496,6 @@ def render_overview(
         handle_selection(sel6, chart_id="assignee_chart")
 
     # ROW 1
-    st.markdown("##### OVERVIEW")
     render_streamlit_grid(
         [
             StreamlitGridRow(
@@ -528,7 +527,6 @@ def render_overview(
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ROW 2
-    st.markdown("##### ISSUES BY WORKFLOW STATE")
     render_streamlit_grid(
         [
             StreamlitGridRow(
@@ -548,7 +546,6 @@ def render_overview(
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ROW 3
-    st.markdown("##### DELIVERY SNAPSHOT")
     render_streamlit_grid(
         [
             StreamlitGridRow(
