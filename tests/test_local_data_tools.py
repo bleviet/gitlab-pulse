@@ -7,9 +7,11 @@ import pandas as pd
 
 from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.overview import (
+    _build_overview_quality_signal_df,
     _build_issue_search_mask,
     _build_local_issue_details,
     _dialog_meta_item_html,
+    _has_multiple_classification_labels,
     _is_local_issue_url,
     _normalize_issue_labels,
     _normalize_issue_search_text,
@@ -209,6 +211,53 @@ def test_issue_dialog_scroll_script_targets_dialog_top_marker() -> None:
     assert 'const markerId = "issue-details-dialog-top"' in script
     assert "scrollIntoView" in script
     assert "node.scrollTop = 0" in script
+
+
+def test_has_multiple_classification_labels_detects_duplicate_type_family() -> None:
+    """Overview quality signals should flag issues with conflicting classification labels."""
+    assert _has_multiple_classification_labels(["type::bug", "type::feature"]) is True
+    assert _has_multiple_classification_labels(["type::bug", "severity::high"]) is False
+
+
+def test_build_overview_quality_signal_df_collects_three_focus_signals() -> None:
+    """Overview quality signals should cover mixed classification, owner, and milestone gaps."""
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "labels": ["type::bug", "type::feature"],
+                "assignee": "alex",
+                "milestone": "Release 24",
+            },
+            {
+                "id": 2,
+                "labels": ["type::task"],
+                "assignee": None,
+                "milestone": "Release 24",
+            },
+            {
+                "id": 3,
+                "labels": ["type::feature"],
+                "assignee": "sam",
+                "milestone": None,
+            },
+            {
+                "id": 4,
+                "labels": ["type::bug"],
+                "assignee": None,
+                "milestone": None,
+            },
+        ]
+    )
+
+    signal_df = _build_overview_quality_signal_df(df)
+    grouped_signals = signal_df.groupby("error_code")["id"].apply(list).to_dict()
+
+    assert grouped_signals == {
+        "MIXED_CLASSIFICATION": [1],
+        "MISSING_MILESTONE": [3, 4],
+        "UNASSIGNED_OWNER": [2, 4],
+    }
 
 
 def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None:

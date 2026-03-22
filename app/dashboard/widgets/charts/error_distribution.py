@@ -13,10 +13,10 @@ def error_distribution(
     quality_df: pd.DataFrame,
     config: dict[str, Any] | None = None
 ) -> dict | None:
-    """Render horizontal bar chart of error code distribution.
+    """Render horizontal bar chart of quality-signal distribution.
 
     Args:
-        quality_df: DataFrame with quality issues
+        quality_df: DataFrame with quality signal rows
         config: Optional configuration
 
     Returns:
@@ -27,7 +27,7 @@ def error_distribution(
     widget_key = config.get("key", "error_distribution_chart")
 
     if quality_df.empty or "error_code" not in quality_df.columns:
-        st.info("No error data available")
+        st.info("No quality signals available")
         return None
 
     error_counts = quality_df["error_code"].value_counts().reset_index()

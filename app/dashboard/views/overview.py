@@ -59,6 +59,66 @@ _ISSUE_GRID_SEARCH_COLUMNS = (
     "milestone",
     "assignee",
 )
+_OVERVIEW_SIGNAL_UNASSIGNED = "UNASSIGNED_OWNER"
+_OVERVIEW_SIGNAL_MISSING_MILESTONE = "MISSING_MILESTONE"
+_OVERVIEW_SIGNAL_MIXED_CLASSIFICATION = "MIXED_CLASSIFICATION"
+
+
+def _has_multiple_classification_labels(labels: object) -> bool:
+    """Return True when an issue carries multiple labels in one classification bucket."""
+    normalized_labels = [label.lower() for label in _normalize_issue_labels(labels)]
+    classification_prefixes = ("type::", "severity::", "priority::")
+    return any(
+        sum(label.startswith(prefix) for label in normalized_labels) > 1
+        for prefix in classification_prefixes
+    )
+
+
+def _build_overview_quality_signal_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Build the curated Overview quality-signal dataset from the current issues."""
+    if df.empty:
+        return pd.DataFrame(columns=["error_code"])
+
+    signal_frames: list[pd.DataFrame] = []
+
+    mixed_classification_mask = (
+        df["labels"].apply(_has_multiple_classification_labels)
+        if "labels" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    if mixed_classification_mask.any():
+        mixed_df = df.loc[mixed_classification_mask].copy()
+        mixed_df["error_code"] = _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION
+        signal_frames.append(mixed_df)
+
+    assignee_series = (
+        normalize_assignee_labels(df["assignee"])
+        if "assignee" in df.columns
+        else pd.Series("Assigned", index=df.index)
+    )
+    unassigned_mask = assignee_series.eq("Unassigned")
+    if unassigned_mask.any():
+        unassigned_df = df.loc[unassigned_mask].copy()
+        unassigned_df["error_code"] = _OVERVIEW_SIGNAL_UNASSIGNED
+        signal_frames.append(unassigned_df)
+
+    milestone_series = (
+        df["milestone"]
+        if "milestone" in df.columns
+        else pd.Series(None, index=df.index, dtype="object")
+    )
+    missing_milestone_mask = milestone_series.isna() | milestone_series.astype(str).str.strip().str.lower().isin(
+        {"", "none", "nan", "<na>"}
+    )
+    if missing_milestone_mask.any():
+        missing_milestone_df = df.loc[missing_milestone_mask].copy()
+        missing_milestone_df["error_code"] = _OVERVIEW_SIGNAL_MISSING_MILESTONE
+        signal_frames.append(missing_milestone_df)
+
+    if not signal_frames:
+        return pd.DataFrame(columns=["error_code"])
+
+    return pd.concat(signal_frames, ignore_index=True)
 
 
 def _priority_color_key(value: object) -> str | None:
@@ -286,7 +346,7 @@ def render_overview(
 
     Args:
         df: Filtered DataFrame with valid issues (milestone filter applied)
-        quality_df: DataFrame with quality issues for hygiene-oriented charts
+        quality_df: Optional quality-hint dataframe for supporting widgets
         stage_descriptions: Optional mapping of stage names to description strings
         timeline_df: Unfiltered DataFrame for the milestone timeline
         highlight_milestone: Active milestone name to highlight in the timeline
@@ -487,8 +547,9 @@ def render_overview(
         handle_selection(sel5, chart_id="issue_state_chart")
 
     def _render_error_distribution_panel() -> None:
+        overview_signal_df = _build_overview_quality_signal_df(unique_df)
         charts.error_distribution(
-            quality_df if quality_df is not None else pd.DataFrame(),
+            overview_signal_df,
             config={
                 "height": 150,
                 "key": f"row3_error_distribution_{chart_reset_suffix}",
@@ -566,8 +627,8 @@ def render_overview(
                     _panel_cell(
                         key="overview_error_distribution",
                         span=3,
-                        title="Quality Hint Distribution",
-                        meta="Signals",
+                        title="Issue Quality Signals",
+                        meta="Hints",
                         render_body=_render_error_distribution_panel,
                     ),
                 )

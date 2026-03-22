@@ -112,28 +112,6 @@ workflow:
     #   type: "waiting"
     #   description: "Matches dynamic verification labels such as iteration-42::verify."
 
-validation:
-  # Required labels for specific issue types
-  required_labels:
-    Bug:
-      - "contains:severity::"  # Matches labels containing "severity::" (e.g. severity::high)
-    Feature:
-      - "contains:priority::"
-    Task:
-      - "contains:priority::"
-
-  # Required fields (column names)
-  required_fields:
-    Feature:
-      - "milestone"  # Feature issues must have a milestone (title)
-
-
-  # Staleness threshold (days since last update)
-  stale_threshold_days: 30
-
-  # Maximum allowed cycle time (days)
-  max_cycle_time_days: 90
-
 # Semantic color overrides (optional)
 # Supported formats:
 # 1) Legacy shared palette (flat key/value)
