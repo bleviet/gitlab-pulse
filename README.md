@@ -77,11 +77,13 @@ cp .env.example .env
 
 Required for live GitLab sync:
 
-| Variable | Description |
-|---|---|
-| `GITLAB_URL` | GitLab instance URL (e.g. `https://gitlab.com`) |
-| `GITLAB_TOKEN` | Personal access token with `read_api` scope |
-| `PROJECT_IDS` | Comma-separated project IDs to sync |
+| Variable | Description | Required For |
+|---|---|---|
+| `GITLAB_URL` | GitLab instance URL (e.g. `https://gitlab.com`) | Live Sync |
+| `GITLAB_TOKEN` | Personal access token with `read_api` scope | Live Sync |
+| `PROJECT_IDS` | Comma-separated project IDs to sync | Live Sync |
+| `ADMIN_PASSWORD` | Password for destructive dashboard actions (default: `admin`) | Optional |
+| `OLLAMA_ENDPOINT` | Local or remote Ollama API URL (default: `http://localhost:11434`) | Optional |
 
 `tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not require a GitLab connection. The example config file (`default.yaml`) ships with an empty `project_ids` list to act as a global fallback, meaning it is perfectly safe to use on a fresh clone. You must supply your own `PROJECT_IDS` (via `.env`) to process live data, or use the local seeded data.
 
@@ -233,6 +235,16 @@ uv run python tools/seeder.py --count 10000 --assignment-rate 1.0 --max-team-mem
 # Profile Layer 2 performance
 uv run python -m cProfile -s time app/processor/main.py
 ```
+
+## Troubleshooting
+
+### Common Setup Failures
+
+- **Missing `.env` file**: If you forget to run `cp .env.example .env`, the collector cannot authenticate with GitLab. Live syncs will fail.
+- **Empty Dashboard (No Data)**: The dashboard reads from pre-calculated Parquet files. If your dashboard is empty, you either haven't fetched data (`app/collector/orchestrator.py`) or haven't processed it (`app/processor/main.py`). For synthetic data, run `tools/seeder.py` first.
+- **GitLab 401 Unauthorized**: Your `GITLAB_TOKEN` in `.env` is invalid, expired, or missing the `read_api` scope.
+- **AI Assistant "Connection Refused"**: The dashboard expects Ollama to be running at the configured `OLLAMA_ENDPOINT` (default: `http://localhost:11434`). Ensure you ran `ollama serve` and pulled a model.
+- **Data Loss on Restart**: If you run this in a container and lose synced issues or chat history on restart, ensure the `data/` directory is mapped to a persistent volume.
 
 ## Q&A
 
