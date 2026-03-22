@@ -82,8 +82,8 @@ class Processor:
             self._write_parquet(combined_valid, self.analytics_path / "issues_valid.parquet")
             valid_count = len(combined_valid)
 
-        # Always write the quality file so a stale file from a previous run
-        # (with validation enabled) is cleared when validation is now disabled.
+        # Always write the quality file so stale hint output is cleared when the
+        # latest processing run produces no validation hints.
         combined_quality = pd.concat(all_quality, ignore_index=True) if all_quality else pd.DataFrame()
         self._write_parquet(combined_quality, self.analytics_path / "data_quality.parquet")
         quality_count = len(combined_quality)
@@ -126,12 +126,18 @@ class Processor:
         # Validate
         result = validate_issues(df, rule)
 
-        # Add orphan issues as MISSING_CONTEXT quality failures
+        # Add orphan issues as MISSING_CONTEXT quality hints while keeping them
+        # in the main analytics dataset.
         if not orphan_df.empty:
-            orphan_df = orphan_df.copy()
-            orphan_df["error_code"] = "MISSING_CONTEXT"
-            orphan_df["error_message"] = "Issue not assigned to any context/project"
-            result.quality_df = pd.concat([result.quality_df, orphan_df], ignore_index=True)
+            orphan_valid_df = orphan_df.copy()
+            orphan_valid_df["context"] = None
+            orphan_valid_df["context_group"] = None
+            result.valid_df = pd.concat([result.valid_df, orphan_valid_df], ignore_index=True)
+
+            orphan_quality_df = orphan_valid_df.copy()
+            orphan_quality_df["error_code"] = "MISSING_CONTEXT"
+            orphan_quality_df["error_message"] = "Issue not assigned to any context/project"
+            result.quality_df = pd.concat([result.quality_df, orphan_quality_df], ignore_index=True)
 
         return result.valid_df, result.quality_df
 

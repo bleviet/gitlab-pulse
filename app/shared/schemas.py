@@ -150,9 +150,9 @@ class AnalyticsIssue(BaseModel):
 
 
 class QualityIssue(BaseModel):
-    """Issue that failed validation rules (Layer 2 quality output).
+    """Issue with validation hints in the Layer 2 quality output.
 
-    Contains the issue data plus error information for the Hygiene view.
+    Contains the issue data plus error information for quality-oriented widgets.
     """
 
     id: int

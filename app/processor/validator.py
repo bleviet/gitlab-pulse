@@ -41,7 +41,7 @@ def validate_issues(
 ) -> ValidationResult:
     """Validate issues against domain rules.
 
-    The Gatekeeper: splits data into validation and quality (failed) DataFrames.
+    Collects validation hints while keeping all issues in the main output dataset.
 
     Note: Only OPEN issues are validated. Closed issues are historical records
     and hygiene checks are not actionable, so they pass through without validation.
@@ -55,10 +55,6 @@ def validate_issues(
     """
     if df.empty:
         return ValidationResult(valid_df=df, quality_df=pd.DataFrame())
-
-    if rule and not getattr(rule.validation, 'enabled', True):
-        logger.info("Validation disabled by rule config — all issues accepted")
-        return ValidationResult(valid_df=df.copy(), quality_df=pd.DataFrame())
 
     # Separate open and closed issues - only validate open issues
     # Closed issues are historical records; hygiene checks are not actionable
@@ -167,9 +163,6 @@ def validate_issues(
 
     # Split open issues based on errors
     if errors:
-        error_indices = {e[0] for e in errors}
-        valid_open_df = open_df[~open_df.index.isin(error_indices)].copy()
-
         # Build quality DataFrame with error info
         quality_rows = []
         for idx, error_code, message in errors:
@@ -180,8 +173,9 @@ def validate_issues(
 
         quality_df = pd.DataFrame(quality_rows)
     else:
-        valid_open_df = open_df.copy()
         quality_df = pd.DataFrame()
+
+    valid_open_df = open_df.copy()
 
     # Merge validated open issues with closed issues (which skip validation)
     if not closed_df.empty:
@@ -189,5 +183,10 @@ def validate_issues(
     else:
         valid_df = valid_open_df
 
-    logger.info(f"Validation: {len(valid_df)} valid ({len(closed_df)} closed skipped), {len(quality_df)} failed")
+    logger.info(
+        "Validation hints: %s issues available, %s quality rows flagged (%s closed skipped)",
+        len(valid_df),
+        len(quality_df),
+        len(closed_df),
+    )
     return ValidationResult(valid_df=valid_df, quality_df=quality_df)

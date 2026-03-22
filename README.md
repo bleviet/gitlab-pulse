@@ -189,10 +189,10 @@ uv run python -m cProfile -s time app/processor/main.py
 
 ### Data Inclusion Logic
 **Q: Are quality issues included in "Open Issues" or "Bug Ratio" metrics?**
-**A:** No. The operational metrics shown in the Overview page are calculated exclusively from the **valid** dataset. Issues that fail validation (e.g., missing labels) are stripped out and do not affect those metrics.
+**A:** Yes. Validation findings are now treated as **hints**, so operational metrics continue to use the full issue dataset while quality widgets highlight the flagged items separately.
 
 **Q: Do the issue lists include quality issues?**
-**A:** No. The list in the Overview view shows only valid issues. Invalid issues are displayed **exclusively** in the **Hygiene** view's Action Table.
+**A:** Yes. Issue lists continue to show all issues. Validation findings are surfaced through quality indicators and hint-focused views instead of removing issues from the main list.
 
 **Q: What are "Backlog" items?**
 **A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.

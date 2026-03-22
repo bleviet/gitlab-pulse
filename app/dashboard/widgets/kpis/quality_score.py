@@ -5,6 +5,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from app.dashboard.widgets.quality_metrics import compute_quality_summary
+
 
 def quality_score(
     valid_df: pd.DataFrame,
@@ -18,13 +20,6 @@ def quality_score(
         quality_df: DataFrame with quality (failed) issues
         config: Optional configuration (unused currently)
     """
-    total_valid = len(valid_df)
-    total_quality = len(quality_df)
-    total = total_valid + total_quality
+    score = compute_quality_summary(valid_df, quality_df)["score"]
 
-    if total == 0:
-        score = 0
-    else:
-        score = round((total_valid / total) * 100, 1)
-
-    st.metric("Quality Score", f"{score}%", help="Percentage of valid issues")
+    st.metric("Quality Score", f"{score}%", help="Percentage of issues without validation hints")

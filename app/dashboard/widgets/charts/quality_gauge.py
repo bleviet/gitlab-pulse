@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.theme import get_palette, plotly_layout, with_alpha
+from app.dashboard.widgets.quality_metrics import compute_quality_summary
 
 
 def quality_gauge(
@@ -21,15 +22,14 @@ def quality_gauge(
         quality_df: DataFrame with quality (failed) issues
         config: Optional configuration
     """
-    total_valid = len(valid_df)
-    total_quality = len(quality_df)
-    total = total_valid + total_quality
+    summary = compute_quality_summary(valid_df, quality_df)
+    total = summary["total_issues"]
 
     if total == 0:
         st.info("No data available to calculate quality score")
         return
 
-    score = round((total_valid / total) * 100, 1)
+    score = float(summary["score"])
 
     palette = get_palette()
     # Determine color based on score

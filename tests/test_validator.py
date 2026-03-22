@@ -6,6 +6,7 @@ import pytest
 from app.processor.enricher import apply_classification, enrich_metrics
 from app.processor.rule_loader import DomainRule, LabelMappings, ValidationConfig
 from app.processor.validator import ErrorCodes, validate_issues
+from app.dashboard.widgets.quality_metrics import compute_quality_summary
 
 
 @pytest.fixture
@@ -134,25 +135,27 @@ class TestValidator:
         assert 1 in result.valid_df["id"].values
 
     def test_validate_missing_severity_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
-        """Test that a bug without severity fails validation."""
+        """Test that a bug without severity is flagged while staying in the valid dataset."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
         enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
         # Issue 2 (missing severity) should be in quality
+        assert 2 in result.valid_df["id"].values
         assert 2 in result.quality_df["id"].values
         error_row = result.quality_df[result.quality_df["id"] == 2]
         assert error_row["error_code"].iloc[0] == ErrorCodes.MISSING_LABEL
 
     def test_validate_conflicting_labels_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
-        """Test that conflicting type labels fail validation."""
+        """Test that conflicting labels are flagged while staying in the valid dataset."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
         enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
         # Issue 4 (conflicting labels) should be in quality
+        assert 4 in result.valid_df["id"].values
         assert 4 in result.quality_df["id"].values
         # Check that CONFLICTING_LABELS error is present for this issue
         issue_4_errors = result.quality_df[result.quality_df["id"] == 4]["error_code"].tolist()
@@ -167,3 +170,21 @@ class TestValidator:
 
         # Issue 3 (feature) should be valid
         assert 3 in result.valid_df["id"].values
+
+    def test_quality_summary_uses_distinct_issue_ids(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
+        """Quality score math should count hinted issues once even with multiple quality rows."""
+        enriched = enrich_metrics(sample_issues_df, sample_rule)
+        enriched = apply_classification(enriched, sample_rule)
+
+        result = validate_issues(enriched, sample_rule)
+        duplicate_hint = result.quality_df[result.quality_df["id"] == 4].copy()
+        duplicate_hint["error_code"] = ErrorCodes.ORPHAN_TASK
+        duplicate_hint["error_message"] = "Duplicate hint for scoring test"
+        quality_df = pd.concat([result.quality_df, duplicate_hint], ignore_index=True)
+
+        summary = compute_quality_summary(result.valid_df, quality_df)
+
+        assert summary["total_issues"] == 4
+        assert summary["flagged_issues"] == 2
+        assert summary["clean_issues"] == 2
+        assert summary["score"] == 50.0

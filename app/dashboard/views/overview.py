@@ -566,8 +566,8 @@ def render_overview(
                     _panel_cell(
                         key="overview_error_distribution",
                         span=3,
-                        title="Issues Error Distribution",
-                        meta="Quality",
+                        title="Quality Hint Distribution",
+                        meta="Signals",
                         render_body=_render_error_distribution_panel,
                     ),
                 )

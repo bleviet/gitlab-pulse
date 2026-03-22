@@ -10,6 +10,7 @@ import streamlit as st
 
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.widgets import charts, tables
+from app.dashboard.widgets.quality_metrics import compute_quality_summary
 from app.dashboard.widgets.tables.issue_detail_grid import issue_detail_grid
 from app.dashboard.components import style_metric_cards
 from app.dashboard.theme import get_alert_background_colors
@@ -28,19 +29,10 @@ def render_hygiene(
 
     Args:
         valid_df: DataFrame with valid issues
-        quality_df: DataFrame with quality (failed) issues
-        rule: Active domain rule (used to detect disabled validation)
+        quality_df: DataFrame with quality hint issues
+        rule: Active domain rule
     """
     st.caption("Quality view for metadata cleanup and validation")
-
-    # Show an informational banner when validation is globally disabled
-    if rule is not None and not getattr(rule.validation, 'enabled', True):
-        st.info(
-            "**Validation is disabled** — all issues are accepted without hygiene checks.  \n"
-            "Set `validation.enabled: true` in your rule YAML to turn checks back on.",
-            icon="🔕",
-        )
-        return
 
     # Apply Bento Grid Style
     style_metric_cards()
@@ -48,17 +40,15 @@ def render_hygiene(
     # Quality Scorecard (Collapsible) - using widget
     with st.expander("📊 Quality Score", expanded=True):
         charts.quality_gauge(valid_df, quality_df)
+        summary = compute_quality_summary(valid_df, quality_df)
         # Summary metrics
-        total_valid = len(valid_df)
-        total_quality = len(quality_df)
-        total = total_valid + total_quality
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Valid Issues", total_valid)
+            st.metric("Clean Issues", summary["clean_issues"])
         with col2:
-            st.metric("Failed Issues", total_quality)
+            st.metric("Hinted Issues", summary["flagged_issues"])
         with col3:
-            st.metric("Total Processed", total)
+            st.metric("Total Processed", summary["total_issues"])
 
     # Error Distribution and Action Table (Collapsible)
     if not quality_df.empty:
@@ -128,5 +118,4 @@ def render_hygiene(
             )
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
-
 
