@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import collections.abc
 import re
+import types
 from typing import Any
 
 # --- Font Constants ---
@@ -202,13 +203,15 @@ _SEMANTIC_DARK: dict[str, str] = {
     "surface_hover": "#121c35",
 }
 
-def get_palette() -> dict[str, str]:
-    """Return the active semantic palette mapping.
-    
+def get_palette() -> types.MappingProxyType[str, str]:
+    """Return the active semantic palette as a read-only mapping.
+
     This is the single source of truth for semantic colors in charts and widgets.
+    Returns a ``MappingProxyType`` to prevent accidental mutation of the
+    canonical palette dicts.
     """
-    mode = get_active_theme_mode()
-    return _SEMANTIC_DARK.copy() if mode == "dark" else _SEMANTIC_LIGHT.copy()
+    source = _SEMANTIC_DARK if get_active_theme_mode() == "dark" else _SEMANTIC_LIGHT
+    return types.MappingProxyType(source)
 
 def get_severity_colors() -> dict[str, str]:
     """Return colors mapping for severities."""

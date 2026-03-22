@@ -37,24 +37,17 @@ def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str 
     if df.empty or parent_col not in df.columns:
         return df
 
-    # Build adjacency list
-    # Use string mapping for safety (NaN handling)
-    children_map = {}
-    roots = []
+    # Build adjacency list using vectorized operations (avoids iterrows)
+    children_map: dict[object, list[object]] = {}
 
-    # Pre-compute lookups
     all_ids = set(df[id_col])
+    parent_series = df[parent_col]
+    is_root = parent_series.isna() | ~parent_series.isin(all_ids)
+    roots = df.index[is_root].tolist()
 
-    for idx, row in df.iterrows():
-        pid = row[parent_col]
-
-        # If parent is NaN or not in the current dataset, treat as root
-        if pd.isna(pid) or pid not in all_ids:
-            roots.append(idx)
-        else:
-            if pid not in children_map:
-                children_map[pid] = []
-            children_map[pid].append(idx)
+    child_df = df[~is_root]
+    for idx, pid in zip(child_df.index, child_df[parent_col]):
+        children_map.setdefault(pid, []).append(idx)
 
     # DFS Traversal to build new order
     ordered_indices = []

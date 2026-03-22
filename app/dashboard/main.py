@@ -160,13 +160,15 @@ def main() -> None:
     filters = render_sidebar(valid_df)
 
     # Apply filters
-    filtered_df = valid_df.copy()
-    pre_milestone_df = filtered_df.copy()
+    # Note: filter_by_* return new DataFrames via boolean indexing, so no
+    # defensive .copy() is needed — the input is never mutated.
+    filtered_df = valid_df
+    pre_milestone_df = valid_df
     if not filtered_df.empty:
         filtered_df = filter_by_team(filtered_df, filters["team"])
         filtered_df = filter_by_context(filtered_df, filters["context"])
         # Save df before milestone filter — overview timeline needs all milestones
-        pre_milestone_df = filtered_df.copy()
+        pre_milestone_df = filtered_df
         filtered_df = filter_by_milestone(filtered_df, filters["milestone"])
         filtered_df = filter_by_date_range(
             filtered_df,

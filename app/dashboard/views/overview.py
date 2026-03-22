@@ -701,7 +701,7 @@ def render_overview(
         pts = st.session_state.get("filtered_issues_selection", [])
         stage_filter = st.session_state.get("filtered_issues_stage")
         state_filter = st.session_state.get("filtered_issues_state")
-        filtered_df = df.copy()
+        filtered_df = df
         
         source_chart = st.session_state.get("filtered_issues_source", "")
         
@@ -888,7 +888,9 @@ def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> No
                 button_label = "Open locally" if is_local_issue else "Open in GitLab"
                 st.link_button(button_label, web_url, type="primary", use_container_width=True)
 
-    _render_tag_chips(row)
+    from app.dashboard.data_loader import load_labels as _load_labels
+    label_styles = _load_labels()
+    _render_tag_chips(row, label_styles=label_styles)
     st.divider()
 
     # ── BODY (70 / 30) ──────────────────────────────────────────────────────
@@ -1029,10 +1031,20 @@ def _normalize_issue_labels(raw_labels: object) -> list[str]:
     return [raw]
 
 
-def _render_tag_chips(row: pd.Series) -> None:
-    """Render priority, issue type, stage, and GitLab label chips inline."""
-    from app.dashboard.data_loader import load_labels as _load_labels
-    label_styles = _load_labels()
+def _render_tag_chips(
+    row: pd.Series,
+    label_styles: dict[str, dict[str, str]] | None = None,
+) -> None:
+    """Render priority, issue type, stage, and GitLab label chips inline.
+
+    Args:
+        row: Issue data row.
+        label_styles: Pre-loaded label styles dict. When ``None`` the function
+            loads styles itself (backward-compatible but slower).
+    """
+    if label_styles is None:
+        from app.dashboard.data_loader import load_labels as _load_labels
+        label_styles = _load_labels()
 
     chips_html: list[str] = []
 
@@ -1168,7 +1180,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     )
 
     # --- Apply Filters ---
-    display_df = df.copy()
+    display_df = df
 
     # Sort by Hierarchy (Parent -> Child) or Staleness
     if "parent_id" in display_df.columns:
@@ -1194,27 +1206,35 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     # Reset index to ensure uniqueness for styling
     display_df = display_df.reset_index(drop=True)
 
-    # Add AI Summary Status Column
+    # Add AI Summary Status Column — scan directory once, then O(1) lookups
     from pathlib import Path
     ai_storage_path = Path("data/ai")
 
-    def check_summary_status(issue_id: object) -> str:
-        if issue_id is None:
-            return "✨"
-        if isinstance(issue_id, int):
-            issue_id_int = issue_id
-        elif (
-            isinstance(issue_id, str) and issue_id.isdigit()
-        ) or (
-            isinstance(issue_id, float) and issue_id.is_integer()
-        ):
-            issue_id_int = int(issue_id)
-        else:
-            return "✨"
-        summary_file = ai_storage_path / f"chat_{issue_id_int}.parquet"
-        return "📝" if summary_file.exists() else "✨"
+    ai_issue_ids: set[int] = set()
+    if ai_storage_path.is_dir():
+        for entry in ai_storage_path.iterdir():
+            if entry.name.startswith("chat_") and entry.suffix == ".parquet":
+                try:
+                    ai_issue_ids.add(int(entry.stem.removeprefix("chat_")))
+                except ValueError:
+                    pass
 
-    display_df.insert(0, "ai_status", display_df["id"].apply(check_summary_status))
+    def _safe_int(value: object) -> int | None:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return None
+
+    display_df.insert(
+        0,
+        "ai_status",
+        display_df["id"].apply(
+            lambda x: "📝" if _safe_int(x) in ai_issue_ids else "✨"
+        ),
+    )
 
     # Combine web_url + iid + title into a single clickable "title" column
     if "web_url" in display_df.columns and "title" in display_df.columns:
@@ -1361,6 +1381,12 @@ def _build_issue_search_mask(
     for token in query_tokens:
         token_mask &= row_text.str.contains(re.escape(token), case=False, na=False, regex=True)
 
+    # Short-circuit: skip expensive fuzzy search when exact token matching
+    # already found results.  Fuzzy matching is preserved as a fallback when
+    # no exact matches exist (i.e. the user mistyped a query).
+    if token_mask.any():
+        return token_mask
+
     threshold = _issue_search_threshold(normalized_query)
     fuzzy_cell_mask = searchable_df.apply(
         lambda column: column.map(
@@ -1368,7 +1394,7 @@ def _build_issue_search_mask(
         )
     ).any(axis=1)
 
-    return token_mask | fuzzy_cell_mask
+    return fuzzy_cell_mask
 
 
 def _normalize_issue_search_text(value: object) -> str:
