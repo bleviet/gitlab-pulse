@@ -196,13 +196,16 @@ class RuleLoader:
     def get_rule(self, project_id: int) -> Optional[DomainRule]:
         """Get the rule configuration for a specific project.
 
+        Falls back to the global default rule (a rule file with an empty
+        ``project_ids`` list) when no project-specific rule is found.
+
         Args:
             project_id: GitLab project ID
 
         Returns:
             DomainRule for the project, or None if not configured
         """
-        return self.rules.get(project_id)
+        return self.rules.get(project_id) or self.rules.get(0)
 
     def get_default_rule(self) -> DomainRule:
         """Get a default rule configuration."""
@@ -236,6 +239,11 @@ class RuleLoader:
                         )
                     seen_projects[project_id] = yaml_file.name
                     rules[project_id] = rule
+
+                # A rule with no project_ids acts as the global default,
+                # applied to any project that has no explicit rule file.
+                if not rule.project_ids:
+                    rules.setdefault(0, rule)
 
             except ConfigurationConflictError:
                 raise

@@ -1,12 +1,16 @@
 # Default Domain Rules Configuration
 # Place team-specific rules in separate YAML files (e.g., team_backend.yaml)
 
-# Project mapping (required field)
-project_ids:
-  - 101  # Example project ID
-  - 102  # Additional project
-  - 103  # Additional project
-#  - 77793080 # Example GitLab project ID
+# Project IDs that should use this rule file's classification, workflow,
+# and color settings.  Leave empty to apply these rules as the global
+# default for ALL projects.  Add specific IDs only when you need
+# per-project rule overrides (create additional YAML files for that).
+#
+# Example:
+#   project_ids:
+#     - 12345678
+#     - 87654321
+project_ids: []
 
 # Team/Domain identifier
 team: "default"

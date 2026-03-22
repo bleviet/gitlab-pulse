@@ -72,9 +72,10 @@ For operators who prefer a graphical interface, the Dashboard includes a passwor
 After the initial setup, the Collector can automatically determine which projects to sync.
 
 ### **4.1. First-Time Setup**
-You must specify `PROJECT_IDS` for the first sync:
+You must specify `PROJECT_IDS` for the first sync. Copy the environment template and fill in your values:
 ```bash
-export PROJECT_IDS="12345,67890"
+cp .env.example .env
+# Edit .env: set GITLAB_URL, GITLAB_TOKEN, and PROJECT_IDS
 uv run python app/collector/orchestrator.py
 ```
 

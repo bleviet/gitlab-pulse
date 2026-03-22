@@ -8,14 +8,16 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 # Install dependencies
 uv sync --dev
 
+# Copy environment template and fill in your values
+cp .env.example .env
 
-# Generate synthetic test data (Local)
+# Generate synthetic test data (no GitLab connection needed)
 uv run python tools/seeder.py --count 1000 --inject-errors
 
 # Or manage local synthetic projects interactively
 uv run python tools/local_data_manager.py
 
-# Or seed a live GitLab project (Remote)
+# Or seed a live GitLab project (requires GITLAB_URL and GITLAB_TOKEN in .env)
 uv run python tools/gitlab_seeder.py --project-id <YOUR_PROJECT_ID> --count 50 --inject-errors
 
 # Process data (Layer 2)
@@ -38,20 +40,28 @@ uv run streamlit run app/dashboard/main.py
 
 ### Environment Variables
 
+Copy the provided template and fill in your values:
+
 ```bash
-export GITLAB_URL="https://gitlab.com"
-export GITLAB_TOKEN="your-token"
-export PROJECT_IDS="12345,67890"
+cp .env.example .env
 ```
 
-`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not create live GitLab projects. Keep `PROJECT_IDS` limited to real GitLab project IDs when running `app/collector/orchestrator.py`.
+Required for live GitLab sync:
+
+| Variable | Description |
+|---|---|
+| `GITLAB_URL` | GitLab instance URL (e.g. `https://gitlab.com`) |
+| `GITLAB_TOKEN` | Personal access token with `read_api` scope |
+| `PROJECT_IDS` | Comma-separated project IDs to sync |
+
+`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not require a GitLab connection.
 
 ### Reset and Recreate Local Seeded Data
 
 If you want to discard the synthetic local dataset and generate a fresh one with more realistic totals, delete the seeded outputs and run the seeder again:
 
 ```bash
-# Remove seeded Layer 1 files
+# Remove seeded Layer 1 files (adjust project IDs to match your seed)
 rm -f data/processed/issues_101.parquet data/processed/issues_102.parquet data/processed/issues_103.parquet
 
 # Optionally clear Layer 2 analytics output
@@ -61,7 +71,7 @@ rm -f data/analytics/*.parquet
 rm -f data/state/sync_state.json
 
 # Recreate local seeded data with more volume
-uv run python tools/seeder.py --count 5000 --projects 101,102,103 --inject-errors --seed 42
+uv run python tools/seeder.py --count 5000 --inject-errors --seed 42
 
 # Rebuild analytics
 uv run python app/processor/main.py
@@ -136,6 +146,8 @@ Edit `app/config/rules/default.yaml` to customize:
   ```
 - **Validation**: Enforce required labels (e.g., Bugs must have Severity).
 - **Contexts & Workflows**: Slice data by domain and define process stages.
+
+By default, `project_ids` is empty — the rules apply globally to all projects. Add specific IDs only when you need per-project rule overrides via additional YAML files.
 
 ## AI Assistant (Layer 4)
 
