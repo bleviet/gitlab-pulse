@@ -12,7 +12,9 @@ from app.dashboard.views.overview import (
     _build_local_issue_details,
     _dialog_meta_item_html,
     _has_multiple_classification_labels,
+    _issue_quality_hints,
     _is_local_issue_url,
+    _mixed_classification_hints,
     _normalize_issue_labels,
     _normalize_issue_search_text,
     _selection_mask_for_quality_signal,
@@ -218,6 +220,30 @@ def test_has_multiple_classification_labels_detects_duplicate_type_family() -> N
     """Overview quality signals should flag issues with conflicting classification labels."""
     assert _has_multiple_classification_labels(["type::bug", "type::feature"]) is True
     assert _has_multiple_classification_labels(["type::bug", "severity::high"]) is False
+
+
+def test_mixed_classification_hints_describe_conflicting_labels() -> None:
+    """Mixed classification hints should explain exactly which labels conflict."""
+    hints = _mixed_classification_hints(["type::bug", "type::feature", "severity::high"])
+
+    assert hints == ["Mixed type labels: type::bug + type::feature"]
+
+
+def test_issue_quality_hints_include_reason_details() -> None:
+    """Issue quality hints should surface the specific mixed-classification reason."""
+    row = pd.Series(
+        {
+            "labels": ["type::bug", "type::feature"],
+            "assignee": None,
+            "milestone": None,
+        }
+    )
+
+    assert _issue_quality_hints(row) == [
+        "Mixed type labels: type::bug + type::feature",
+        "Unassigned owner",
+        "Missing milestone",
+    ]
 
 
 def test_build_overview_quality_signal_df_collects_three_focus_signals() -> None:

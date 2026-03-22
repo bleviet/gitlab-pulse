@@ -74,6 +74,49 @@ def _has_multiple_classification_labels(labels: object) -> bool:
     )
 
 
+def _mixed_classification_hints(labels: object) -> list[str]:
+    """Describe the conflicting classification labels carried by an issue."""
+    label_groups = {
+        "type::": "Mixed type labels",
+        "severity::": "Mixed severity labels",
+        "priority::": "Mixed priority labels",
+    }
+    normalized_labels = _normalize_issue_labels(labels)
+
+    hints: list[str] = []
+    for prefix, label_name in label_groups.items():
+        matches = [label for label in normalized_labels if label.lower().startswith(prefix)]
+        if len(matches) > 1:
+            hints.append(f"{label_name}: {' + '.join(matches)}")
+    return hints
+
+
+def _is_missing_milestone(value: object) -> bool:
+    """Return True when milestone information is absent."""
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "<na>"}
+
+
+def _issue_quality_hints(row: pd.Series) -> list[str]:
+    """Build the user-facing quality hint messages for a single issue row."""
+    hints = _mixed_classification_hints(row.get("labels"))
+
+    assignee_label = normalize_assignee_labels(pd.Series([row.get("assignee")])).iloc[0]
+    if assignee_label == "Unassigned":
+        hints.append("Unassigned owner")
+
+    if _is_missing_milestone(row.get("milestone")):
+        hints.append("Missing milestone")
+
+    return hints
+
+
+def _issue_quality_hints_text(row: pd.Series) -> str:
+    """Return quality hint messages as a compact string for table display."""
+    return " | ".join(_issue_quality_hints(row))
+
+
 def _build_overview_quality_signal_df(df: pd.DataFrame) -> pd.DataFrame:
     """Build the curated Overview quality-signal dataset from the current issues."""
     if df.empty:
@@ -118,9 +161,7 @@ def _overview_quality_signal_masks(df: pd.DataFrame) -> dict[str, pd.Series]:
         if "milestone" in df.columns
         else pd.Series(None, index=df.index, dtype="object")
     )
-    missing_milestone_mask = milestone_series.isna() | milestone_series.astype(str).str.strip().str.lower().isin(
-        {"", "none", "nan", "<na>"}
-    )
+    missing_milestone_mask = milestone_series.apply(_is_missing_milestone)
 
     return {
         _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION: mixed_classification_mask,
@@ -1044,6 +1085,9 @@ def _render_dialog_meta(row: pd.Series) -> None:
         ("Days in Stage", _fmt(row.get("days_in_stage")) if pd.notna(row.get("days_in_stage")) else "—"),
         ("Age", _fmt(row.get("age_days")) if pd.notna(row.get("age_days")) else "—"),
     ]
+    quality_hints = _issue_quality_hints(row)
+    if quality_hints:
+        text_fields.append(("Quality Hints", " • ".join(quality_hints)))
     for label, value in text_fields:
         if value != "—":
             st.markdown(
@@ -1140,6 +1184,9 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     cols = [c for c in cols_to_show if c in display_df.columns]
 
     display_df = display_df[cols]
+    quality_hint_series = display_df.apply(_issue_quality_hints_text, axis=1)
+    if quality_hint_series.ne("").any():
+        display_df["quality_hints"] = quality_hint_series
 
     if search_query:
         display_df = display_df[_build_issue_search_mask(display_df, search_query)]
@@ -1204,6 +1251,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         "severity": st.column_config.TextColumn("Priority", width="small"),
         "context": st.column_config.TextColumn("Context", width="small"),
         "milestone": st.column_config.TextColumn("Milestone", width="small"),
+        "quality_hints": st.column_config.TextColumn("Quality Hints", width="large"),
     }
 
     # Apply styling if context or priority columns are present.
@@ -1233,7 +1281,16 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     if compact:
         column_order = ["ai_status", "title", "assignee"]
     else:
-        column_order = ["ai_status", "title", "stage", "days_in_stage", "severity", "milestone", "assignee"]
+        column_order = [
+            "ai_status",
+            "title",
+            "stage",
+            "days_in_stage",
+            "severity",
+            "milestone",
+            "assignee",
+            "quality_hints",
+        ]
         if "context" in display_df.columns:
             column_order.insert(2, "context")
 
