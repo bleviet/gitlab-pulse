@@ -11,23 +11,24 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 
 ## Quick Start
 
+The fastest way to get everything running locally is using the included setup script:
+
+```bash
+# Run the setup script (installs deps, prepares .env, and offers local test data)
+./setup.sh
+```
+
+**Manual Setup:**
+
 ```bash
 # Install dependencies
 uv sync --dev
 
-# Copy environment template and fill in your values
+# Copy environment template
 cp .env.example .env
 
-# Generate synthetic test data (no GitLab connection needed)
+# Generate synthetic test data and process it
 uv run python tools/seeder.py --count 1000 --inject-errors
-
-# Or manage local synthetic projects interactively
-uv run python tools/local_data_manager.py
-
-# Or seed a live GitLab project (requires GITLAB_URL and GITLAB_TOKEN in .env)
-uv run python tools/gitlab_seeder.py --project-id <YOUR_PROJECT_ID> --count 50 --inject-errors
-
-# Process data (Layer 2)
 uv run python app/processor/main.py
 
 # Launch dashboard
