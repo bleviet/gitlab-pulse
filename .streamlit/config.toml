@@ -1,6 +1,8 @@
 [server]
 headless = true
 address = "0.0.0.0"
+# CORS and XSRF protection are disabled for local development convenience.
+# Re-enable both for public-facing or production deployments.
 enableCORS = false
 enableXsrfProtection = false
 enableStaticServing = false

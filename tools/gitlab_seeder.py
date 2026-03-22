@@ -244,13 +244,13 @@ def generate_issue_payload(milestones: list, parent_iid: Optional[int] = None, i
 
 def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_path: str, token: str) -> bool:
     """Link two work items using GraphQL mutation."""
-    url = "https://gitlab.com/api/graphql"
+    gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
+    url = f"{gitlab_url.rstrip('/')}/api/graphql"
     headers = {"Authorization": f"Bearer {token}"}
-    
-    # Construct GIDs (assuming WorkItem GID matches Issue ID for these new items)
+
     child_gid = f"gid://gitlab/WorkItem/{child_numeric_id}"
     parent_gid = f"gid://gitlab/WorkItem/{parent_numeric_id}"
-    
+
     mutation = """
     mutation($id: WorkItemID!, $parentId: WorkItemID) {
       workItemUpdate(input: {id: $id, hierarchyWidget: {parentId: $parentId}}) {
@@ -258,12 +258,12 @@ def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_p
       }
     }
     """
-    
+
     try:
         resp = requests.post(
             url,
             json={
-                "query": mutation, 
+                "query": mutation,
                 "variables": {"id": child_gid, "parentId": parent_gid}
             },
             headers=headers
@@ -279,44 +279,6 @@ def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_p
         return False
 
 
-
-def link_work_items_gql(child_numeric_id: int, parent_numeric_id: int, project_path: str, token: str) -> bool:
-    """Link two work items using GraphQL mutation."""
-    url = "https://gitlab.com/api/graphql"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    # Construct GIDs (assuming WorkItem GID matches Issue ID for these new items)
-    # NOTE: This assumes issue.id matches the WorkItem ID. 
-    # Use the 'id' field from the issue object, NOT 'iid'.
-    child_gid = f"gid://gitlab/WorkItem/{child_numeric_id}"
-    parent_gid = f"gid://gitlab/WorkItem/{parent_numeric_id}"
-    
-    mutation = """
-    mutation($id: WorkItemID!, $parentId: WorkItemID) {
-      workItemUpdate(input: {id: $id, hierarchyWidget: {parentId: $parentId}}) {
-        errors
-      }
-    }
-    """
-    
-    try:
-        resp = requests.post(
-            url,
-            json={
-                "query": mutation, 
-                "variables": {"id": child_gid, "parentId": parent_gid}
-            },
-            headers=headers
-        )
-        data = resp.json()
-        errors = data.get("data", {}).get("workItemUpdate", {}).get("errors", [])
-        if errors:
-            logger.error(f"  -> GraphQL Linking failed: {errors}")
-            return False
-        return True
-    except Exception as e:
-        logger.error(f"  -> GraphQL Request failed: {e}")
-        return False
 
 
 def seed_issues(project, count: int, milestones: list, inject_errors: bool = False) -> None:

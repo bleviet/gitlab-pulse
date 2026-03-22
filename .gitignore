@@ -6,6 +6,8 @@ data/processed/*.parquet
 data/analytics/*.parquet
 data/ai/*.parquet
 data/state/*.json
+data/config/layouts/*.json
+!data/config/layouts/default.json
 
 # Keep directory structure
 !data/*/.gitkeep
