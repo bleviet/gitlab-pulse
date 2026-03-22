@@ -81,27 +81,38 @@ def _build_overview_quality_signal_df(df: pd.DataFrame) -> pd.DataFrame:
 
     signal_frames: list[pd.DataFrame] = []
 
+    for signal_code, signal_mask in _overview_quality_signal_masks(df).items():
+        if signal_mask.any():
+            signal_df = df.loc[signal_mask].copy()
+            signal_df["error_code"] = signal_code
+            signal_frames.append(signal_df)
+
+    if not signal_frames:
+        return pd.DataFrame(columns=["error_code"])
+
+    return pd.concat(signal_frames, ignore_index=True)
+
+
+def _overview_quality_signal_masks(df: pd.DataFrame) -> dict[str, pd.Series]:
+    """Return boolean masks for the Overview quality-signal criteria."""
+    if df.empty:
+        empty_mask = pd.Series(dtype=bool)
+        return {
+            _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION: empty_mask,
+            _OVERVIEW_SIGNAL_UNASSIGNED: empty_mask,
+            _OVERVIEW_SIGNAL_MISSING_MILESTONE: empty_mask,
+        }
+
     mixed_classification_mask = (
         df["labels"].apply(_has_multiple_classification_labels)
         if "labels" in df.columns
         else pd.Series(False, index=df.index)
     )
-    if mixed_classification_mask.any():
-        mixed_df = df.loc[mixed_classification_mask].copy()
-        mixed_df["error_code"] = _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION
-        signal_frames.append(mixed_df)
-
     assignee_series = (
         normalize_assignee_labels(df["assignee"])
         if "assignee" in df.columns
         else pd.Series("Assigned", index=df.index)
     )
-    unassigned_mask = assignee_series.eq("Unassigned")
-    if unassigned_mask.any():
-        unassigned_df = df.loc[unassigned_mask].copy()
-        unassigned_df["error_code"] = _OVERVIEW_SIGNAL_UNASSIGNED
-        signal_frames.append(unassigned_df)
-
     milestone_series = (
         df["milestone"]
         if "milestone" in df.columns
@@ -110,15 +121,19 @@ def _build_overview_quality_signal_df(df: pd.DataFrame) -> pd.DataFrame:
     missing_milestone_mask = milestone_series.isna() | milestone_series.astype(str).str.strip().str.lower().isin(
         {"", "none", "nan", "<na>"}
     )
-    if missing_milestone_mask.any():
-        missing_milestone_df = df.loc[missing_milestone_mask].copy()
-        missing_milestone_df["error_code"] = _OVERVIEW_SIGNAL_MISSING_MILESTONE
-        signal_frames.append(missing_milestone_df)
 
-    if not signal_frames:
-        return pd.DataFrame(columns=["error_code"])
+    return {
+        _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION: mixed_classification_mask,
+        _OVERVIEW_SIGNAL_UNASSIGNED: assignee_series.eq("Unassigned"),
+        _OVERVIEW_SIGNAL_MISSING_MILESTONE: missing_milestone_mask,
+    }
 
-    return pd.concat(signal_frames, ignore_index=True)
+
+def _selection_mask_for_quality_signal(df: pd.DataFrame, signal_code: str) -> pd.Series:
+    """Build a selection mask for the Overview quality-signal chart."""
+    normalized_code = signal_code.strip().upper()
+    signal_masks = _overview_quality_signal_masks(df)
+    return signal_masks.get(normalized_code, pd.Series(False, index=df.index))
 
 
 def _priority_color_key(value: object) -> str | None:
@@ -548,13 +563,14 @@ def render_overview(
 
     def _render_error_distribution_panel() -> None:
         overview_signal_df = _build_overview_quality_signal_df(unique_df)
-        charts.error_distribution(
+        sel6 = charts.error_distribution(
             overview_signal_df,
             config={
                 "height": 150,
                 "key": f"row3_error_distribution_{chart_reset_suffix}",
             },
         )
+        handle_selection(sel6, chart_id="quality_signal_chart")
 
     # ROW 1
     render_streamlit_grid(
@@ -698,6 +714,20 @@ def render_overview(
 
                     if selected_state is not None:
                         filtered_df = filtered_df[filtered_df["state"] == selected_state]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
+                elif source_chart == "quality_signal_chart":
+                    selected_signal = None
+                    customdata = pt.get("customdata")
+                    if isinstance(customdata, list) and customdata:
+                        selected_signal = str(customdata[0]).strip().upper()
+
+                    if selected_signal is None:
+                        selected_signal = val.strip().upper().replace(" ", "_")
+
+                    signal_mask = _selection_mask_for_quality_signal(filtered_df, selected_signal)
+                    if signal_mask.any():
+                        filtered_df = filtered_df[signal_mask]
                     else:
                         filtered_df = pd.DataFrame(columns=filtered_df.columns)
                 else:

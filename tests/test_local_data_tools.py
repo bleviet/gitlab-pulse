@@ -15,6 +15,7 @@ from app.dashboard.views.overview import (
     _is_local_issue_url,
     _normalize_issue_labels,
     _normalize_issue_search_text,
+    _selection_mask_for_quality_signal,
     _priority_cell_style,
     _priority_color_key,
     _issue_dialog_scroll_script,
@@ -258,6 +259,40 @@ def test_build_overview_quality_signal_df_collects_three_focus_signals() -> None
         "MISSING_MILESTONE": [3, 4],
         "UNASSIGNED_OWNER": [2, 4],
     }
+
+
+def test_selection_mask_for_quality_signal_matches_filtered_issue_rows() -> None:
+    """Clicking an Overview quality-signal bar should filter the matching issues."""
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "labels": ["type::bug", "type::feature"],
+                "assignee": "alex",
+                "milestone": "Release 24",
+            },
+            {
+                "id": 2,
+                "labels": ["type::task"],
+                "assignee": None,
+                "milestone": "Release 24",
+            },
+            {
+                "id": 3,
+                "labels": ["type::feature"],
+                "assignee": "sam",
+                "milestone": None,
+            },
+        ]
+    )
+
+    mixed_mask = _selection_mask_for_quality_signal(df, "MIXED_CLASSIFICATION")
+    unassigned_mask = _selection_mask_for_quality_signal(df, "UNASSIGNED_OWNER")
+    milestone_mask = _selection_mask_for_quality_signal(df, "MISSING_MILESTONE")
+
+    assert mixed_mask.tolist() == [True, False, False]
+    assert unassigned_mask.tolist() == [False, True, False]
+    assert milestone_mask.tolist() == [False, False, True]
 
 
 def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None:
