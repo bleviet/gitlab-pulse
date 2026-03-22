@@ -1,203 +1,147 @@
-# **Master Architecture: GitLabInsight**
+# Master Architecture: GitLabInsight
 
-Version: 1.0
-Status: Finalized Specification  
-Scope: Universal End-to-End Data Pipeline (Ingestion to Visualization)
+Version: 1.1  
+Status: Current implementation reference  
+Scope: End-to-end data flow from GitLab ingestion through local analytics, dashboard rendering, and AI assistance.
 
-## **1\. Executive Summary**
+## 1. Executive Summary
 
-**GitLabInsight** is a versatile analytics platform designed to extract, validate, and visualize GitLab issue data for any user—from individual developers and open-source maintainers to large-scale organizations. It follows a **Clean Architecture** and a **[Medallion Data Pattern](../glossary/GLOSSARY.md)** to ensure that raw technical data is transformed into meaningful workflow metrics without being restricted to any specific workflow or environment.
+**GitLabInsight** is a local-first analytics platform for GitLab issue data. It ingests issues from GitLab or synthetic local seed data, normalizes them into Parquet, enriches them with rules-based workflow and quality metadata, and renders them in a Streamlit dashboard with optional local Ollama-backed AI assistance.
 
-## **2\. Data Strategy & Storage Decisions**
+The architecture follows a layered data pipeline:
 
-The system uses a tiered storage approach, moving from high-volume raw files to high-performance analytical files, ensuring scalability for projects of any size.
-
-### **2.1. The Data Layers**
-
-| Layer | Name | Path | Description |
+| Layer | Name | Path | Purpose |
 | :---- | :---- | :---- | :---- |
-| **Layer 0** | **Raw** | data/raw/ | **Transient/Audit:** Unmodified JSON responses from GitLab. |
-| **Layer 1** | **Processed** | data/processed/ | **Standardized Mirror:** Validated technical data (Parquet). |
-| **Layer 2** | **Analytics** | data/analytics/ | **Gold:** Enriched, context-mapped metrics (Parquet). |
-| **Layer 2** | **Quality** | data/analytics/ | **Exceptions:** Issues failing custom validation rules. |
-| **Layer 4** | **AI Services** | data/ai/ | **AI Memory:** Issue summaries and chat histories (Parquet). |
+| **Layer 0** | Raw | `data/raw/` | Audit copy of GitLab API issue payloads |
+| **Layer 1** | Processed | `data/processed/` | Standardized technical mirror (`issues_*`, `milestones_*`, `labels_*`) |
+| **Layer 2** | Analytics | `data/analytics/` | Enriched analytics dataset and quality hints |
+| **Layer 4** | AI Memory | `data/ai/` | Persistent summaries and chat history per issue |
 
-### **2.2. ADR: Why persistent Raw storage?**
+## 2. Layer 1: Data Acquisition
 
-* **Reliability:** In any data-driven environment, it is critical to have a "Source of Truth." The Raw layer preserves the original API response as evidence of the state at the time of sync.  
-### 3. Overview (Flow)
-Tracks the *efficiency* of the process (Cycle Time, Lead Time).
-- **Key Metric:** Days in Stage, Flow Efficiency.
-- **View:** "Overview" Dashboard (Work by Stage, Days in Stage).
+**Role:** Fetch issue data from GitLab and persist a clean technical mirror for downstream processing.
 
-## Data Pipeline Layers
-* **Idempotency:** If the processing logic in Layer 1 changes (e.g., adding a new field), you can re-run the pipeline using the Raw files instead of re-querying GitLab. This prevents unnecessary network load and respects API rate limits.
+### 2.1 Implemented components
 
-## **3\. Layer 1: Data Acquisition (The Hybrid Collector)**
+- `app/collector/orchestrator.py`: orchestration and CLI entry point
+- `app/collector/rest_client.py`: issue, milestone, and label retrieval
+- `app/collector/gql_client.py`: work-item hierarchy enrichment
+- `app/collector/state.py`: incremental sync state management
 
-**Role:** Robust extraction and initial standardization.
+### 2.2 Implemented behavior
 
-### **3.1. Implementation Strategy**
+1. Read project IDs from `--project-ids`, `PROJECT_IDS`, or previously tracked state.
+2. Fetch changed issues incrementally using `updated_after` unless `--full-sync` is used.
+3. Persist raw issue payloads into Layer 0.
+4. Fetch hierarchy data through GraphQL when a project path is available.
+5. Upsert issues into `data/processed/issues_{project_id}.parquet`.
+6. Persist milestones and labels separately as full-refresh side datasets.
+7. Update `data/state/sync_state.json`.
 
-* **REST API (python-gitlab):** Used for high-volume metadata retrieval (titles, labels, timestamps). **Update**: Must specifically flatten the milestone object to extract milestone_title and milestone_due_date for every issue. 
-* **GraphQL API:** Used specifically for **Hierarchy Resolution**. It resolves Parent-Child links (Issues to Tasks) not natively accessible via the REST Issue API, supporting modern GitLab work items.  
-* **Milestones Collector:** Fetches all milestones independently (active and closed), enabling visibility into empty milestones and deadline tracking.
-* **Incremental Sync:** Uses a sync\_state.json to track updated\_after timestamps, reducing API load by \>90%.
+### 2.3 Notable operational edge case
 
-### **3.2. ADR: Why Pydantic for Ingestion?**
+If a project returns `404` but a matching `data/processed/issues_{project_id}.parquet` already exists, the collector treats that project as **local seeded data** and skips it instead of failing the full run. This preserves synthetic local demo data when those IDs remain in `PROJECT_IDS`.
 
-* **Data Integrity:** GitLab API responses can vary across versions and instances. Pydantic acts as a "strict gatekeeper," ensuring that every record in the processed layer adheres to a known schema.  
-* **Validation vs. Dataclasses:** Pydantic provides built-in coercion (e.g., strings to datetime) and complex validation required for robust ingestion, which dataclasses lack out-of-the-box.
+## 3. Layer 2: Domain Logic and Validation
 
-## **4\. Layer 2: Domain Logic & Validation**
+**Role:** Transform the Layer 1 mirror into analytics-ready issue data plus actionable quality hints.
 
-**Role:** Applying context and calculating metrics.
+### 3.1 Implemented components
 
-### **4.1. Rules-Based Configuration (rules.yaml)**
+- `app/processor/main.py`
+- `app/processor/enricher.py`
+- `app/processor/validator.py`
+- `app/processor/rule_loader.py`
 
-To ensure flexibility across different use cases, the platform uses **Modular Rules**. Users can manage their own .yaml files in app/config/rules/ to define how data should be interpreted.
+### 3.2 Implemented behavior
 
-* **Mappings:** Maps technical labels (type::bug) to user-defined terms (Bug).  
-* **Validation Rules:** Defines what constitutes "quality" for your specific project (e.g., "Every Feature must have a Milestone").
+- Load all `issues_*.parquet` files from Layer 1
+- Apply vectorized metrics enrichment
+- Map classifications and workflow stages from YAML rules
+- Perform **context explosion** so a single issue can appear in multiple logical contexts
+- Validate issues against rule-driven quality expectations
+- Write:
+  - `data/analytics/issues_valid.parquet`
+  - `data/analytics/data_quality.parquet`
 
-### **4.2. Performance Logic**
+### 3.3 Current quality model
 
-* **Pandas Vectorization:** All date-based metrics (age\_days, lead\_time) are calculated using vectorized Pandas operations rather than Python loops, allowing for near-instant processing of thousands of issues.  
-* **The Gatekeeper:** Layer 2 splits data. Valid data goes to the Analytics file; invalid data goes to the Quality file, ensuring your insights are never skewed by poorly tagged issues.
+Issues without matching contexts are handled in two ways:
 
-### **4.3. Context Slicing (Data Explosion)**
+- they remain in the main analytics dataset so reporting stays complete
+- they also produce `MISSING_CONTEXT` quality hints so the assignment gap is visible
 
-Many organizations use a single GitLab repository for "Platform Development"—one codebase that serves multiple products, customers, or R&D initiatives. Since GitLab Free lacks sub-projects, teams use labels (e.g., `rnd::Alpha`, `cust::BMW`) to logically segment work.
+## 4. Layer 3: Presentation
 
-**The Problem:** An issue (e.g., "Sensor Bug") may belong to *multiple* contexts (`rnd::Alpha` AND `rnd::Beta`). Project managers for each context need to see this issue in their respective dashboards.
+**Role:** Render analytics through Streamlit using a curated overview and a customizable layout builder.
 
-**The Solution: Data Explosion**  
-Layer 2 "explodes" the dataset. One physical issue becomes multiple logical rows in the analytics layer:
+### 4.1 Current pages
 
-| Original Issue | Analytics Rows |
-| :------------- | :------------- |
-| Issue #100 (labels: `rnd::Alpha`, `rnd::Beta`) | Row 1: `context=Alpha`, Row 2: `context=Beta` |
+The active page set in `app/dashboard/main.py` is:
 
-**Why This Matters:**
-* **Clean Architecture:** Layer 3 (Dashboard) remains "dumb"—it simply filters by the `context` column without needing to parse labels.
-* **Quality Enforcement:** A validation rule (`require_context_assignment`) flags issues that aren't assigned to any context, enforcing team discipline.
+- **Overview**
+- **Custom**
+- **Admin** (only when authenticated as admin)
 
-## **5\. Layer 3: Presentation (Streamlit Dashboard)**
+There is a `views/hygiene.py` file in the repository, but it is not part of the active top-level navigation.
 
-**Role:** High-speed visualization and drill-down.
+### 4.2 Dashboard builder status
 
-### **5.1. UX Design System**
+The dashboard builder is implemented as a **hybrid layout engine**:
 
-* **Semantic Palette:** Uses a unified color system (e.g., Bug=Red, Feature=Blue, Stale=Amber) across all charts to reduce cognitive load.  
-* **Mode Adaptability:** The interface is designed to support both Dark and Light modes automatically, ensuring accessibility and contrast ratios (WCAG AA) are maintained in any environment.
+- **Edit mode:** uses `streamlit-elements` for drag-and-drop and resize interactions
+- **View mode:** renders with native Streamlit columns based on persisted grid coordinates
 
-### **5.2. UX Persona Strategy**
+Layouts are stored as JSON files under `data/config/layouts/`.
 
-* **Strategic View:** High-level trends (Inflow vs. Outflow) and project velocity.  
-* **Operational View:** Days-in-stage analysis and the Stale Issue list to keep projects moving.  
-* **Health & Hygiene View:** A dedicated screen showing the "Clean-up list" from the Quality layer, helping maintainers improve their project metadata.
+### 4.3 Overview status
 
-### **5.3. ADR: Why Streamlit?**
+The Overview page is the main curated workflow view. It currently includes:
 
-* **Rapid Iteration:** Allows users to customize their own views directly in Python without needing web development expertise.  
-* **Native Pandas Support:** Since our data is already in Parquet/Pandas format, the integration is seamless, making it highly efficient for local or server-side hosting.
+- open issues by priority
+- closed issues by priority
+- daily new vs. closed issues
+- issues by workflow state
+- milestone release timeline
+- open vs. closed issues
+- issue quality signals
+- issue drill-down table with fuzzy search and AI status markers
+- issue details dialog and AI assistant integration
 
-### **5.4. Architectural Evolution: Dynamic Layout Engine (Dashboard Builder)**
+### 4.4 Caching
 
-**Status:** Implemented
+The dashboard uses `@st.cache_data` with short TTLs for analytics loading, including a 2-minute TTL on the main data loaders.
 
-**Goal:** Enable a "No-Code" experience where users can compose custom views from widgets and save their layouts.
+## 5. Layer 4: AI Services
 
-This is a pivot from a **Static Reporting Tool** (developer-defined layouts) to a **Dynamic Dashboard Platform** (user-defined layouts).
+**Role:** Provide local, persistent issue summarization and follow-up chat.
 
-**Core Concept:** Shift from **Imperative Layouts** (hardcoded `st.columns`) to **Declarative Layouts** (JSON configurations rendered by a layout engine).
+### 5.1 Implemented components
 
-#### **5.4.1. Architectural Components**
+- `app/ai/models.py`
+- `app/ai/service.py`
+- dashboard integration in `app/dashboard/widgets/features/ai_assistant.py`
+- sidebar AI endpoint configuration in `app/dashboard/sidebar.py`
 
-| Component | Role | Location |
-| :-------- | :--- | :------- |
-| **Widget Registry** | Catalog of 12 widgets (KPIs, Charts, Tables). | `app/dashboard/registry.py` |
-| **Widget Library** | Individual widget files organized by type. | `app/dashboard/widgets/{kpis,charts,tables}/` |
-| **Layout Store** | JSON persistence for custom layouts. | `data/config/layouts/*.json` |
-| **Grid Engine** | Layout CRUD and widget rendering. | `app/dashboard/engine.py` |
+### 5.2 Implemented behavior
 
-**Widget Registry (12 widgets):**
-```python
-WidgetRegistry._registry = {
-    "kpi_flow_metrics": flow_metrics,
-    "chart_stage_distribution": stage_distribution,
-    "chart_milestone_timeline": milestone_timeline,
-    "table_issue_detail_grid": issue_detail_grid,
-    # (Additional KPI and chart widgets omitted for brevity)
-}
-```
+- health-check the configured Ollama endpoint
+- list available models from Ollama
+- generate a structured summary for a selected issue
+- persist summary and chat history in `data/ai/chat_{issue_id}.parquet`
+- mark summaries as stale when `issue.updated_at > ref_issue_updated_at`
 
-**Layout Store Schema (JSON):**
-```json
-{
-  "name": "My Dashboard",
-  "layout": [
-    {"i": "widget_1", "x": 0, "y": 0, "w": 12, "h": 2, "type": "kpi_flow_metrics"},
-    {"i": "widget_2", "x": 0, "y": 2, "w": 6, "h": 4, "type": "chart_burnup_velocity"}
-  ]
-}
-```
+## 6. Local Data Tooling
 
-#### **5.4.2. Implementation Status**
+The repository supports a fully local demo and validation workflow:
 
-| Phase | Goal | Status |
-| :---- | :--- | :----- |
-| **Phase 1: Modularization** | Refactor UI into 16 reusable widgets. | ✅ Complete |
-| **Phase 2: Edit Mode Toggle** | Sidebar toggle, save/delete layouts. | ✅ Complete |
-| **Phase 3: Toolbox** | Widget Toolbox with add/remove buttons. | ✅ Complete |
+- `tools/seeder.py` creates synthetic Layer 1 issue data directly
+- `tools/local_data_manager.py` can inspect, seed, delete, process, and reset local synthetic projects
 
-#### **5.4.3. ADR: Why Native Streamlit Rendering?**
+This allows dashboard and processor testing without a live GitLab connection.
 
-* **Initial Plan:** Use `streamlit-elements` for drag-and-drop grid.
-* **Revised Decision:** Use native Streamlit columns with ordered widget rendering.
-* **Reason:** Streamlit widgets cannot render inside `streamlit-elements` MUI cards. Native rendering provides full widget functionality.
-* **Trade-off:** No drag-and-drop positioning, but full widget interactivity preserved.
+## 7. Operational Notes
 
-
-
-## **6\. Testing & Validation Strategy**
-
-**Role:** Ensuring performance and logic correctness without API dependency.
-
-### **6.1. The "Bypass" Pattern**
-
-To validate Layer 2 (Logic) and Layer 3 (UI Performance) without hitting GitLab API rate limits, the system includes a **Data Seeder**.
-
-* **Tool:** tools/seeder.py  
-* **Mechanism:** Generates synthetic Parquet files directly into data/processed/.  
-*   **Scale:** Capable of generating 100,000+ realistic records with injected "dirty data" (missing labels, conflicts) to verify validation rules and dashboard latency under load.
-
-### **6.2. Live Integration Testing**
-
-*   **Tool:** tools/gitlab\_seeder.py
-*   **Role:** Populates a real GitLab project with known test data (including Task hierarchy via GraphQL) to verify the Layer 1 Collector against actual API behaviors.
-
-## **7\. System Structure Summary**
-
-```bash
-/  
-├── app/  
-│   ├── collector/          \# Layer 1: REST/GQL Hybrid Logic  
-│   ├── processor/          \# Layer 2: Pandas/Pydantic Logic  
-│   ├── dashboard/          \# Layer 3: Streamlit UI  
-│   ├── ai/                 \# Layer 4: Ollama AI Service  
-│   └── config/rules/       \# Modular .yaml rule files  
-├── data/  
-│   ├── raw/                \# L0 Output: JSON response dumps  
-│   ├── processed/          \# L1 Output: Technical Mirror (Parquet)  
-│   ├── analytics/          \# L2 Output: Trusted KPIs (Parquet)  
-│   ├── ai/                 \# L4 Output: AI summaries & chat (Parquet)  
-│   └── state/              \# Sync timestamps, server configs  
-└── tools/  
-    ├── seeder.py           \# Synthetic data generator for testing
-    └── gitlab_seeder.py    \# Live data generator for integration testing
-```
-
-## **8\. Conclusion**
-
-GitLabInsight is designed to scale with you. Whether you are a solo developer tracking a side project or a large organization managing hundreds of repositories, this architecture ensures that your data remains stable, your logic stays flexible, and your insights are always high-performing.
+- The app is designed for internal or local use, not direct public internet exposure.
+- Admin actions are password-gated in the Streamlit UI, but broader production auth should still be handled externally.
+- The architecture is intentionally local-first: persistent files in `data/` are part of normal operation, not just temporary artifacts.

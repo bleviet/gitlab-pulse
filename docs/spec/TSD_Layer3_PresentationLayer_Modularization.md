@@ -1,95 +1,73 @@
 # Technical Specification: Layer 3 - Widget Modularization
 
-**Version:** 1.1
-
+**Version:** 1.2  
 **Status:** Implemented
 
-## 1. Directory Structure
+## 1. Current Directory Structure
 
-```
+```text
 app/dashboard/
-├── registry.py                    # Widget dispatcher
-├── engine.py                      # Layout CRUD + grid rendering
-├── widgets/
-│   ├── __init__.py
-│   ├── kpis/
-│   │   ├── __init__.py
-│   │   ├── flow_metrics.py
-│   │   ├── stats_kpis.py
-│   │   ├── release_metrics.py
-│   │   ├── stale_count.py
-│   │   └── quality_score.py
-│   ├── charts/
-│   │   ├── __init__.py
-│   │   ├── stage_distribution.py
-│   │   ├── aging_boxplot.py
-│   │   ├── burnup_velocity.py
-│   │   ├── workload_distribution.py
-│   │   ├── work_type_distribution.py
-│   │   ├── status_donut.py
-│   │   ├── quality_gauge.py
-│   │   └── error_distribution.py
-│   └── tables/
-│       ├── __init__.py
-│       ├── issue_detail_grid.py
-│       ├── stale_issues_list.py
-│       ├── quality_action_table.py
-│       └── issue_detail_grid.py
-└── views/
-    ├── overview.py      # Uses widgets
-    ├── release.py       # Uses widgets
-    ├── stats.py         # Uses widgets
-    ├── aging.py         # Uses widgets
-    └── hygiene.py       # Uses widgets
+├── registry.py
+├── engine.py
+├── data_loader.py
+├── sidebar.py
+├── views/
+│   ├── admin.py
+│   ├── overview.py
+│   └── hygiene.py
+└── widgets/
+    ├── kpis/
+    │   ├── flow_metrics.py
+    │   ├── quality_score.py
+    │   └── stale_count.py
+    ├── charts/
+    │   ├── burnup_velocity.py
+    │   ├── error_distribution.py
+    │   ├── milestone_timeline.py
+    │   ├── quality_gauge.py
+    │   ├── stage_distribution.py
+    │   ├── status_donut.py
+    │   ├── workload_distribution.py
+    │   └── work_type_distribution.py
+    ├── tables/
+    │   └── issue_detail_grid.py
+    └── features/
+        └── ai_assistant.py
 ```
 
-## 2. Widget Interface
+## 2. Current Registry Surface
+
+The current widget registry exposes 11 layout-builder widgets:
+
+- **KPIs:** `kpi_flow_metrics`, `kpi_stale_count`, `kpi_quality_score`
+- **Charts:** `chart_stage_distribution`, `chart_burnup_velocity`, `chart_workload_distribution`, `chart_work_type_distribution`, `chart_status_donut`, `chart_quality_gauge`, `chart_error_distribution`, `chart_milestone_timeline`
+- **Tables:** `table_issue_detail_grid`
+
+The AI assistant is modularized under `widgets/features/`, but it is not a layout-builder registry widget today. It is used from the overview drill-down flow.
+
+## 3. Widget Interface
+
+The current registry contract is:
 
 ```python
 def widget_name(
     df: pd.DataFrame,
-    config: dict[str, Any] | None = None
+    config: dict[str, Any] | None = None,
 ) -> None | dict:
-    """Standard widget signature.
-
-    Args:
-        df: Filtered DataFrame from Layer 2
-        config: Optional configuration dict
-
-    Returns:
-        None or selection state for interactive charts
-    """
+    ...
 ```
 
-## 3. Config Schema
+Some widgets return selection data for interactive filtering. Quality widgets use a specialized call path that also receives the quality DataFrame.
 
-| Key | Type | Purpose |
-|-----|------|---------|
-| `key` | str | Unique Streamlit key |
-| `height` | int | Chart height (px) |
-| `title` | str | Override header |
-| `group_col` | str | Column to group by |
+## 4. What Modularization Achieved
 
-## 4. Registry Pattern
+- widget rendering is isolated from page wiring
+- the layout engine can instantiate widgets by ID
+- the custom dashboard builder no longer depends on one-off page-specific rendering logic
+- overview-specific composition can still remain curated when needed
 
-```python
-class WidgetRegistry:
-    _registry: dict[str, WidgetRenderer] = {
-        "kpi_flow_metrics": flow_metrics,
-        "chart_stage_distribution": stage_distribution,
-        "table_issue_detail_grid": issue_detail_grid,
-        # ...
-    }
+## 5. Current Implementation Notes
 
-    @classmethod
-    def get_renderer(cls, widget_id: str) -> WidgetRenderer:
-        return cls._registry[widget_id]
-```
-
-## 5. Definition of Done
-
-- [x] Widget directory structure created
-- [x] 16 widgets extracted (4 KPIs, 8 charts, 4 tables)
-- [x] All views refactored to use widgets
-- [x] Registry implements lookup
-- [x] No visual regression
+- The modularization effort is complete enough for the shipped custom layout builder
+- Not every dashboard surface is registry-driven; the Overview page still composes panels directly
+- `views/hygiene.py` remains in the tree as a legacy surface, but it is not currently part of the active main navigation

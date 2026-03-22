@@ -1,78 +1,104 @@
 # Technical Specification: Layer 3 - Dynamic Dashboard Engine
 
-**Version:** 2.1
-
+**Version:** 2.2  
 **Status:** Implemented
 
 ## 1. Overview
 
-The Dashboard Builder enables users to create custom views by composing widgets from a registry. Layouts are persisted as JSON files.
+The dashboard supports two complementary presentation modes:
+
+- a curated **Overview** page for workflow and quality monitoring
+- a user-editable **Custom** page backed by persisted layouts and a widget registry
 
 ## 2. Architecture
 
-### 2.1. Widget Registry (`app/dashboard/registry.py`)
+### 2.1 Widget Registry
 
-Central dispatcher mapping widget IDs to render functions. (See registry.py for full list).
+`app/dashboard/registry.py` maps widget IDs to render functions. The current registry ships:
 
-### 2.2. Layout Schema
+- 3 KPI widgets
+- 7 chart widgets
+- 1 table widget
 
-Layouts stored in `data/config/layouts/*.json`. Uses a 12-column Grid System.
+### 2.2 Layout Schema
+
+Custom layouts are stored in `data/config/layouts/*.json` using a 12-column grid model:
 
 ```json
 {
   "name": "Management View",
   "layout": [
-    // Mosaic Layout: Tall widget on left, stacked widgets on right
-    {"i": "w1", "type": "chart_stage_distribution", "x": 0, "y": 0, "w": 6, "h": 4},
-    {"i": "w2", "type": "kpi_flow_metrics",    "x": 6, "y": 0, "w": 6, "h": 2},
-    {"i": "w3", "type": "kpi_quality_score",   "x": 6, "y": 2, "w": 6, "h": 2}
+    { "i": "widget_1", "type": "chart_stage_distribution", "x": 0, "y": 0, "w": 12, "h": 4 },
+    { "i": "widget_2", "type": "kpi_flow_metrics", "x": 0, "y": 4, "w": 6, "h": 2 },
+    { "i": "widget_3", "type": "table_issue_detail_grid", "x": 6, "y": 4, "w": 6, "h": 4 }
   ]
 }
 ```
 
-### 2.3. Grid Engine (`app/dashboard/engine.py`)
+### 2.3 Grid Engine
 
-The engine uses a **Hybrid Rendering Strategy**:
+`app/dashboard/engine.py` implements a **hybrid rendering strategy**:
 
-1.  **Edit Mode (Blueprint):**
-    -   Uses `streamlit-elements` (React-Grid-Layout) to render a visual "Blueprint" of the dashboard.
-    -   Displays simplified "Cards" representing widgets.
-    -   Allows **Drag-and-Drop** positioning and **Resizing**.
-    -   Updates the internal `layout` state in real-time.
+1. **Edit Mode**
+   - Uses `streamlit-elements`
+   - Supports drag-and-drop positioning
+   - Supports resize handles
+   - Shows lightweight blueprint cards instead of full widgets
 
-2.  **View Mode (Native Render):**
-    -   Converts the grid coordinates `(x, y, w, h)` into native Streamlit structures.
-    -   **Mosaic Detection:** Identifies vertical columns of widgets.
-        -   *Example:* If Widget A is at `x=0, w=6` and Widget B/C are at `x=6, w=6`, it creates 2 main columns.
-        -   Col 1 renders Widget A (height handled via `st.container(height=...)` or natural height).
-        -   Col 2 renders Widget B then Widget C vertically.
-    -   **Fallback:** Row-based rendering for linear layouts.
+2. **View Mode**
+   - Uses native Streamlit columns
+   - Groups persisted layout items by `y` then `x`
+   - Preserves widget interactivity and normal Streamlit behavior
+
+This hybrid model is the current shipped design: edit with `streamlit-elements`, render with native Streamlit.
 
 ## 3. User Interface
 
-### 3.1. Interactive Grid (Edit Mode)
--   **Toggle:** "✏️ Edit Layout" button in sidebar.
--   **Visuals:**
-    -   Widgets appear as Draggable Cards with handles.
-    -   "Empty" grid spaces are visible hints.
--   **Actions:**
-    -   **Resize:** Grab corner to span multiple rows/columns.
-    -   **Swap:** Drag Widget A over Widget B to swap positions.
-    -   **Remove:** 'X' button on card corner.
--   **Persist:** "Save Changes" button commits JSON to disk.
+### 3.1 Active top-level pages
 
-### 3.2. Widget Toolbox
--   Sidebar panel listing available widgets by category (KPIs, Charts, Tables).
--   "Add +" button injects widget into the first available grid space.
+The active navigation in `app/dashboard/main.py` currently exposes:
+
+- `📊 Overview`
+- `🎨 Custom`
+- `⚡ Admin` when admin access is enabled in session state
+
+### 3.2 Custom view controls
+
+The Custom page supports:
+
+- layout loading from JSON
+- edit mode toggle
+- drag, resize, and delete while editing
+- widget add actions from the sidebar toolbox
+- explicit save to disk
+
+### 3.3 Admin operations
+
+The Admin page can:
+
+- run the collector
+- run the processor
+- clear Streamlit cached data
 
 ## 4. Widget Contract
 
-Widgets must support flexible sizing to fit grid containers:
--   `height`: passed from grid row-span logic (e.g. 1 unit = 150px).
--   `use_container_width`: always True.
+Registered widgets receive:
 
-## 5. Implementation Notes
+- a filtered DataFrame
+- an optional config dictionary
 
--   **Mosaic Support:** The rendering algorithm must prioritize "Vertical Stacks" over "Horizontal Rows" to support the "Tall Left, Stacked Right" pattern requested.
--   **Row Units:** Base row height set to ~150px. Widget height `h=2` -> 300px container.
--   **Responsive:** Grid collapses to single column on mobile, but preserves relative order.
+Common config values include:
+
+| Key | Purpose |
+| :---- | :---- |
+| `key` | Unique Streamlit widget key |
+| `height` | Requested render height |
+| widget-specific options | Chart or table behavior overrides |
+
+Quality widgets may also receive `quality_df` in addition to the main analytics DataFrame.
+
+## 5. Current Limitations
+
+- Overview is curated and hard-coded rather than layout-driven
+- Edit-mode interactions depend on `streamlit-elements`
+- The legacy `views/hygiene.py` file is present in the repository but is not part of the active main navigation

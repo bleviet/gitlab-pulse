@@ -1,54 +1,58 @@
-# **Technical Specification: Layer 2 \- Domain Logic & Validation**
+# Technical Specification: Layer 2 - Domain Logic & Validation
 
-**Scope:** Implementation details for modular rules, metrics calculation, and data quality filtering.
+**Status:** Implemented  
+**Scope:** Current processor behavior for enrichment, context mapping, and quality output.
 
-## **1\. Configuration Engine**
+## 1. Configuration Engine
 
-### **1.1. Modular Rule Loader**
+### 1.1 Rule loading
 
-The service scans app/config/rules/\*.yaml. Each file must follow the DomainRule schema.
+`app/processor/rule_loader.py` loads YAML rules from `app/config/rules/` and resolves the correct rule set for each project. The default rule acts as the global fallback.
 
-* **Conflict Detection:** If two YAML files claim the same GitLab project\_id, the service must abort with a ConfigurationConflictError.
+## 2. Enrichment Pipeline
 
-## **2\. Enrichment & Validation Engine**
+`app/processor/main.py` currently applies the following steps per project:
 
-### **2.1. Vectorized Metrics (Pandas)**
+1. Load `data/processed/issues_{project_id}.parquet`
+2. Enrich metrics
+3. Apply classification mappings
+4. Assign workflow stage and stage type
+5. Explode matching contexts into multiple logical rows
+6. Validate issues against configured rules
+7. Merge orphan-context handling into both analytics and quality outputs
 
-Calculations are performed on the entire DataFrame to ensure high performance.
+## 3. Implemented Behaviors
 
-* **Aging:** df\['age\_days'\] \= (now \- df\['created\_at'\]).days.  
-* **Cycle Time:** df\['cycle\_time'\] \= (df\['closed\_at'\] \- df\['created\_at'\]).days.
+### 3.1 Vectorized metrics
 
-### **2.2. Validation Logic**
+Metrics are calculated with Pandas operations rather than row-by-row loops. This includes age-style and cycle-time style metrics used by the dashboard.
 
-The "Gatekeeper" checks each issue against the rules defined in the corresponding YAML:
+### 3.2 Context explosion
 
-* **Required Labels:** Check if type::bug issues have a severity:: label.  
-* **Staleness:** Tag issues as is\_stale if updated\_at \> max\_stale\_days.
+If a single issue matches multiple configured contexts, Layer 2 emits one logical analytics row per matched context. This keeps Layer 3 filtering simple and explicit.
 
-### **2.3. Context Slicing (Data Explosion)**
+### 3.3 Orphan context handling
 
-To support "Platform Development" patterns where one repo serves multiple projects, the processor employs "Data Explosion":
+Issues that do not match any configured context are not dropped. Instead:
 
-*   **Config:** Rules define contexts via label prefixes (e.g., `rnd::Alpha`, `cust::Beta`).
-*   **Expansion:** A single issue with labels `rnd::Alpha` and `cust::Beta` is expanded into two rows in the analytics dataset.
-    *   Row 1: `{id: 100, context: "Alpha", context_group: "R&D"}`
-    *   Row 2: `{id: 100, context: "Beta", context_group: "Customer"}`
-*   **Validation:** If `require_context_assignment` is true, issues without any matching context label are flagged as `MISSING_CONTEXT` quality failures.
+- they remain in `issues_valid.parquet` with empty context fields
+- they also produce `MISSING_CONTEXT` rows in `data_quality.parquet`
 
-## **3\. Data Output (Split Storage)**
+This preserves reporting completeness while still surfacing the data quality problem.
+
+### 3.4 Quality output lifecycle
+
+`data_quality.parquet` is always rewritten, even when there are zero current quality hints. This clears stale quality output from earlier runs.
+
+## 4. Data Outputs
 
 | File | Content |
 | :---- | :---- |
-| issues\_valid.parquet | Only issues that passed all YAML-defined rules. |
-| data\_quality.parquet | Failed issues \+ error\_code (e.g., MISSING\_LABEL, STALE\_WITHOUT\_UPDATE). |
+| `data/analytics/issues_valid.parquet` | Enriched analytics dataset |
+| `data/analytics/data_quality.parquet` | Validation and quality hints |
 
-## **4\. Architecture Decision Records (ADR)**
+## 5. Rationale
 
-### **4.1. Why Pandas Vectorization?**
-
-* **Efficiency:** Calculating age for 100,000 issues using a Python for loop takes seconds; using Pandas vectorization takes milliseconds. In an analytics tool, sub-second processing is the standard.
-
-### **4.2. Why Modular YAML Rules?**
-
-* **Decentralization:** Different teams/projects have different definitions of "Quality." Modular rules allow project A to require milestones while project B focuses purely on labels, without them sharing a single monolithic config file.
+- **Modular YAML rules:** different teams can tailor interpretation without changing processor code
+- **Split analytics vs. quality output:** analytics stays usable while quality issues remain actionable
+- **Context explosion in Layer 2:** avoids repeated label parsing in the UI layer

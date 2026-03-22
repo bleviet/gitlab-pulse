@@ -1,61 +1,63 @@
-# **Technical Specification: Layer 1 \- Data Acquisition Service**
+# Technical Specification: Layer 1 - Data Acquisition Service
 
-**Scope:** Implementation details for the Hybrid Collector (REST \+ GraphQL).
+**Status:** Implemented  
+**Scope:** Current collector behavior for GitLab ingestion and Layer 1 persistence.
 
-## **1\. System Components**
+## 1. Components
 
-### **1.1. Ingestion Orchestrator**
+### 1.1 Ingestion Orchestrator
 
-The main service loop responsible for:
+`app/collector/orchestrator.py` coordinates the collection pipeline:
 
-1. Scanning the environment for PROJECT\_IDS.  
-2. Managing the sync\_state.json (tracking last\_updated\_at per project).  
-3. Triggering the L0 (Raw) to L1 (Processed) pipeline.
+1. Resolve project IDs from CLI, environment, or tracked sync state
+2. Fetch issues incrementally unless `--full-sync` is set
+3. Persist raw issue payloads to Layer 0
+4. Enrich issues with GraphQL hierarchy data when possible
+5. Upsert Layer 1 issue parquet files
+6. Persist milestone and label parquet side datasets
+7. Update sync state
 
-### **1.2. Hybrid API Clients**
+### 1.2 API Clients
 
-* **REST Client:** Wraps python-gitlab. Uses updated\_after filters to perform incremental syncs.  
-* **GraphQL Client:** Uses httpx to perform batch queries for "Work Item" widgets (Hierarchy/Parent-Child links) using the project's full\_path.
+- **REST client:** fetches issues, milestones, labels, and project path metadata
+- **GraphQL client:** fetches work-item hierarchy using the project's full path
 
-## **2\. Data Flow & Logic**
+## 2. Sync Algorithm
 
-### **2.1. The Sync Algorithm**
+1. **Check State:** read `data/state/sync_state.json`
+2. **Fetch Issues:** call REST with `updated_after` unless running full sync
+3. **Persist Raw:** save raw issue payloads to `data/raw/`
+4. **Fetch Side Data:** fetch milestones and labels independently
+5. **Enrich Hierarchy:** fetch parent/child work-item data through GraphQL when project path resolution succeeds
+6. **Persist Layer 1:** upsert `data/processed/issues_{project_id}.parquet`
+7. **Update State:** store latest seen `updated_at` and issue counts
 
-1. **Check State:** Read data/state/sync\_state.json.  
-2. **Fetch REST:** Pull issues updated after the saved timestamp.  
-3. **Persist L0:** Save the raw JSON response to data/raw/{project\_id}\_{timestamp}.json for auditing.  
-4. **Enrich GQL:** Batch the internal IDs (IIDs) and query GraphQL for hierarchy data.  
-5. **Transform:** Use Pydantic to validate and normalize the union of REST \+ GQL data.  
-6. **Persist L1:** Upsert into data/processed/issues\_{project\_id}.parquet.
+## 3. Layer 1 Outputs
 
-## **3\. Data Model (Pydantic)**
+| File | Behavior |
+| :---- | :---- |
+| `issues_{project_id}.parquet` | Upserted by issue `id` |
+| `milestones_{project_id}.parquet` | Full replace on each sync |
+| `labels_{project_id}.parquet` | Full replace on each sync |
 
-```python
-class RawIssue(BaseModel):  
-    id: int  
-    iid: int  
-    project\_id: int  
-    title: str  
-    description: Optional\[str\] \= None
-    state: Literal\['opened', 'closed'\]  
-    created\_at: datetime  
-    updated\_at: datetime  
-    closed\_at: Optional\[datetime\]  
-    labels: List\[str\]  
-    \# GraphQL Fields  
-    work\_item\_type: str \= "ISSUE"  
-    parent\_id: Optional\[int\] \= None  
-    child\_ids: List\[int\] \= \[\]
-```
+Writes are performed atomically through temporary files before rename.
 
-## **4\. Architecture Decision Records (ADR)**
+## 4. Current Edge Cases
 
-### **4.1. Why Pydantic instead of Dataclasses?**
+### 4.1 Incremental project discovery
 
-* **Coercion:** GitLab API returns ISO strings; Pydantic automatically converts these to Python datetime objects during instantiation.  
-* **Deep Validation:** Ensures that nested lists (like labels) are actually lists of strings, preventing downstream "type-errors" in Pandas.
+If `PROJECT_IDS` is omitted, the collector falls back to previously tracked projects from sync state. This enables repeat syncs and admin-triggered syncs after the initial setup.
 
-### **4.2. Why Snappy-Compressed Parquet?**
+### 4.2 Local seeded project preservation
 
-* **Read Speed:** Parquet's columnar format allows L2 to read only the labels and dates columns without loading issue descriptions into memory.  
-* **Space:** Snappy provides a balance between compression ratio and CPU speed, ideal for local laboratory servers.
+If GitLab returns `404` for a project but `data/processed/issues_{project_id}.parquet` already exists, the orchestrator marks that project as skipped local data instead of failing the overall run.
+
+### 4.3 Hierarchy enrichment fallback
+
+GraphQL hierarchy enrichment is best-effort. If project path lookup fails, issue sync still proceeds using REST data only.
+
+## 5. Rationale
+
+- **Parquet with Snappy:** fast columnar reads for downstream analytics
+- **Pydantic-backed schema normalization:** predictable typing at the ingestion boundary
+- **Incremental sync state:** reduces repeated GitLab API load during normal operation

@@ -1,91 +1,81 @@
-# **Technical Specification: Overview View (Value Stream)**
+# Technical Specification: Overview View
 
-**Scope:** Specification for tracking the "Idea to Production" workflow, focusing on Inventory (WIP) and Flow Health.
+**Status:** Implemented  
+**Scope:** Current behavior of the primary curated dashboard page in `app/dashboard/views/overview.py`.
 
-## **1. Concept: Value Stream Metrics**
+## 1. Purpose
 
-Moving monitoring from "Counting Bugs" to "Measuring Flow." Since the architecture captures the **current state snapshot**, we focus on metrics derived from the current status of the board.
+The Overview page is the main workflow health view. It combines issue flow, milestone timing, quality signals, and issue drill-down into a single curated screen.
 
-### **1.1. Key Metrics**
-*   **WIP (Work in Progress):** Count of issues in each stage. Identifies bottlenecks (e.g., high "Review" count vs low "Test" count).
-*   **Stage Staleness:** Median days in current stage. Identifies where items get stuck (e.g., "Architecture" items rotting for 45 days).
-*   **Flow Efficiency Proxy:** Ratio of Active Stages (Implementation) vs. Waiting Stages (Ready for Review).
+## 2. Data Model Assumptions
 
-## **2. Layer 2: Logic & Configuration**
+The page renders from the Layer 2 analytics dataset and uses deduplicated issue IDs for headline visualizations where multi-context duplication would otherwise distort counts.
 
-### **2.1. Rule Configuration (`rules.yaml`)**
+It also accepts:
 
-We extend the `DomainRule` to map labels to logical process stages.
+- `quality_df` for supporting quality signals
+- `stage_descriptions` from the loaded rule set
+- `timeline_df` so milestone visuals can use pre-milestone-filter data
 
-```yaml
-workflow:
-  # Ordered list of stages. Priority is top-down.
-  stages:
-    - name: "Architecture"
-      labels: ["workflow::architecture", "status::design"]
-      type: "active"  # or "waiting"
-      description: "Initial design phase"
-    - name: "Implementation"
-      labels: ["workflow::implementation", "status::coding"]
-      type: "active"
-    - name: "Review"
-      labels: ["workflow::review", "status::mr_open"]
-      type: "waiting"
-    - name: "Testing"
-      labels: ["workflow::test", "status::validation"]
-      type: "active"
-    - name: "Done"
-      labels: ["workflow::done", "status::released"]
-      type: "completed"
-```
+## 3. Current Panels
 
-### **2.2. Enrichment Logic (`enricher.py`)**
+### 3.1 Row 1
 
-The `enrich_workflow_stage` function determines the current stage of an issue.
+- **Open Issues by Priority**
+- **Closed Issues by Priority**
+- **Daily New vs. Closed Issues**
 
-1.  **Default:** `stage="Backlog"`, `stage_type="waiting"`.
-2.  **Priority Matching:** Iterate through configured stages in order.
-3.  **Label Match:** If issue has *any* of the stage's labels:
-    *   Assign `stage = stage_name`
-    *   Assign `stage_type = stage_type`
-    *   Stop (First match wins).
+### 3.2 Row 2
 
-## **3. Layer 3: Presentation (Dashboard)**
+- **Issues by Workflow State**
 
-The **"Overview"** view provides insights into process health.
+This panel reflects configured workflow stage order when available.
 
-### **3.1. Work by Stage**
-*   **Type:** Horizontal Bar Chart.
-*   **Layout:** Full-width Tab ("Work by Stage").
-*   **Data:** Count of issues per `stage`.
-    *   **Deduplication:** Issues with multiple contexts are counted only once (Unique Issue ID).
-*   **Sorting:** By defined workflow order.
-*   **Features:**
-    *   **Grand Total:** Displayed in chart header.
-    *   **Stage Totals:** Displayed numerically at bar ends (e.g., `(25)`).
-    *   **Descriptions:** Tooltips show stage descriptions from config.
-    *   **Interaction:** Click to filter, Shift+Click to multi-select, Double-Click to reset.
+### 3.3 Row 3
 
-### **3.2. Days in Stage**
-*   **Type:** Boxplot.
-*   **Layout:** Full-width Tab ("Days in Stage").
-*   **Data:** Unique issues (deduplicated).
-*   **X-Axis:** Stage.
-*   **Y-Axis:** `days_in_stage`.
-*   **Goal:** Highlight stages with high median age or extreme outliers.
+- **Release Timeline**
+- **Open vs. Closed Issues**
+- **Issue Quality Signals**
 
-### **3.3. Stage Detail (Drill-down)**
-*   **Design:** Unified Data Grid (Table).
-*   **Interaction:** Filtered by interactive selection in Charts or multi-select dropdown.
-*   **Multi-Context:** Displays duplicate rows for issues with multiple contexts (one row per context-match) to allow complete slicing.
-*   **Why (UX):**
-    *   **Unified Grid:** Avoids the "Stack of Tables" vertical scroll fatigue.
-    *   **Cross-Stage Sorting:** Allows finding the "Oldest Active Item" regardless of specific stage (e.g. Architecture vs Implementation).
-*   **Columns:** `ID`, `Title`, `Stage`, `Age`, `Assignee`. Sorted by `Age` (descending) by default to highlight stuck items.
-*   **AI Assistant:** Integrated panel for summarizing selected issues.
+## 4. Interactions
 
-## **4. Architecture Decision Records (ADR)**
+### 4.1 Chart-driven drill-down
 
-### **4.1. Snapshot-based Workflow**
-*   **Decision:** Calculate flow metrics from the *current* snapshot state (labels) rather than reconstructing full history.
-*   **Why:** simpler to implement and provides immediate value for "Current Health". Future iterations can parse system notes for full cycle time analysis if needed.
+Multiple charts return selection payloads. When the user clicks into a chart, the page opens a filtered issue dialog backed by the same analytics dataset.
+
+### 4.2 Milestone synchronization
+
+The release timeline and sidebar milestone selector are synchronized bidirectionally through session state. Selecting a milestone from the timeline updates the sidebar filter, and clearing the sidebar resets timeline selection state.
+
+### 4.3 Issue drill-down table
+
+The issue table supports:
+
+- single-row selection
+- fuzzy search across normalized issue text
+- AI status markers:
+  - `✨` means no persisted AI summary yet
+  - `📝` means AI data exists in `data/ai/`
+- clickable issue links
+- optional context and quality-hint display
+
+Selecting a row persists the issue URL in session state and opens the detail flow.
+
+### 4.4 Local seeded issue details
+
+For locally seeded issues, the detail flow resolves from local parquet-backed data rather than assuming a live GitLab API lookup. This keeps local demo workflows usable end-to-end.
+
+## 5. AI Integration
+
+The Overview drill-down flow is the primary place where the AI assistant is exposed today. From the selected issue, the user can:
+
+- see whether AI content exists
+- generate a summary
+- view the current summary
+- continue a chat tied to that issue
+
+## 6. Notes on Scope
+
+- The active top-level page name is **Overview**
+- There is no active top-level **Hygiene** page in the current main navigation
+- Overview is intentionally curated; it is not the same surface as the generic custom layout builder
