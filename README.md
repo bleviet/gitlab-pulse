@@ -11,14 +11,46 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 
 ## Quick Start
 
-The fastest way to get everything running locally is using the included setup script:
+You can run GitLabInsight either locally on your host or isolated within a Docker container. Both methods can auto-generate synthetic data for a zero-configuration demo.
+
+### Option 1: Docker Evaluation (Recommended for Demos)
+
+For an isolated evaluation environment without installing Python dependencies on your host, use Docker. 
 
 ```bash
-# Run the setup script (installs deps, prepares .env, and offers local test data)
+# Copy environment template
+cp .env.example .env
+
+# Start the application using Docker Compose
+docker compose up --build
+```
+
+**What happens?**
+* The container builds and installs dependencies internally.
+* If no data exists, the container automatically generates and processes synthetic test data internally.
+* This generated data (and any AI chats) is saved to the `./data` directory on your host via volume mounting.
+* Open `http://localhost:8501` to view your dashboard.
+
+*Note: This Docker setup is intended as an optional onboarding/testing path, not as a replacement for the native workflow.*
+
+### Option 2: Native Host Setup (Recommended for Development)
+
+The fastest way to set up the native Python environment on your host is via the included `setup.sh` script:
+
+```bash
 ./setup.sh
 ```
 
-**Manual Setup:**
+**What happens?**
+* **Prerequisites Check**: Verifies Python and `uv` are installed.
+* **Dependencies**: Runs `uv sync` to install all required packages on your host.
+* **Configuration**: Copies `.env.example` to `.env` if it doesn't exist.
+* **Local Data (Optional)**: Prompts you to generate and process synthetic data locally so you can use the dashboard immediately without a GitLab connection.
+* **Result**: You are left with a fully configured local Python environment ready to run `uv run streamlit run app/dashboard/main.py`.
+
+### Option 3: Manual Native Setup
+
+If you prefer to run the steps manually instead of using `setup.sh`:
 
 ```bash
 # Install dependencies
@@ -26,12 +58,31 @@ uv sync
 
 # Copy environment template
 cp .env.example .env
+```
 
-# Generate synthetic test data and process it
+**For Synthetic Data (No GitLab Connection Needed):**
+```bash
+# Generate synthetic test data
 uv run python tools/seeder.py --count 1000 --inject-errors
+
+# Process the data
 uv run python app/processor/main.py
 
 # Launch dashboard
+uv run streamlit run app/dashboard/main.py
+```
+
+**For Live GitLab Data:**
+```bash
+# 1. Edit .env and configure GITLAB_URL, GITLAB_TOKEN, and PROJECT_IDS
+
+# 2. Fetch data from GitLab
+uv run python app/collector/orchestrator.py
+
+# 3. Process the fetched data
+uv run python app/processor/main.py
+
+# 4. Launch dashboard
 uv run streamlit run app/dashboard/main.py
 ```
 
@@ -189,7 +240,7 @@ Before deploying or sharing your instance, consider these core security principl
 - **Least Privilege**: The required `GITLAB_TOKEN` only needs the `read_api` scope. No write permissions are necessary or requested by the collector.
 - **Data Privacy**: All AI interactions, summaries, and chat histories are processed by the configured `OLLAMA_ENDPOINT`. If you use the default local Ollama installation (`http://localhost:11434`), your data never leaves your infrastructure. However, if you configure a proxy pointing to a cloud LLM provider, your chat histories and issue data will be sent to that external service. All generated summaries and histories are persisted locally in `data/ai/`.
 
-## AI Assistant (Layer 4)
+## AI Assistant
 
 GitLabInsight includes a **local AI assistant** powered by [Ollama](https://ollama.com/). This enables context-aware issue summarization and chat without sending data to external APIs.
 
@@ -214,12 +265,6 @@ ollama serve
 - **Multi-Server Support:** Configure remote Ollama servers via the sidebar (Settings > 🤖 AI Settings).
 - **Persistence:** Summaries and chat history are saved to `data/ai/` for future sessions.
 
-### Usage
-
-1. Go to the **Flow** tab in the dashboard.
-2. Select an issue from the **Issue Drill-down** table.
-3. Switch to the **🤖 AI Assistant** tab.
-4. Click **✨ Generate** to create a summary, or **🔄 Regenerate** to update it.
 
 ## Testing
 
@@ -250,24 +295,14 @@ uv run python -m cProfile -s time app/processor/main.py
 ## Q&A
 
 ### Data Inclusion Logic
-**Q: Are quality issues included in "Open Issues" or "Bug Ratio" metrics?**
-**A:** Yes. Validation findings are now treated as **hints**, so operational metrics continue to use the full issue dataset while quality widgets highlight the flagged items separately.
-
-**Q: Do the issue lists include quality issues?**
-**A:** Yes. Issue lists continue to show all issues. Validation findings are surfaced through quality indicators and hint-focused views instead of removing issues from the main list.
-
 **Q: What are "Backlog" items?**
-**A:** "Backlog" is the default classification for any valid issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
+**A:** "Backlog" is the default classification for any issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
 
 ### Multi-Context Issues
 **Q: What if an issue belongs to multiple contexts (e.g., "R&D" and "Customer")?**
 **A:**
 - **Metrics & Charts**: The issue is counted **only once** (deduplicated).
 - **Issue Table**: The issue appears **twice** (or more), once for each context, allowing you to see it in every relevant slice.
-
-### Help & Descriptions
-**Q: Where can I find stage definitions?**
-**A:** Hover over the bars in the **Work by Stage** chart. The tooltips now display a detailed description of each stage (e.g., "Code review and merge request feedback") as configured in your `default.yaml`. A general help icon `(?)` in the chart header also provides usage instructions.
 
 ## License
 

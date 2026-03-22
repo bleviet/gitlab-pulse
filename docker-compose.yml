@@ -1,0 +1,15 @@
+services:
+  gitlab-insight:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gitlab-insight:local
+    ports:
+      - "8501:8501" # Expose Streamlit dashboard port
+    volumes:
+      - ./data:/app/data # Persist data and AI chats
+    env_file:
+      - .env
+    environment:
+      # Automatically seed synthetic test data on startup if no live data exists
+      - SEED_LOCAL_DATA=true
