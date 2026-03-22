@@ -29,7 +29,7 @@ echo -e "${GREEN}✓ Found uv${NC}\n"
 
 # 2. Install dependencies
 echo -e "${CYAN}→ Installing dependencies...${NC}"
-uv sync --dev
+uv sync
 echo -e "${GREEN}✓ Dependencies installed successfully.${NC}\n"
 
 # 3. Environment configuration

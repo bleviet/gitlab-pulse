@@ -4,7 +4,7 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 
 ## Requirements
 
-- **Python**: `>=3.13`
+- **Python**: `>=3.11`
 - **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
 - **Platform**: Linux, macOS, or Windows (WSL recommended)
 - **AI (Optional)**: [Ollama](https://ollama.com/) for local assistant features
@@ -22,7 +22,7 @@ The fastest way to get everything running locally is using the included setup sc
 
 ```bash
 # Install dependencies
-uv sync --dev
+uv sync
 
 # Copy environment template
 cp .env.example .env
