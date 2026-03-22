@@ -21,7 +21,6 @@ from app.dashboard.data_loader import (
     load_valid_issues,
 )
 from app.dashboard.views.overview import render_overview
-from app.dashboard.views.hygiene import render_hygiene
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
 from app.dashboard.theme import apply_rule_color_overrides, get_global_css
@@ -178,7 +177,6 @@ def main() -> None:
     # Page navigation
     pages = {
         "📊 Overview": "overview",
-        "🧹 Hygiene": "hygiene",
         "🎨 Custom": "custom",
     }
 
@@ -240,8 +238,6 @@ def main() -> None:
             timeline_df=pre_milestone_df,
             highlight_milestone=filters["milestone"],
         )
-    elif view_id == "hygiene":
-        render_hygiene(filtered_df, quality_df, rule=default_rule)
     elif view_id == "custom":
         # Custom view using layout-based widget rendering
         from app.dashboard.engine import load_layout, save_layout, remove_widget_from_layout
