@@ -580,7 +580,18 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 
 /* Reduce default Streamlit top whitespace so content starts near the app brand */
 [data-testid="stMainBlockContainer"] {{
-    padding-top: 2rem !important;
+    padding-top: 0.75rem !important;
+}}
+
+/* Tighten the default app header/toolbar chrome by ~20px */
+[data-testid="stHeader"] {{
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+}}
+
+[data-testid="stToolbar"],
+[data-testid="stAppToolbar"] {{
+    top: 0.2rem !important;
 }}
 
 /* Reduce sidebar top space — the gap is caused by the stSidebarHeader bar (3.75rem tall
