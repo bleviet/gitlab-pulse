@@ -2,6 +2,13 @@
 
 A versatile analytics platform for GitLab issue data. Extracts, validates, and visualizes workflow health and throughput using a **Clean Architecture** and **Medallion Data Pattern**.
 
+## Requirements
+
+- **Python**: `>=3.13`
+- **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
+- **Platform**: Linux, macOS, or Windows (WSL recommended)
+- **AI (Optional)**: [Ollama](https://ollama.com/) for local assistant features
+
 ## Quick Start
 
 ```bash
@@ -36,7 +43,29 @@ uv run streamlit run app/dashboard/main.py
 | **L2** | `app/processor/` | Domain logic & validation |
 | **L3** | `app/dashboard/` | Hierarchical Streamlit visualization |
 
-## Configuration
+## Production Deployment
+
+While GitLabInsight can be run entirely on a laptop, deploying it for team use requires a few operational considerations:
+
+### Minimal Deployment Steps
+1. Clone the repository on a server.
+2. `cp .env.example .env` and configure your `GITLAB_URL`, `GITLAB_TOKEN` (with `read_api`), and `PROJECT_IDS`.
+3. Set a secure `ADMIN_PASSWORD` in `.env` for dashboard changes.
+4. Schedule `uv run python app/collector/orchestrator.py` to run periodically (e.g., via cron) to ingest new data.
+5. Schedule `uv run python app/processor/main.py` to run after the collector to update analytics.
+6. Serve the dashboard as a long-running process: `uv run streamlit run app/dashboard/main.py`.
+
+### Persistent Storage
+If deploying via Docker or Kubernetes, the `data/` directory must be mapped to a persistent volume. This directory stores the operational state of the application:
+- `data/raw/`, `data/processed/`, and `data/analytics/`: Built data lakes.
+- `data/state/`: Incremental sync cursors for the collector.
+- `data/ai/`: Persistent chat histories and AI summaries.
+- `data/config/layouts/`: User-saved dashboard layouts.
+
+### Streamlit Scope
+The [Streamlit](https://streamlit.io/) dashboard is designed for **internal team use**, corporate VPNs, or local-only viewing. It includes a basic password lock for admin actions (like deleting items) but is not designed or hardened to be exposed directly to the public internet without an external authentication proxy (like Cloudflare Access or OAuth2-Proxy).
+
+## Configuration Files
 
 ### Environment Variables
 
@@ -54,7 +83,7 @@ Required for live GitLab sync:
 | `GITLAB_TOKEN` | Personal access token with `read_api` scope |
 | `PROJECT_IDS` | Comma-separated project IDs to sync |
 
-`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not require a GitLab connection.
+`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not require a GitLab connection. The example config file (`default.yaml`) ships with an empty `project_ids` list to act as a global fallback, meaning it is perfectly safe to use on a fresh clone. You must supply your own `PROJECT_IDS` (via `.env`) to process live data, or use the local seeded data.
 
 ### Reset and Recreate Local Seeded Data
 
@@ -148,6 +177,14 @@ Edit `app/config/rules/default.yaml` to customize:
 - **Contexts & Workflows**: Slice data by domain and define process stages.
 
 By default, `project_ids` is empty — the rules apply globally to all projects. Add specific IDs only when you need per-project rule overrides via additional YAML files.
+
+## Security
+
+Before deploying or sharing your instance, consider these core security principles:
+
+- **Secrets Management**: Your `.env` file contains sensitive tokens. It must **never** be committed to version control. The repository ignores it by default.
+- **Least Privilege**: The required `GITLAB_TOKEN` only needs the `read_api` scope. No write permissions are necessary or requested by the collector.
+- **Data Privacy**: All AI interactions, summaries, and chat histories are processed by the configured `OLLAMA_ENDPOINT`. If you use the default local Ollama installation (`http://localhost:11434`), your data never leaves your infrastructure. However, if you configure a proxy pointing to a cloud LLM provider, your chat histories and issue data will be sent to that external service. All generated summaries and histories are persisted locally in `data/ai/`.
 
 ## AI Assistant (Layer 4)
 
