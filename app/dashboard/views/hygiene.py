@@ -70,8 +70,13 @@ def render_hygiene(
         filtered_df = quality_df.copy()
         if selection and selection.get("selection", {}).get("points"):
             selected_points = selection["selection"]["points"]
-            # Error code is on the Y axis
-            selected_errors = [p["y"] for p in selected_points]
+            selected_errors: list[str] = []
+            for point in selected_points:
+                custom_data = point.get("customdata")
+                if isinstance(custom_data, list) and custom_data:
+                    selected_errors.append(str(custom_data[0]))
+                elif point.get("y") is not None:
+                    selected_errors.append(str(point["y"]))
             if selected_errors:
                 filtered_df = filtered_df[filtered_df["error_code"].isin(selected_errors)]
 
@@ -123,6 +128,5 @@ def render_hygiene(
             )
     else:
         st.success("✅ Perfect data quality! All issues passed validation.")
-
 
 

@@ -235,6 +235,7 @@ def main() -> None:
         }
         render_overview(
             filtered_df,
+            quality_df=quality_df,
             stage_descriptions=stage_descriptions,
             timeline_df=pre_milestone_df,
             highlight_milestone=filters["milestone"],

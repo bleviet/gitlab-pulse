@@ -277,6 +277,7 @@ def _load_issue_details(project_id: int, issue_iid: int) -> _IssueDetailsData:
 
 def render_overview(
     df: pd.DataFrame,
+    quality_df: pd.DataFrame | None = None,
     stage_descriptions: dict[str, str] | None = None,
     timeline_df: pd.DataFrame | None = None,
     highlight_milestone: str | None = None,
@@ -285,6 +286,7 @@ def render_overview(
 
     Args:
         df: Filtered DataFrame with valid issues (milestone filter applied)
+        quality_df: DataFrame with quality issues for hygiene-oriented charts
         stage_descriptions: Optional mapping of stage names to description strings
         timeline_df: Unfiltered DataFrame for the milestone timeline
         highlight_milestone: Active milestone name to highlight in the timeline
@@ -484,16 +486,14 @@ def render_overview(
         )
         handle_selection(sel5, chart_id="issue_state_chart")
 
-    def _render_assignee_panel() -> None:
-        sel6 = charts.assignee_distribution(
-            unique_df,
+    def _render_error_distribution_panel() -> None:
+        charts.error_distribution(
+            quality_df if quality_df is not None else pd.DataFrame(),
             config={
                 "height": 150,
-                "key": f"row3_assignee_{chart_reset_suffix}",
-                "limit": 5,
+                "key": f"row3_error_distribution_{chart_reset_suffix}",
             },
         )
-        handle_selection(sel6, chart_id="assignee_chart")
 
     # ROW 1
     render_streamlit_grid(
@@ -564,11 +564,11 @@ def render_overview(
                         render_body=_render_issue_state_panel,
                     ),
                     _panel_cell(
-                        key="overview_assignee_distribution",
+                        key="overview_error_distribution",
                         span=3,
-                        title="Issue Distribution by Assignee",
-                        meta="Top 5",
-                        render_body=_render_assignee_panel,
+                        title="Issues Error Distribution",
+                        meta="Quality",
+                        render_body=_render_error_distribution_panel,
                     ),
                 )
             )
