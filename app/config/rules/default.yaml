@@ -1,0 +1,180 @@
+# Default Domain Rules Configuration
+# Place team-specific rules in separate YAML files (e.g., team_backend.yaml)
+
+# Project IDs that should use this rule file's classification, workflow,
+# and color settings.  Leave empty to apply these rules as the global
+# default for ALL projects.  Add specific IDs only when you need
+# per-project rule overrides (create additional YAML files for that).
+#
+# Example:
+#   project_ids:
+#     - 12345678
+#     - 87654321
+project_ids: []
+
+# Team/Domain identifier
+team: "default"
+
+# Classification Rules: Categorize issues by Type, Severity, Priority
+classification:
+  type:
+    Bug: 
+      labels: ["type::bug"]
+      title: ["contains:bug", "contains:fix", "contains:error", "contains:crash"]
+    Feature:
+      labels: ["type::feature"]
+      title: ["contains:feature", "contains:enhancement", "contains:add"]
+    Task:
+      labels: ["type::task"]
+      title: ["contains:task", "contains:refactor", "contains:update", "contains:clean"]
+    Epic:
+      labels: ["type::epic"]
+      
+  severity:
+    Critical:
+      labels: ["severity::critical"]
+    High:
+      labels: ["severity::high"]
+    Medium:
+      labels: ["severity::medium"]
+    Low:
+      labels: ["severity::low"]
+      
+  priority:
+    P1:
+      labels: ["priority::1"]
+    P2:
+      labels: ["priority::2"]
+    P3:
+      labels: ["priority::3"]
+
+# Context rules: Categorize work into sub-projects or business domains using label patterns or title keywords
+contexts:
+  rules:
+    - name: "ProjectA"
+      labels: ["contains:project::A"]
+    - name: "ProjectB"
+      labels: ["contains:project::B"]
+    
+    # --- Examples of Context Rules ---
+    #
+    # 1. Regex Match (Case-Insensitive):
+    # - name: "Go Lang"
+    #   title: ["regex:(?i)\\bgo\\b"] 
+    #
+    # 2. Strict Label Match (Exact):
+    # - name: "Urgent"
+    #   labels: ["exact:p1-urgent", "exact:critical-incident"]
+    #
+    # 3. Flexible Title Keywords (Contains):
+    # - name: "Database"
+    #   title: ["contains:sql", "contains:postgres", "contains:database"]
+    #
+    # 4. Mixed Criteria (Labels OR Title):
+    # - name: "Security"
+    #   labels: ["contains:security", "exact:cve"]
+    #   title: ["regex:(?i)vulnerability", "contains:exploit"]
+    
+    # - name: "iteration"
+    #   labels: ["regex:^iteration-\d+$"]
+
+# Validation rules
+workflow:
+  stages:
+    - name: "Architecture"
+      labels: ["workflow::architecture", "status::design"]
+      type: "active"
+      description: "Discovery, solution design, and architectural decision-making"
+    - name: "Implementation"
+      labels: ["workflow::implementation", "status::coding"]
+      type: "active"
+      description: "Building the solution and iterating on the implementation"
+    - name: "Review"
+      labels: ["workflow::review", "status::mr_open"]
+      type: "waiting"
+      description: "Peer review, merge request feedback, and approval"
+    - name: "Testing"
+      labels: ["workflow::test", "status::validation"]
+      type: "waiting"
+      description: "Verification, QA, and release-readiness checks"
+    - name: "Done"
+      labels: ["workflow::done", "status::released"]
+      type: "completed"
+      description: "Work is complete, merged, and considered finished"
+
+    # Regex-based label matching is also supported when stages are represented
+    # by dynamic labels instead of fixed workflow names.
+    #
+    # Example:
+    # - name: "Implementation"
+    #   labels: ["regex:^iteration-\\d+$", "regex:^sprint-\\d+$"]
+    #   type: "active"
+    #   description: "Matches iteration-style labels such as iteration-42."
+    #
+    # - name: "Testing"
+    #   labels: ["regex:^iteration-\\d+::verify$", "regex:^qa::.+$"]
+    #   type: "waiting"
+    #   description: "Matches dynamic verification labels such as iteration-42::verify."
+
+# Semantic color overrides (optional)
+# Supported formats:
+# 1) Legacy shared palette (flat key/value)
+# 2) Theme-aware palette with `light` and `dark` sections
+colors:
+  light:
+    # Issue Types — mapped to frontend-design chart palette (light)
+    bug:     "#b51c3c"   # --chart-4 Rose
+    feature: "#1a7a62"   # --chart-7 Mint
+    task:    "#005e9e"   # --chart-1 Cyan
+    epic:    "#8a0ea8"   # --chart-3 Orchid
+
+    # Status / Flow
+    active:    "#1a7a62"   # --chart-7 Mint
+    waiting:   "#b06000"   # --chart-6 Amber
+    completed: "#8a0ea8"   # --chart-3 Orchid
+    stale:     "#b51c3c"   # --chart-4 Rose
+
+    # General UI
+    primary: "#ff512f"   # --brand
+    neutral: "#3d5370"   # --muted light
+
+    # Severity — semantic red → amber → yellow → green scale
+    critical: "#F43F5E"
+    high:     "#FB923C"
+    medium:   "#FBBF24"
+    low:      "#1a7a62"   # --chart-7 Mint
+    unset:    "#3d5370"   # --muted light
+
+    # Priority
+    p1: "#b51c3c"   # --chart-4 Rose
+    p2: "#b06000"   # --chart-6 Amber
+    p3: "#1a7a62"   # --chart-7 Mint
+
+  dark:
+    # Issue Types — mapped to frontend-design chart palette (dark)
+    bug:     "#f5576c"   # --chart-4 Rose
+    feature: "#56d4b0"   # --chart-7 Mint
+    task:    "#4facfe"   # --chart-1 Cyan
+    epic:    "#c76bff"   # --chart-3 Orchid
+
+    # Status / Flow
+    active:    "#56d4b0"   # --chart-7 Mint
+    waiting:   "#f4a44a"   # --chart-6 Amber
+    completed: "#c76bff"   # --chart-3 Orchid
+    stale:     "#f5576c"   # --chart-4 Rose
+
+    # General UI
+    primary: "#ff512f"   # --brand
+    neutral: "#7a8fa8"   # --muted dark
+
+    # Severity — semantic red → orange → amber → mint scale
+    critical: "#e06565"
+    high:     "#e88236"
+    medium:   "#f4a44a"   # --chart-6 Amber
+    low:      "#56d4b0"   # --chart-7 Mint
+    unset:    "#7a8fa8"   # --muted dark
+
+    # Priority
+    p1: "#dd2476"   # --brand-2 (reserved)
+    p2: "#f4a44a"   # --chart-6 Amber
+    p3: "#56d4b0"   # --chart-7 Mint

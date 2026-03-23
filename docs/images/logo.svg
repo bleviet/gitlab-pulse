@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" aria-hidden="true">
+  <defs>
+    <linearGradient id="gi-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ff512f"/>
+      <stop offset="100%" stop-color="#dd2476"/>
+    </linearGradient>
+    <filter id="gi-sh">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5"
+                    flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="48" height="48" rx="13" fill="url(#gi-bg)" filter="url(#gi-sh)"/>
+  <rect x="7"  y="31" width="7" height="11" rx="2.5" fill="white" opacity="0.90"/>
+  <rect x="17" y="23" width="7" height="19" rx="2.5" fill="white" opacity="0.90"/>
+  <rect x="27" y="15" width="7" height="27" rx="2.5" fill="white" opacity="0.90"/>
+  <circle cx="38.5" cy="10.5" r="5.5" fill="none"
+          stroke="white" stroke-width="2.4" opacity="0.95"/>
+  <circle cx="38.5" cy="10.5" r="1.6" fill="white" opacity="0.80"/>
+  <line x1="42.5" y1="14.5" x2="45" y2="17"
+        stroke="white" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
+</svg>

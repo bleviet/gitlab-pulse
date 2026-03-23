@@ -1,0 +1,1530 @@
+"""Overview Page (Value Stream) for Layer 3 Dashboard.
+
+Visualizes flow efficiency, bottlenecks, and aging.
+Refactored to use Widget Registry where applicable.
+"""
+
+import ast
+import html
+import os
+import re
+from collections.abc import Callable
+from contextlib import suppress
+from difflib import SequenceMatcher
+from typing import Any, TypedDict, cast
+from urllib.parse import parse_qs, urlparse
+
+import gitlab
+import pandas as pd
+import streamlit as st
+from gitlab.exceptions import GitlabError
+from st_keyup import st_keyup
+
+from app.dashboard.engine import (
+    GRID_COLUMNS,
+    StreamlitGridCell,
+    StreamlitGridRow,
+    render_streamlit_grid,
+)
+from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
+from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
+from app.dashboard.widgets import charts, features, tables
+
+
+class _IssueNoteData(TypedDict):
+    """Serialized GitLab issue note for Streamlit caching and rendering."""
+
+    author_name: str
+    author_username: str
+    body: str
+    created_at: str
+    system: bool
+
+
+class _IssueDetailsData(TypedDict):
+    """Serialized GitLab issue details for the native modal view."""
+
+    description: str
+    notes: list[_IssueNoteData]
+    title: str
+    web_url: str
+
+
+_ISSUE_DIALOG_TOP_MARKER_ID = "issue-details-dialog-top"
+_ISSUE_GRID_SEARCH_COLUMNS = (
+    "iid",
+    "title",
+    "stage",
+    "days_in_stage",
+    "severity",
+    "context",
+    "milestone",
+    "assignee",
+)
+_OVERVIEW_SIGNAL_UNASSIGNED = "UNASSIGNED_OWNER"
+_OVERVIEW_SIGNAL_MISSING_MILESTONE = "MISSING_MILESTONE"
+_OVERVIEW_SIGNAL_MIXED_CLASSIFICATION = "MIXED_CLASSIFICATION"
+
+
+def _has_multiple_classification_labels(labels: object) -> bool:
+    """Return True when an issue carries multiple labels in one classification bucket."""
+    normalized_labels = [label.lower() for label in _normalize_issue_labels(labels)]
+    classification_prefixes = ("type::", "severity::", "priority::")
+    return any(
+        sum(label.startswith(prefix) for label in normalized_labels) > 1
+        for prefix in classification_prefixes
+    )
+
+
+def _mixed_classification_hints(labels: object) -> list[str]:
+    """Describe the conflicting classification labels carried by an issue."""
+    label_groups = {
+        "type::": "Mixed type labels",
+        "severity::": "Mixed severity labels",
+        "priority::": "Mixed priority labels",
+    }
+    normalized_labels = _normalize_issue_labels(labels)
+
+    hints: list[str] = []
+    for prefix, label_name in label_groups.items():
+        matches = [label for label in normalized_labels if label.lower().startswith(prefix)]
+        if len(matches) > 1:
+            hints.append(f"{label_name}: {' + '.join(matches)}")
+    return hints
+
+
+def _is_missing_milestone(value: object) -> bool:
+    """Return True when milestone information is absent."""
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "<na>"}
+
+
+def _issue_quality_hints(row: pd.Series) -> list[str]:
+    """Build the user-facing quality hint messages for a single issue row."""
+    if row.get("state") != "opened":
+        return []
+
+    hints = _mixed_classification_hints(row.get("labels"))
+
+    assignee_label = normalize_assignee_labels(pd.Series([row.get("assignee")])).iloc[0]
+    if assignee_label == "Unassigned":
+        hints.append("Unassigned owner")
+
+    if _is_missing_milestone(row.get("milestone")):
+        hints.append("Missing milestone")
+
+    return hints
+
+
+def _issue_quality_hints_text(row: pd.Series) -> str:
+    """Return quality hint messages as a compact string for table display."""
+    return " | ".join(_issue_quality_hints(row))
+
+
+def _build_overview_quality_signal_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Build the curated Overview quality-signal dataset from the current issues."""
+    if df.empty:
+        return pd.DataFrame(columns=["error_code"])
+
+    signal_frames: list[pd.DataFrame] = []
+
+    for signal_code, signal_mask in _overview_quality_signal_masks(df).items():
+        if signal_mask.any():
+            signal_df = df.loc[signal_mask].copy()
+            signal_df["error_code"] = signal_code
+            signal_frames.append(signal_df)
+
+    if not signal_frames:
+        return pd.DataFrame(columns=["error_code"])
+
+    return pd.concat(signal_frames, ignore_index=True)
+
+
+def _overview_quality_signal_masks(df: pd.DataFrame) -> dict[str, pd.Series]:
+    """Return boolean masks for the Overview quality-signal criteria."""
+    if df.empty:
+        empty_mask = pd.Series(dtype=bool)
+        return {
+            _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION: empty_mask,
+            _OVERVIEW_SIGNAL_UNASSIGNED: empty_mask,
+            _OVERVIEW_SIGNAL_MISSING_MILESTONE: empty_mask,
+        }
+
+    is_opened_mask = (
+        df["state"].eq("opened")
+        if "state" in df.columns
+        else pd.Series(True, index=df.index)
+    )
+
+    mixed_classification_mask = (
+        df["labels"].apply(_has_multiple_classification_labels)
+        if "labels" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    assignee_series = (
+        normalize_assignee_labels(df["assignee"])
+        if "assignee" in df.columns
+        else pd.Series("Assigned", index=df.index)
+    )
+    milestone_series = (
+        df["milestone"]
+        if "milestone" in df.columns
+        else pd.Series(None, index=df.index, dtype="object")
+    )
+    missing_milestone_mask = milestone_series.apply(_is_missing_milestone)
+
+    return {
+        _OVERVIEW_SIGNAL_MIXED_CLASSIFICATION: mixed_classification_mask & is_opened_mask,
+        _OVERVIEW_SIGNAL_UNASSIGNED: assignee_series.eq("Unassigned") & is_opened_mask,
+        _OVERVIEW_SIGNAL_MISSING_MILESTONE: missing_milestone_mask & is_opened_mask,
+    }
+
+
+def _selection_mask_for_quality_signal(df: pd.DataFrame, signal_code: str) -> pd.Series:
+    """Build a selection mask for the Overview quality-signal chart."""
+    normalized_code = signal_code.strip().upper()
+    signal_masks = _overview_quality_signal_masks(df)
+    return signal_masks.get(normalized_code, pd.Series(False, index=df.index))
+
+
+def _priority_color_key(value: object) -> str | None:
+    """Normalize a displayed priority/severity value into a palette key."""
+    if value is None or pd.isna(value):
+        return "unset"
+
+    normalized = str(value).strip().lower()
+    if normalized in {"", "nan", "none", "<na>", "unset"}:
+        return "unset"
+
+    aliases = {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+        "p1": "p1",
+        "p2": "p2",
+        "p3": "p3",
+        "1": "p1",
+        "2": "p2",
+        "3": "p3",
+        "priority::1": "p1",
+        "priority::2": "p2",
+        "priority::3": "p3",
+    }
+    return aliases.get(normalized)
+
+
+def _text_color_for_background(color: str) -> str:
+    """Choose a readable text color for a hex background."""
+    normalized = color.strip().lstrip("#")
+    if len(normalized) == 3:
+        normalized = "".join(ch * 2 for ch in normalized)
+    if len(normalized) != 6:
+        return "#ffffff"
+
+    red = int(normalized[0:2], 16)
+    green = int(normalized[2:4], 16)
+    blue = int(normalized[4:6], 16)
+    luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
+    return "#0d1120" if luminance > 0.62 else "#ffffff"
+
+
+def _priority_cell_style(value: object) -> str | None:
+    """Return CSS for the filtered-issues priority cell background."""
+    color_key = _priority_color_key(value)
+    if color_key is None:
+        return None
+
+    palette = get_palette()
+    background = palette.get(color_key)
+    if not background:
+        return None
+
+    return (
+        f"background-color: {background}; "
+        f"color: {_text_color_for_background(background)}; "
+        "font-weight: 700;"
+    )
+
+
+def _selection_mask_for_value(df: pd.DataFrame, value: str) -> pd.Series:
+    """Build a chart-selection mask against the overview DataFrame."""
+    normalized_value = value.strip()
+    severity_mask = df["severity"].astype(str).str.contains(
+        normalized_value, case=False, na=False
+    )
+    if normalized_value.lower() == "low":
+        severity_mask = severity_mask | df["severity"].isna() | df["severity"].astype(
+            str
+        ).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
+
+    assignee_mask = normalize_assignee_labels(df["assignee"]).str.contains(
+        normalized_value, case=False, na=False
+    )
+
+    return (
+        df["stage"].astype(str).str.contains(normalized_value, case=False, na=False)
+        | assignee_mask
+        | severity_mask
+        | df["state"].astype(str).str.contains(normalized_value, case=False, na=False)
+    )
+
+
+def _is_local_issue_url(url: object) -> bool:
+    """Return True when a URL points to a synthetic local dashboard issue."""
+    if not isinstance(url, str) or not url:
+        return False
+
+    parsed_url = urlparse(url)
+    query = parse_qs(parsed_url.query)
+    return query.get("issue_source", [""])[0] == "local"
+
+
+def _build_local_issue_details(row: pd.Series) -> _IssueDetailsData:
+    """Build issue details directly from a local seeded row."""
+    return {
+        "title": str(row.get("title") or ""),
+        "description": str(row.get("description") or "").strip(),
+        "web_url": str(row.get("web_url") or ""),
+        "notes": _normalize_local_issue_notes(row.get("notes")),
+    }
+
+
+def _build_issue_ai_context_row(
+    row: pd.Series,
+    issue_details: _IssueDetailsData,
+) -> pd.Series:
+    """Merge loaded issue details into the selected row for AI context."""
+    ai_context_row = row.copy()
+    ai_context_row["description"] = issue_details["description"]
+    ai_context_row["notes"] = issue_details["notes"]
+    ai_context_row["title"] = issue_details["title"] or row.get("title")
+    ai_context_row["web_url"] = issue_details["web_url"] or row.get("web_url")
+    return ai_context_row
+
+
+def _normalize_local_issue_notes(raw_notes: object) -> list[_IssueNoteData]:
+    """Normalize seeded local-issue notes from parquet into dialog note records."""
+    if raw_notes is None:
+        return []
+
+    values = raw_notes.tolist() if hasattr(raw_notes, "tolist") else raw_notes
+    if isinstance(values, dict):
+        values = [values]
+    if not isinstance(values, list | tuple):
+        return []
+
+    notes: list[_IssueNoteData] = []
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        notes.append(
+            {
+                "author_name": str(value.get("author_name") or ""),
+                "author_username": str(value.get("author_username") or ""),
+                "body": str(value.get("body") or ""),
+                "created_at": str(value.get("created_at") or ""),
+                "system": bool(value.get("system", False)),
+            }
+        )
+
+    return notes
+
+
+def _sync_local_issue_query_selection(df: pd.DataFrame) -> None:
+    """Sync local issue query params into overview selection state."""
+    if "web_url" not in df.columns or "project_id" not in df.columns or "iid" not in df.columns:
+        return
+
+    issue_source = str(st.query_params.get("issue_source", "")).strip()
+    if issue_source != "local":
+        return
+
+    project_id_raw = str(st.query_params.get("issue_project_id", "")).strip()
+    issue_iid_raw = str(st.query_params.get("issue_iid", "")).strip()
+
+    try:
+        project_id = int(project_id_raw)
+        issue_iid = int(issue_iid_raw)
+    except ValueError:
+        return
+
+    matches = df[(df["project_id"] == project_id) & (df["iid"] == issue_iid)]
+    if matches.empty:
+        return
+
+    selected_row = matches.iloc[0]
+    selected_url = str(selected_row.get("web_url") or "")
+    if not selected_url:
+        return
+
+    if st.session_state.get("selected_issue_url") != selected_url:
+        st.session_state["selected_issue_url"] = selected_url
+        st.session_state["selected_issue_title"] = selected_row.get("title", "")
+        st.session_state["show_issue_dialog"] = True
+
+
+def _clear_local_issue_query_params() -> None:
+    """Clear local issue deep-link query params after dismissing a modal."""
+    for key in ("issue_source", "issue_project_id", "issue_iid"):
+        if key in st.query_params:
+            del st.query_params[key]
+
+
+@st.cache_resource
+def _get_gitlab_client() -> gitlab.Gitlab:
+    """Create and cache the GitLab API client used by the overview dialog."""
+    gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com").strip() or "https://gitlab.com"
+    private_token = os.environ.get("GITLAB_TOKEN", "").strip()
+
+    if not private_token:
+        raise ValueError("GITLAB_TOKEN environment variable is required to load issue details.")
+
+    return gitlab.Gitlab(gitlab_url, private_token=private_token, timeout=15)
+
+
+@st.cache_data(ttl=60)
+def _load_issue_details(project_id: int, issue_iid: int) -> _IssueDetailsData:
+    """Fetch the latest issue description and notes from the GitLab REST API."""
+    client = _get_gitlab_client()
+    project = client.projects.get(project_id)
+    issue = project.issues.get(issue_iid)
+
+    issue_attrs = issue.attributes
+    notes: list[_IssueNoteData] = []
+
+    for note in issue.notes.list(iterator=True, order_by="created_at", sort="asc"):
+        note_attrs = note.attributes
+        author = note_attrs.get("author") or {}
+        notes.append(
+            {
+                "author_name": str(author.get("name") or ""),
+                "author_username": str(author.get("username") or ""),
+                "body": str(note_attrs.get("body") or ""),
+                "created_at": str(note_attrs.get("created_at") or ""),
+                "system": bool(note_attrs.get("system", False)),
+            }
+        )
+
+    return {
+        "title": str(issue_attrs.get("title") or ""),
+        "description": str(issue_attrs.get("description") or ""),
+        "web_url": str(issue_attrs.get("web_url") or ""),
+        "notes": notes,
+    }
+
+
+def render_overview(
+    df: pd.DataFrame,
+    quality_df: pd.DataFrame | None = None,
+    stage_descriptions: dict[str, str] | None = None,
+    timeline_df: pd.DataFrame | None = None,
+    highlight_milestone: str | None = None,
+) -> None:
+    """Render the Overview (Flow) page.
+
+    Args:
+        df: Filtered DataFrame with valid issues (milestone filter applied)
+        quality_df: Optional quality-hint dataframe for supporting widgets
+        stage_descriptions: Optional mapping of stage names to description strings
+        timeline_df: Unfiltered DataFrame for the milestone timeline
+        highlight_milestone: Active milestone name to highlight in the timeline
+    """
+    if df.empty:
+        st.warning("No data available.")
+        return
+
+    _sync_local_issue_query_selection(df)
+
+    unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
+    _timeline_source = (timeline_df if timeline_df is not None else df).drop_duplicates(
+        subset=["id"]
+    ) if "id" in (timeline_df if timeline_df is not None else df).columns else (timeline_df or df)
+    
+    _active_ms = highlight_milestone if highlight_milestone and highlight_milestone != "All" else None
+
+    chart_reset_suffix = st.session_state.get("chart_reset_counter", 0)
+    palette = get_palette()
+    panel_label_color = with_alpha(get_plotly_font_color(), 0.72)
+
+    def handle_selection(
+        selection_dict: dict[str, Any] | None,
+        chart_id: str,
+        stage_filter: str | None = None,
+        state_filter: str | None = None,
+    ) -> None:
+        prev_key = f"prev_sel_{chart_id}"
+        if selection_dict and selection_dict.get("selection", {}).get("points"):
+            pts = selection_dict["selection"]["points"]
+            
+            if pts != st.session_state.get(prev_key):
+                st.session_state[prev_key] = pts
+                st.session_state["show_filtered_issues_dialog"] = True
+                st.session_state["filtered_issues_selection"] = pts
+                st.session_state["filtered_issues_stage"] = stage_filter
+                st.session_state["filtered_issues_state"] = state_filter
+                st.session_state["filtered_issues_source"] = chart_id
+        else:
+            if st.session_state.get(prev_key):
+                st.session_state[prev_key] = []
+                # If this chart was the source of the active dialog, clear it
+                if st.session_state.get("filtered_issues_source") == chart_id:
+                    st.session_state["show_filtered_issues_dialog"] = False
+                    st.session_state["filtered_issues_selection"] = []
+                    st.session_state["show_issue_dialog"] = False
+                    st.session_state["selected_issue_url"] = ""
+
+    def render_panel_header(title: str, meta: str | None = None) -> None:
+        """Render a compact, theme-aware panel heading."""
+        meta_html = ""
+        if meta:
+            meta_html = (
+                f"<span style='font-size:0.68rem; font-weight:700; "
+                f"letter-spacing:0.14em; text-transform:uppercase; "
+                f"color:{palette['primary']};'>{meta}</span>"
+            )
+
+        st.markdown(
+            (
+                "<div style='display:flex; align-items:center; justify-content:space-between; "
+                "gap:0.75rem; margin-bottom:0.55rem;'>"
+                f"<span style='font-size:0.78rem; font-weight:700; letter-spacing:0.12em; "
+                f"text-transform:uppercase; color:{panel_label_color};'>{title}</span>"
+                f"{meta_html}</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+
+    def _panel_cell(
+        key: str,
+        span: int,
+        title: str,
+        render_body: Callable[[], None],
+        meta: str | None = None,
+    ) -> StreamlitGridCell:
+        """Build a reusable overview panel cell for the shared Streamlit grid."""
+
+        def _render_panel() -> None:
+            with st.container(border=True):
+                render_panel_header(title, meta=meta)
+                render_body()
+
+        return StreamlitGridCell(key=key, span=span, render=_render_panel)
+
+    def _render_open_priority_panel() -> None:
+        sel1 = charts.priority_donut(
+            unique_df,
+            config={"height": 200, "key": f"row1_priority_{chart_reset_suffix}", "show_legend": False},
+        )
+        handle_selection(sel1, chart_id="open_donut", state_filter="opened")
+
+    def _render_closed_priority_panel() -> None:
+        sel2 = charts.priority_donut(
+            unique_df,
+            config={
+                "height": 200,
+                "key": f"row1_priority_closed_{chart_reset_suffix}",
+                "show_legend": False,
+                "state_filter": "closed",
+                "center_text": "CLOSED<br>ISSUES",
+            },
+        )
+        handle_selection(sel2, chart_id="closed_donut", state_filter="closed")
+
+    def _render_velocity_panel() -> None:
+        sel3 = charts.daily_velocity_line(
+            unique_df,
+            config={"height": 200, "key": f"row1_velocity_{chart_reset_suffix}"},
+        )
+        handle_selection(sel3, chart_id="velocity_chart")
+
+    def _render_stage_distribution_panel() -> None:
+        if "stage_order" in unique_df.columns:
+            stages = unique_df.groupby("stage")["stage_order"].min().sort_values().index.tolist()
+        else:
+            stages = unique_df["stage"].unique().tolist() if "stage" in unique_df.columns else []
+            default_stage_order = [
+                "Backlog",
+                "To Do",
+                "In Progress",
+                "Review",
+                "Testing",
+                "Waiting for Release",
+                "Done",
+                "Closed",
+            ]
+            stages = sorted(
+                stages,
+                key=lambda stage_name: (
+                    default_stage_order.index(stage_name)
+                    if stage_name in default_stage_order
+                    else len(default_stage_order)
+                ),
+            )
+
+        stages = [
+            stage_name
+            for stage_name in stages
+            if not unique_df[
+                (unique_df["stage"] == stage_name) & (unique_df["state"] == "opened")
+            ].empty
+        ]
+
+        if not stages:
+            st.info("No stage data available.")
+            return
+
+        stage_cols = st.columns(len(stages))
+        for idx, stage_name in enumerate(stages):
+            with stage_cols[idx]:
+                st.markdown(
+                    (
+                        "<div style='text-align:center; font-size:0.75rem; "
+                        "font-weight:bold; color:#777; margin-bottom:-10px;'>"
+                        f"{stage_name.upper()}</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+                stage_df = unique_df[unique_df["stage"] == stage_name]
+                sel = charts.priority_bar(
+                    stage_df,
+                    config={
+                        "height": 200,
+                        "key": f"row2_stage_bar_{idx}_{chart_reset_suffix}",
+                    },
+                )
+                handle_selection(sel, chart_id=f"stage_bar_{idx}", stage_filter=stage_name)
+
+    def _render_timeline_panel() -> None:
+        key_suffix = st.session_state.get("timeline_reset_counter", 0)
+        sel4 = charts.milestone_timeline(
+            _timeline_source,
+            config={
+                "key": f"row3_timeline_{key_suffix}",
+                "height": 150,
+                "highlight_milestone": _active_ms,
+            },
+        )
+
+        if sel4 and sel4.get("selection", {}).get("points"):
+            pts = sel4["selection"]["points"]
+            if pts and "customdata" in pts[0] and len(pts[0]["customdata"]) > 2:
+                selected_ms = pts[0]["customdata"][2]
+
+                if selected_ms == _active_ms:
+                    st.session_state["overview_milestone_reset"] = True
+                else:
+                    st.session_state["overview_milestone_pending"] = selected_ms
+
+                st.session_state.timeline_reset_counter = (
+                    st.session_state.get("timeline_reset_counter", 0) + 1
+                )
+                st.rerun()
+
+    def _render_issue_state_panel() -> None:
+        sel5 = charts.issue_state_bar(
+            unique_df,
+            config={
+                "height": 150,
+                "key": f"row3_issue_state_{chart_reset_suffix}",
+            },
+        )
+        handle_selection(sel5, chart_id="issue_state_chart")
+
+    def _render_error_distribution_panel() -> None:
+        overview_signal_df = _build_overview_quality_signal_df(unique_df)
+        sel6 = charts.error_distribution(
+            overview_signal_df,
+            config={
+                "height": 150,
+                "key": f"row3_error_distribution_{chart_reset_suffix}",
+            },
+        )
+        handle_selection(sel6, chart_id="quality_signal_chart")
+
+    # ROW 1
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_open_priority",
+                        span=3,
+                        title="Open Issues by Priority",
+                        render_body=_render_open_priority_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_closed_priority",
+                        span=3,
+                        title="Closed Issues by Priority",
+                        render_body=_render_closed_priority_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_velocity",
+                        span=6,
+                        title="Daily New vs. Closed Issues",
+                        render_body=_render_velocity_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ROW 2
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_stage_distribution",
+                        span=GRID_COLUMNS,
+                        title="Issues by Workflow State",
+                        render_body=_render_stage_distribution_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ROW 3
+    render_streamlit_grid(
+        [
+            StreamlitGridRow(
+                cells=(
+                    _panel_cell(
+                        key="overview_timeline",
+                        span=6,
+                        title="Release Timeline",
+                        meta="Milestones",
+                        render_body=_render_timeline_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_issue_state",
+                        span=3,
+                        title="Open vs. Closed Issues",
+                        render_body=_render_issue_state_panel,
+                    ),
+                    _panel_cell(
+                        key="overview_error_distribution",
+                        span=3,
+                        title="Issue Quality Signals",
+                        meta="Hints",
+                        render_body=_render_error_distribution_panel,
+                    ),
+                )
+            )
+        ],
+        total_columns=GRID_COLUMNS,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Display Filtered Issues Dialog
+    if st.session_state.get("show_filtered_issues_dialog", False):
+        pts = st.session_state.get("filtered_issues_selection", [])
+        stage_filter = st.session_state.get("filtered_issues_stage")
+        state_filter = st.session_state.get("filtered_issues_state")
+        filtered_df = df
+        
+        source_chart = st.session_state.get("filtered_issues_source", "")
+        
+        if stage_filter:
+            filtered_df = filtered_df[filtered_df["stage"] == stage_filter]
+            
+        if state_filter and state_filter != "all":
+            filtered_df = filtered_df[filtered_df["state"] == state_filter]
+            
+        if pts:
+            pt = pts[0]
+            val = pt.get("label") or pt.get("x") or pt.get("y") or pt.get("text")
+            
+            if val and isinstance(val, str):
+                if source_chart == "velocity_chart":
+                    try:
+                        selected_date = pd.to_datetime(val)
+                        if selected_date.tzinfo is not None:
+                            selected_date = selected_date.tz_localize(None)
+                        selected_date = selected_date.floor("D")
+                        
+                        is_closed_trace = (pt.get("curveNumber") == 1)
+                        if "customdata" in pt and pt["customdata"]:
+                            is_closed_trace = (pt["customdata"][0] == "Closed")
+                            
+                        target_col = "closed_at" if is_closed_trace else "created_at"
+                        target_state = "closed" if is_closed_trace else "opened"
+                        
+                        if target_col in filtered_df.columns:
+                            col_dates = pd.to_datetime(filtered_df[target_col], errors="coerce")
+                            if getattr(col_dates.dt, 'tz', None) is not None:
+                                col_dates = col_dates.dt.tz_localize(None)
+                            col_dates = col_dates.dt.floor("D")
+                            filtered_df = filtered_df[(col_dates == selected_date) & (filtered_df["state"] == target_state)]
+                    except Exception:
+                        pass
+                elif source_chart == "issue_state_chart":
+                    selected_state = None
+                    customdata = pt.get("customdata")
+                    if isinstance(customdata, list) and customdata:
+                        candidate_state = str(customdata[0]).strip().lower()
+                        if candidate_state in {"opened", "closed"}:
+                            selected_state = candidate_state
+
+                    if selected_state is None:
+                        normalized_val = val.strip().lower()
+                        if "open" in normalized_val:
+                            selected_state = "opened"
+                        elif "closed" in normalized_val:
+                            selected_state = "closed"
+
+                    if selected_state is not None:
+                        filtered_df = filtered_df[filtered_df["state"] == selected_state]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
+                elif source_chart == "quality_signal_chart":
+                    selected_signal = None
+                    customdata = pt.get("customdata")
+                    if isinstance(customdata, list) and customdata:
+                        selected_signal = str(customdata[0]).strip().upper()
+
+                    if selected_signal is None:
+                        selected_signal = val.strip().upper().replace(" ", "_")
+
+                    signal_mask = _selection_mask_for_quality_signal(filtered_df, selected_signal)
+                    if signal_mask.any():
+                        filtered_df = filtered_df[signal_mask]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
+                else:
+                    # Simple loose string matching for any column
+                    val = val.replace("<b>", "").replace("</b>", "").replace("<br>Open", "").replace("OPEN", "opened").replace("CLOSED", "closed").strip()
+
+                    mask = _selection_mask_for_value(filtered_df, val)
+                    if mask.any():
+                        filtered_df = filtered_df[mask]
+                    else:
+                        filtered_df = pd.DataFrame(columns=filtered_df.columns)
+                    
+        if not filtered_df.empty:
+            _show_filtered_issues_dialog(filtered_df)
+        else:
+            st.session_state["show_filtered_issues_dialog"] = False
+            if source_chart:
+                st.session_state[f"prev_sel_{source_chart}"] = []
+            st.toast("No issues matched this selection.", icon="ℹ️")
+
+    # Open single native issue dialog if selected from the table (not within filtered modal)
+    elif st.session_state.get("show_issue_dialog", False):
+        selected_url = st.session_state.get("selected_issue_url", "")
+        if selected_url:
+            selected_row = _get_selected_original_row(df)
+            if selected_row is not None:
+                _show_issue_dialog(selected_row)
+
+
+@st.dialog("Filtered Issues", width="large")
+def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
+    """Render issue details grid in a dialog when a chart is clicked."""
+    selected_url = st.session_state.get("selected_issue_url", "")
+    if selected_url and st.session_state.get("show_issue_dialog", False):
+        selected_row = _get_selected_original_row(df)
+        if selected_row is not None:
+            _render_issue_details_content(selected_row, is_nested=True)
+            return
+
+    if st.button("Close", key="close_filtered_issues_modal", type="primary", use_container_width=True):
+        st.session_state["show_filtered_issues_dialog"] = False
+        st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
+        st.session_state["filtered_issues_stage"] = None
+        st.session_state["filtered_issues_state"] = None
+        st.session_state["show_issue_dialog"] = False
+        st.session_state["selected_issue_url"] = ""
+        st.rerun()
+
+    _render_issue_detail_grid(df, compact=False)
+
+def _get_selected_original_row(
+    df: pd.DataFrame,
+) -> pd.Series | None:
+    """Return the full original row for the currently selected issue, or None."""
+    url = st.session_state.get("selected_issue_url", "")
+    if not url or "web_url" not in df.columns:
+        return None
+    matches = df[df["web_url"] == url]
+    if matches.empty:
+        return None
+    return cast(pd.Series, matches.iloc[0])
+
+
+@st.dialog("Issue Details", width="large")
+def _show_issue_dialog(row: pd.Series) -> None:
+    """Render a native, read-only issue details dialog backed by the GitLab API."""
+    _render_issue_details_content(row, is_nested=False)
+
+
+def _render_issue_details_content(row: pd.Series, is_nested: bool = False) -> None:
+    project_id_val = row.get("project_id")
+    issue_iid_val = row.get("iid")
+
+    if pd.isna(project_id_val) or pd.isna(issue_iid_val):
+        st.error("This issue is missing the GitLab metadata required to load its details.")
+        return
+
+    project_id = int(project_id_val)
+    issue_iid = int(issue_iid_val)
+    is_local_issue = _is_local_issue_url(row.get("web_url"))
+
+    if is_local_issue:
+        issue_details = _build_local_issue_details(row)
+    else:
+        try:
+            with st.spinner("Loading issue details from GitLab..."):
+                issue_details = _load_issue_details(project_id, issue_iid)
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+        except GitlabError as exc:
+            st.error(f"Failed to load issue details from GitLab: {exc}")
+            return
+
+    web_url = _fmt(issue_details["web_url"] or row.get("web_url"))
+    iid = _fmt(row.get("iid"))
+    title = _fmt(issue_details["title"] or row.get("title"))
+    ai_context_row = _build_issue_ai_context_row(row, issue_details)
+    dialog_key_prefix = "filtered-issue-dialog" if is_nested else "issue-dialog"
+
+    st.markdown(
+        f'<div id="{_ISSUE_DIALOG_TOP_MARKER_ID}"></div>',
+        unsafe_allow_html=True,
+    )
+
+    header_col, action_col = st.columns([0.65, 0.35], gap="small")
+    with header_col:
+        st.markdown(f"### #{iid} — {_cell(title)}")
+    with action_col:
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            if st.button(
+                "Back",
+                use_container_width=True,
+                type="primary",
+                key=f"{dialog_key_prefix}-btn-top-back",
+            ):
+                st.session_state["show_issue_dialog"] = False
+                st.session_state["selected_issue_url"] = ""
+                _clear_local_issue_query_params()
+                if "selected_issue_title" in st.session_state:
+                    st.session_state["selected_issue_title"] = ""
+                st.rerun()
+        with btn_col2:
+            if web_url != "—":
+                button_label = "Open locally" if is_local_issue else "Open in GitLab"
+                st.link_button(button_label, web_url, type="primary", use_container_width=True)
+
+    from app.dashboard.data_loader import load_labels as _load_labels
+    label_styles = _load_labels()
+    _render_tag_chips(row, label_styles=label_styles)
+    st.divider()
+
+    _render_issue_dialog_tab_styles()
+    details_tab, activity_tab, ai_tab = st.tabs(
+        ["Details", "Activity", "🤖 AI Assistant"]
+    )
+
+    with details_tab:
+        col_content, col_meta = st.columns([0.7, 0.3], gap="medium")
+
+        with col_content:
+            st.markdown("#### Description")
+            description = issue_details["description"].strip()
+            if description:
+                st.markdown(description)
+            else:
+                st.caption("_No description provided._")
+            if is_local_issue:
+                st.caption("Local seeded issue details are rendered directly from parquet data.")
+
+        with col_meta:
+            _render_dialog_meta(row)
+
+    with ai_tab:
+        st.caption("Generate a summary, check whether it is stale, and continue the issue-specific AI chat.")
+        features.ai_assistant(
+            ai_context_row,
+            widget_key_prefix=f"{dialog_key_prefix}-ai",
+        )
+
+    with activity_tab:
+        st.markdown("#### Activity")
+        if issue_details["notes"]:
+            for note in issue_details["notes"]:
+                author = note["author_name"] or note["author_username"] or "GitLab"
+                avatar = "📌" if note["system"] else "💬"
+                with st.chat_message("assistant", avatar=avatar):
+                    st.markdown(f"**{author}**")
+                    st.caption(_format_timestamp(note["created_at"], system_note=note["system"]))
+                    if note["body"].strip():
+                        st.markdown(note["body"])
+                    else:
+                        st.caption("_Empty comment._")
+        elif is_local_issue:
+            st.caption("_Local seeded issues do not include GitLab activity history._")
+        else:
+            st.caption("_No comments yet._")
+
+    st.divider()
+
+    if st.button(
+        "Back",
+        use_container_width=True,
+        type="primary",
+        key=f"{dialog_key_prefix}-btn-bottom-back",
+    ):
+        st.session_state["show_issue_dialog"] = False
+        st.session_state["selected_issue_url"] = ""
+        _clear_local_issue_query_params()
+        if "selected_issue_title" in st.session_state:
+            st.session_state["selected_issue_title"] = ""
+        st.rerun()
+
+    _scroll_issue_dialog_to_top()
+
+
+def _render_issue_dialog_tab_styles() -> None:
+    """Apply a slightly stronger visual treatment to issue-dialog tabs."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stDialog"] [data-baseweb="tab-list"] {
+            gap: 0.75rem;
+            margin-top: -0.2rem;
+        }
+
+        [data-testid="stDialog"] [data-baseweb="tab"] {
+            padding-top: 0.22rem;
+            padding-bottom: 0.45rem;
+        }
+
+        [data-testid="stDialog"] [data-baseweb="tab"] p {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _scroll_issue_dialog_to_top() -> None:
+    """Scroll the active issue details dialog back to its top anchor."""
+    import streamlit.components.v1 as components
+
+    components.html(_issue_dialog_scroll_script(), height=0, width=0)
+
+
+def _issue_dialog_scroll_script() -> str:
+    """Build the parent-document script that scrolls the dialog to the top."""
+    return f"""
+    <script>
+    (function() {{
+        const parentDoc = window.parent.document;
+        const markerId = "{_ISSUE_DIALOG_TOP_MARKER_ID}";
+
+        function scrollDialogToTop() {{
+            const marker = parentDoc.getElementById(markerId);
+            const dialog = (marker && marker.closest('[role="dialog"]'))
+                || parentDoc.querySelector('[data-testid="stDialog"] [role="dialog"]')
+                || parentDoc.querySelector('[role="dialog"]');
+
+            if (marker) {{
+                marker.scrollIntoView({{ block: 'start', inline: 'nearest' }});
+            }}
+
+            if (!dialog) {{
+                return;
+            }}
+
+            [dialog, ...dialog.querySelectorAll('section, div')].forEach((node) => {{
+                if (node.scrollHeight > node.clientHeight + 24) {{
+                    node.scrollTop = 0;
+                }}
+            }});
+        }}
+
+        [0, 120, 300, 600].forEach((delay) => {{
+            window.setTimeout(scrollDialogToTop, delay);
+        }});
+    }})();
+    </script>
+    """
+
+
+def _chip_html(text: str, bg: str, fg: str) -> str:
+    """Return an inline HTML badge/chip span."""
+    return (
+        f'<span style="background-color:{bg};color:{fg};border-radius:1em;'
+        f'padding:3px 10px;font-size:0.78em;font-weight:500;'
+        f'display:inline-block;white-space:nowrap;">{text}</span>'
+    )
+
+
+def _normalize_issue_labels(raw_labels: object) -> list[str]:
+    """Normalize labels from parquet/array/string forms into individual values."""
+    if raw_labels is None:
+        return []
+
+    def _clean_labels(values: list[object]) -> list[str]:
+        return [
+            str(value).strip()
+            for value in values
+            if str(value).strip().lower() not in ("", "nan", "none", "<na>")
+        ]
+
+    if isinstance(raw_labels, list):
+        return _clean_labels(raw_labels)
+
+    raw = str(raw_labels).strip()
+    if raw.lower() in ("", "nan", "none", "[]", "<na>"):
+        return []
+
+    try:
+        parsed = ast.literal_eval(raw)
+    except (ValueError, SyntaxError):
+        parsed = None
+
+    quoted_values = re.findall(r"'([^']+)'|\"([^\"]+)\"", raw)
+    if len(quoted_values) > 1:
+        return _clean_labels([first or second for first, second in quoted_values])
+
+    if isinstance(parsed, list):
+        return _clean_labels(parsed)
+
+    if isinstance(parsed, tuple):
+        return _clean_labels(list(parsed))
+
+    return [raw]
+
+
+def _render_tag_chips(
+    row: pd.Series,
+    label_styles: dict[str, dict[str, str]] | None = None,
+) -> None:
+    """Render priority, issue type, stage, and GitLab label chips inline.
+
+    Args:
+        row: Issue data row.
+        label_styles: Pre-loaded label styles dict. When ``None`` the function
+            loads styles itself (backward-compatible but slower).
+    """
+    if label_styles is None:
+        from app.dashboard.data_loader import load_labels as _load_labels
+        label_styles = _load_labels()
+
+    chips_html: list[str] = []
+
+    _severity_colors: dict[str, tuple[str, str]] = {
+        "critical": ("#c0392b", "#ffffff"),
+        "high":     ("#e67e22", "#ffffff"),
+        "medium":   ("#f39c12", "#ffffff"),
+        "low":      ("#27ae60", "#ffffff"),
+    }
+
+    for field, color_map in [
+        ("severity", _severity_colors),
+        ("issue_type", {}),
+        ("stage", {}),
+    ]:
+        val = _fmt(row.get(field))
+        if val == "—":
+            continue
+        bg, fg = color_map.get(val.lower(), ("#e0e0e0", "#333333"))
+        chips_html.append(_chip_html(val, bg, fg))
+
+    label_list = _normalize_issue_labels(row.get("labels"))
+    for lb in label_list:
+        style = label_styles.get(lb, {})
+        bg = style.get("color", "#e0e0e0")
+        fg = style.get("text_color", "#333333")
+        chips_html.append(_chip_html(lb, bg, fg))
+
+    if chips_html:
+        st.markdown(
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">'
+            + "".join(chips_html)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_dialog_meta(row: pd.Series) -> None:
+    """Render metadata fields in the right column of the dialog body."""
+    divider_color = with_alpha(get_plotly_font_color(), 0.14)
+    label_color = with_alpha(get_plotly_font_color(), 0.72)
+    value_color = get_plotly_font_color()
+
+    text_fields: list[tuple[str, str]] = [
+        ("Stage", _fmt(row.get("stage"))),
+        ("State", _fmt(row.get("state"))),
+        ("Assignee", _fmt(row.get("assignee"))),
+        ("Milestone", _fmt(row.get("milestone"))),
+        ("Context", _fmt(row.get("context"))),
+        ("Days in Stage", _fmt(row.get("days_in_stage")) if pd.notna(row.get("days_in_stage")) else "—"),
+        ("Age", _fmt(row.get("age_days")) if pd.notna(row.get("age_days")) else "—"),
+    ]
+    quality_hints = _issue_quality_hints(row)
+    if quality_hints:
+        text_fields.append(("Quality Hints", " • ".join(quality_hints)))
+    for label, value in text_fields:
+        if value != "—":
+            st.markdown(
+                _dialog_meta_item_html(
+                    label=label,
+                    value=value,
+                    divider_color=divider_color,
+                    label_color=label_color,
+                    value_color=value_color,
+                ),
+                unsafe_allow_html=True,
+            )
+
+
+def _dialog_meta_item_html(
+    label: str,
+    value: str,
+    divider_color: str,
+    label_color: str,
+    value_color: str,
+) -> str:
+    """Build HTML for a single dialog metadata section with a separator."""
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
+    return (
+        f'<div style="padding:0.1rem 0 0.7rem 0;'
+        f'margin-bottom:0.7rem;border-bottom:1px solid {divider_color};">'
+        f'<div style="font-size:0.72rem;letter-spacing:0.08em;'
+        f'text-transform:uppercase;font-weight:700;color:{label_color};">'
+        f"{safe_label}</div>"
+        f'<div style="margin-top:0.28rem;font-size:0.98rem;line-height:1.35;'
+        f'font-weight:600;color:{value_color};">{safe_value}</div>'
+        "</div>"
+    )
+
+
+def _fmt(val: object) -> str:
+    """Return a clean string value or '—' for missing/empty."""
+    if val is None:
+        return "—"
+    s = str(val).strip()
+    return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
+
+
+def _format_timestamp(value: str, system_note: bool = False) -> str:
+    """Format a GitLab timestamp for dialog metadata."""
+    parsed = pd.to_datetime(value, utc=True, errors="coerce")
+    if pd.isna(parsed):
+        suffix = " · system note" if system_note else ""
+        return f"{value}{suffix}" if value else "Unknown time"
+    formatted = parsed.strftime("%Y-%m-%d %H:%M UTC")
+    return f"{formatted} · system note" if system_note else formatted
+
+
+def _cell(val: str) -> str:
+    """Escape a string for safe use inside a markdown table cell."""
+    return val.replace("|", "\\|").replace("\n", " ").replace("\r", "")
+
+
+def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.DataFrame:
+    """Render unified issue detail grid with drill-down filters.
+
+    Args:
+        df: DataFrame of issues to display
+        compact: When True, show only title and assignee columns (used in
+            side-by-side layout where the chart provides stage/priority context).
+
+    Returns:
+        The prepared display DataFrame (used by the caller for AI panel and
+        detail card lookup).
+    """
+
+    search_query = st_keyup(
+        "",
+        placeholder="Search title, assignee, context, milestone, priority, stage...",
+        key="filter_title",
+        debounce=150,
+    )
+
+    # --- Apply Filters ---
+    display_df = df
+
+    # Sort by Hierarchy (Parent -> Child) or Staleness
+    if "parent_id" in display_df.columns:
+        display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
+    else:
+        display_df = display_df.sort_values("days_in_stage", ascending=False)
+
+    # Select Columns (keep 'id' for AI status lookup, 'iid' for numeric sorting)
+    # We also keep 'state' and 'labels' temporarily for quality hint calculation.
+    cols_to_show = [
+        "id", "iid", "web_url", "title", "stage", "days_in_stage",
+        "severity", "context", "milestone", "assignee", "state", "labels"
+    ]
+    cols = [c for c in cols_to_show if c in display_df.columns]
+
+    display_df = display_df[cols].copy()
+    quality_hint_series = display_df.apply(_issue_quality_hints_text, axis=1)
+    
+    # Always ensure the column exists if there's data, so the grid can render it
+    display_df["quality_hints"] = quality_hint_series
+
+    if search_query:
+        display_df = display_df[_build_issue_search_mask(display_df, search_query)]
+
+    # Reset index to ensure uniqueness for styling
+    display_df = display_df.reset_index(drop=True)
+
+    # Add AI Summary Status Column — scan directory once, then O(1) lookups
+    from pathlib import Path
+    ai_storage_path = Path("data/ai")
+
+    ai_issue_ids: set[int] = set()
+    if ai_storage_path.is_dir():
+        for entry in ai_storage_path.iterdir():
+            if entry.name.startswith("chat_") and entry.suffix == ".parquet":
+                with suppress(ValueError):
+                    ai_issue_ids.add(int(entry.stem.removeprefix("chat_")))
+
+    def _safe_int(value: object) -> int | None:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return None
+
+    display_df.insert(
+        0,
+        "ai_status",
+        display_df["id"].apply(
+            lambda x: "📝" if _safe_int(x) in ai_issue_ids else "✨"
+        ),
+    )
+
+    # Combine web_url + iid + title into a single clickable "title" column
+    if "web_url" in display_df.columns and "title" in display_df.columns:
+        iid_part = display_df["iid"].astype(str) if "iid" in display_df.columns else "?"
+        display_df["title"] = (
+            display_df["web_url"]
+            + "#"
+            + iid_part
+            + " - "
+            + display_df["title"].fillna("")
+        )
+        if "iid" in display_df.columns:
+            display_df = display_df.drop(columns=["iid"])
+
+    column_config = {
+        "ai_status": st.column_config.TextColumn(
+            "AI",
+            width=40,
+            help="📝 = Has AI summary | ✨ = No summary yet"
+        ),
+        "title": st.column_config.LinkColumn(
+            "Title",
+            display_text=r"#(.+)$",
+            width="large",
+            help="Click to open the issue URL",
+        ),
+        "assignee": st.column_config.TextColumn("Assignee", width="medium"),
+        "stage": st.column_config.TextColumn("Stage", width="small"),
+        "days_in_stage": st.column_config.NumberColumn(
+            "Days in Stage",
+            help="Days since last update in this stage",
+            format="%d days",
+        ),
+        "severity": st.column_config.TextColumn("Priority", width="small"),
+        "context": st.column_config.TextColumn("Context", width="small"),
+        "milestone": st.column_config.TextColumn("Milestone", width="small"),
+        "quality_hints": st.column_config.TextColumn("Quality Hints", width="large"),
+    }
+
+    # Apply styling if context or priority columns are present.
+    styler = None
+    if "context" in display_df.columns or "severity" in display_df.columns:
+        from app.dashboard.data_loader import load_labels
+
+        label_styles = load_labels()
+
+        def highlight_context(val: object) -> str | None:
+            if not isinstance(val, str):
+                return None
+            style = label_styles.get(val)
+            if style:
+                bg_color = style.get("color", "#FFFFFF")
+                text_color = style.get("text_color", "#000000")
+                return f'background-color: {bg_color}; color: {text_color}'
+            return None
+
+        styler = display_df.style
+        if "context" in display_df.columns:
+            styler = styler.map(highlight_context, subset=["context"])
+        if "severity" in display_df.columns:
+            styler = styler.map(_priority_cell_style, subset=["severity"])
+
+    # Compact mode: title + assignee only (stage/priority context via chart clicks)
+    if compact:
+        column_order = ["ai_status", "title", "assignee"]
+    else:
+        column_order = [
+            "ai_status",
+            "title",
+            "stage",
+            "days_in_stage",
+            "severity",
+            "milestone",
+            "assignee",
+            "quality_hints",
+        ]
+        if "context" in display_df.columns:
+            column_order.insert(2, "context")
+
+    # Persist selected issue for downstream panels (AI + detail card).
+    # Call st.rerun() whenever the persisted URL changes so that the layout
+    # decision in render_overview is always made with up-to-date state.
+    selection_state = st.session_state.get("issue_drilldown_table", {})
+    if hasattr(selection_state, "selection"):
+        selection_state = selection_state.selection
+    selected_indices = getattr(selection_state, "rows", [])
+    if not selected_indices and isinstance(selection_state, dict):
+        selected_indices = selection_state.get("rows", [])
+
+    _prev_url = st.session_state.get("selected_issue_url", "")
+
+    if selected_indices:
+        selected_idx = selected_indices[0]
+        if selected_idx < len(display_df):
+            selected_row = display_df.iloc[selected_idx]
+            _new_url = selected_row.get("web_url", "")
+            if _new_url != _prev_url:
+                st.session_state.selected_issue_url = _new_url
+                st.session_state.selected_issue_title = selected_row.get("title", "")
+                st.session_state["show_issue_dialog"] = True
+                st.rerun()
+    elif "issue_drilldown_table" in st.session_state and _prev_url != "":
+        st.session_state.selected_issue_url = ""
+        st.session_state.selected_issue_title = ""
+        st.session_state["show_issue_dialog"] = False
+        st.rerun()
+
+    st.caption("Select an issue to view details and AI insights.")
+    tables.issue_detail_grid(
+        styler if styler is not None else display_df,
+        config={
+            "column_config": column_config,
+            "column_order": column_order,
+            "height": 640 if not compact else 400,
+            "selection_mode": "single-row",
+            "key": "issue_drilldown_table",
+            "minimize_columns": False,
+            "enable_filters": False,
+        }
+    )
+
+    return display_df
+
+
+def _build_issue_search_mask(
+    df: pd.DataFrame,
+    query: str,
+    search_columns: tuple[str, ...] = _ISSUE_GRID_SEARCH_COLUMNS,
+) -> pd.Series:
+    """Build a fuzzy search mask across the filtered-issues table columns."""
+    normalized_query = _normalize_issue_search_text(query)
+    if not normalized_query:
+        return pd.Series(True, index=df.index)
+
+    active_columns = [column for column in search_columns if column in df.columns]
+    if not active_columns:
+        return pd.Series(True, index=df.index)
+
+    searchable_df = df[active_columns].apply(lambda column: column.map(_normalize_issue_search_text))
+    row_text = searchable_df.agg(" ".join, axis=1).str.replace(r"\s+", " ", regex=True).str.strip()
+    query_tokens = normalized_query.split()
+
+    token_mask = pd.Series(True, index=df.index)
+    for token in query_tokens:
+        token_mask &= row_text.str.contains(re.escape(token), case=False, na=False, regex=True)
+
+    # Short-circuit: skip expensive fuzzy search when exact token matching
+    # already found results.  Fuzzy matching is preserved as a fallback when
+    # no exact matches exist (i.e. the user mistyped a query).
+    if token_mask.any():
+        return token_mask
+
+    threshold = _issue_search_threshold(normalized_query)
+    fuzzy_cell_mask = searchable_df.apply(
+        lambda column: column.map(
+            lambda value: _is_fuzzy_issue_search_match(value, normalized_query, threshold)
+        )
+    ).any(axis=1)
+
+    return fuzzy_cell_mask
+
+
+def _normalize_issue_search_text(value: object) -> str:
+    """Normalize a cell value into plain lowercase text for issue-grid search."""
+    if isinstance(value, dict):
+        return " ".join(
+            normalized
+            for normalized in (_normalize_issue_search_text(item) for item in value.values())
+            if normalized
+        )
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(
+            normalized
+            for normalized in (_normalize_issue_search_text(item) for item in value)
+            if normalized
+        )
+    if value is None:
+        return ""
+
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
+
+    text = str(value).replace("_", " ").replace("::", " ")
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _is_fuzzy_issue_search_match(value: str, normalized_query: str, threshold: float) -> bool:
+    """Return whether a normalized cell value is a close fuzzy match."""
+    if not value:
+        return False
+    if normalized_query in value:
+        return True
+
+    token_scores = [
+        SequenceMatcher(None, normalized_query, token).ratio()
+        for token in value.split()
+    ]
+    best_score = max([SequenceMatcher(None, normalized_query, value).ratio(), *token_scores])
+    return best_score >= threshold
+
+
+def _issue_search_threshold(normalized_query: str) -> float:
+    """Return a typo-tolerant search threshold based on query length."""
+    query_length = len(normalized_query)
+    if query_length <= 4:
+        return 0.9
+    if query_length <= 8:
+        return 0.82
+    return 0.72

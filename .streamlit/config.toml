@@ -1,0 +1,112 @@
+[server]
+headless = true
+address = "0.0.0.0"
+# CORS and XSRF protection are disabled for local development convenience.
+# Re-enable both for public-facing or production deployments.
+enableCORS = false
+enableXsrfProtection = false
+enableStaticServing = false
+
+[theme]
+base = "dark"
+font = "Manrope"
+baseRadius = "0.5rem"
+buttonRadius = "full"
+showSidebarBorder = true
+showWidgetBorder = true
+headingFontWeights = [600, 500, 500, 500, 500, 500]
+headingFontSizes = ["3rem", "2rem"]
+codeFont = "SpaceMono"
+codeFontSize = ".75rem"
+chartCategoricalColors = ["#4facfe", "#ff7354", "#c76bff", "#f5576c", "#74c7f0", "#f4a44a", "#56d4b0", "#9f7bea"]
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-Regular.ttf"
+style = "normal"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-SemiBold.ttf"
+style = "normal"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Manrope"
+url = "app/static/Manrope-Bold.ttf"
+style = "normal"
+weight = 700
+
+[[theme.fontFaces]]
+family = "SpaceGrotesk"
+url = "app/static/SpaceGrotesk-VariableFont_wght.ttf"
+
+
+[[theme.fontFaces]]
+family = "SpaceMono"
+url = "app/static/SpaceMono-Bold.ttf"
+style = "normal"
+weight = 700
+
+
+[[theme.fontFaces]]
+family = "SpaceMono"
+url = "app/static/SpaceMono-BoldItalic.ttf"
+style = "italic"
+weight = 700
+
+
+[[theme.fontFaces]]
+family = "SpaceMono"
+url = "app/static/SpaceMono-Italic.ttf"
+style = "italic"
+weight = 400
+
+
+[[theme.fontFaces]]
+family = "SpaceMono"
+url = "app/static/SpaceMono-Regular.ttf"
+style = "normal"
+weight = 400
+
+[theme.light]
+primaryColor = "#ff512f"
+backgroundColor = "#e8ecf5"
+secondaryBackgroundColor = "#f1f4fb"
+textColor = "#0d1120"
+borderColor = "#c8cbd3"
+dataframeBorderColor = "#c8cbd3"
+dataframeHeaderBackgroundColor = "#dce3f0"
+linkColor = "#006ea3"
+codeBackgroundColor = "#dce3f0"
+
+[theme.light.sidebar]
+primaryColor = "#ff512f"
+backgroundColor = "#dde3f0"
+secondaryBackgroundColor = "#e8ecf5"
+textColor = "#0d1120"
+borderColor = "#c8cbd3"
+dataframeBorderColor = "#c8cbd3"
+dataframeHeaderBackgroundColor = "#dce3f0"
+
+[theme.dark]
+primaryColor = "#ff512f"
+backgroundColor = "#050811"
+secondaryBackgroundColor = "#0c1123"
+textColor = "#d4deee"
+borderColor = "#1c2030"
+dataframeBorderColor = "#1c2030"
+dataframeHeaderBackgroundColor = "#0e1525"
+linkColor = "#00f2fe"
+codeBackgroundColor = "#0e1525"
+
+[theme.dark.sidebar]
+primaryColor = "#ff512f"
+backgroundColor = "#0c1123"
+secondaryBackgroundColor = "#050811"
+textColor = "#d4deee"
+borderColor = "#1c2030"
+dataframeBorderColor = "#1c2030"
+dataframeHeaderBackgroundColor = "#0e1525"
+
