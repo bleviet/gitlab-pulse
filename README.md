@@ -124,7 +124,7 @@ If deploying via Docker or Kubernetes, the `data/` directory must be mapped to a
 - `data/config/layouts/`: User-saved dashboard layouts.
 
 ### Streamlit Scope
-The [Streamlit](https://streamlit.io/) dashboard is designed for **internal team use**, corporate VPNs, or local-only viewing. It includes a basic password lock for admin actions (like deleting items) but is not designed or hardened to be exposed directly to the public internet without an external authentication proxy (like Cloudflare Access or OAuth2-Proxy).
+The [Streamlit](https://streamlit.io/) dashboard is designed for **internal team use**, corporate VPNs, or local-only viewing. It includes a basic password lock for admin actions but is not designed or hardened to be exposed directly to the public internet without an external authentication proxy (like Cloudflare Access or OAuth2-Proxy).
 
 ## Configuration Files
 
