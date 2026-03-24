@@ -9,6 +9,15 @@ A versatile analytics platform for GitLab issue data. Extracts, validates, and v
 - **Platform**: Linux, macOS, or Windows (WSL recommended)
 - **AI (Optional)**: [Ollama](https://ollama.com/) for local assistant features
 
+## Core Configuration
+
+To start with live data, you must configure both your environment and your domain rules. These define what is fetched from GitLab and how it is categorized on your dashboard.
+
+1.  **Environment (`.env`)**: Copy `.env.example` to `.env`. This file stores your `GITLAB_TOKEN` and the list of `PROJECT_IDS` to sync.
+2.  **Rules (`app/config/rules/`)**: The `default.yaml` file in this directory is a **template and example configuration**. It determines how issues are classified (Bug, Feature, etc.), validated, and grouped. 
+    *   **Action**: Create your own YAML file (e.g., `my_project.yaml`) in `app/config/rules/`.
+    *   **Guidance**: Without a valid rules file, the application will use the example defaults, which may not match your project's labels or workflow.
+
 ## Quick Start
 
 You can run GitLab Pulse either locally on your host or isolated within a Docker container. Both methods can auto-generate synthetic data for a zero-configuration demo.
@@ -218,7 +227,9 @@ uv run python tools/seeder.py \
 
 ### Rules Configuration
 
-Edit `app/config/rules/default.yaml` to customize:
+The `app/config/rules/default.yaml` file serves as a **global example configuration**. To customize how GitLab Pulse interprets your project data, you should create your own YAML file in the `app/config/rules/` folder.
+
+Edit your configuration to customize:
 - **Classification Rules**: Define Type, Severity, and Priority using flexible matching:
   ```yaml
   classification:
@@ -230,7 +241,7 @@ Edit `app/config/rules/default.yaml` to customize:
 - **Validation**: Enforce required labels (e.g., Bugs must have Severity).
 - **Contexts & Workflows**: Slice data by domain and define process stages.
 
-By default, `project_ids` is empty — the rules apply globally to all projects. Add specific IDs only when you need per-project rule overrides via additional YAML files.
+By default, `project_ids` is empty in `default.yaml` — the rules apply globally to all projects. Add specific IDs only when you need per-project rule overrides via additional YAML files.
 
 ## Security
 
