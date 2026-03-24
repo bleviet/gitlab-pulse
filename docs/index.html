@@ -626,10 +626,6 @@
             height: 100%;
         }
 
-        .insight-item .browser-frame {
-            margin-bottom: auto;
-        }
-
         .insight-item h4 {
             font-size: 1.25rem;
             color: var(--text);
@@ -763,8 +759,8 @@
             <div class="logo">
                 <img src="images/logo.svg" alt="GitLab Pulse Logo" width="32" height="32"
                     style="border-radius: 7px; flex-shrink: 0;">
-                <a href="https://bleviet.github.io/gitlab-pulse/"><span
-                        style="color: var(--brand);">GitLab</span><span style="color: var(--text);">Pulse</span></a>
+                <a href="https://bleviet.github.io/gitlab-pulse/"><span style="color: var(--brand);">GitLab</span><span
+                        style="color: var(--text);">Pulse</span></a>
             </div>
             <div class="nav-links">
                 <a href="#">Home</a>
@@ -906,7 +902,7 @@
                     </div>
                 </div>
 
-                <!-- Insight 4: Quality & Priority -->
+                <!-- Insight 4: Quality Signals -->
                 <div class="insight-item reveal delay-2">
                     <div class="browser-frame">
                         <div class="browser-header">
@@ -925,6 +921,52 @@
                         <h4>Metadata Health</h4>
                         <p>Lists issues that are missing critical labels—such as milestones, or assignees—to
                             help keep your backlog organized.</p>
+                    </div>
+                </div>
+
+                <!-- Insight 5: Interactive Filtering -->
+                <div class="insight-item reveal delay-1">
+                    <div class="browser-frame">
+                        <div class="browser-header">
+                            <div class="browser-dot" style="background: #ff5f56;"></div>
+                            <div class="browser-dot" style="background: #ffbd2e;"></div>
+                            <div class="browser-dot" style="background: #27c93f;"></div>
+                        </div>
+                        <div class="browser-content">
+                            <img src="images/screenshots/issues_filtered_dark.png"
+                                data-light="images/screenshots/issues_filtered.png"
+                                data-dark="images/screenshots/issues_filtered_dark.png" alt="Interactive Filtering"
+                                class="theme-aware-img">
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Interactive Filtering</h4>
+                        <p>Select any segment in the bar charts or donut charts to instantly filter the issue table.
+                            Fuzzy search through all columns to quickly find issues by title, assignee, label, or any
+                            other metadata.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Insight 6: Priority Pulse -->
+                <div class="insight-item reveal delay-2">
+                    <div class="browser-frame">
+                        <div class="browser-header">
+                            <div class="browser-dot" style="background: #ff5f56;"></div>
+                            <div class="browser-dot" style="background: #ffbd2e;"></div>
+                            <div class="browser-dot" style="background: #27c93f;"></div>
+                        </div>
+                        <div class="browser-content">
+                            <img src="images/screenshots/open_issues_by_priority_dark.png"
+                                data-light="images/screenshots/open_issues_by_priority.png"
+                                data-dark="images/screenshots/open_issues_by_priority_dark.png" alt="Priority Pulse"
+                                class="theme-aware-img">
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Priority Pulse</h4>
+                        <p>Real-time distribution of issues by priority level. Identify bottlenecks in high-priority
+                            tasks and ensure your team is focused on what matters most.</p>
                     </div>
                 </div>
             </div>
@@ -984,6 +1026,54 @@
                     </div>
                     <h3>Milestone View</h3>
                     <p>Aggregated metrics for specific milestones, including burn-down status and unassigned items.</p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="card reveal delay-1">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </div>
+                    <h3>AI Assistant</h3>
+                    <p>Powered by Ollama to provide local AI insights. Summarize project health, identify risks, and
+                        suggest backlog improvements without your data leaving your machine.
+                    </p>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="card reveal delay-2">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <h3>Drill-down Filters</h3>
+                    <p>Click on any chart segment to instantly filter your data. Exploring your project is intuitive
+                        and fast.</p>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="card reveal delay-3">
+                    <div class="card-accent-line"></div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        </svg>
+                    </div>
+                    <h3>Adaptive UI</h3>
+                    <p>Full support for Dark and Light modes. A cohesive experience tailored to your workspace
+                        environment.</p>
                 </div>
             </div>
         </div>
