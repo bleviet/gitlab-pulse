@@ -1,319 +1,190 @@
 # GitLab Pulse
 
-A versatile analytics platform for GitLab issue data. Extracts, validates, and visualizes workflow health and throughput using a **Clean Architecture** and **Medallion Data Pattern**.
+GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extracts data via the GitLab API, applies custom workflow mapping rules, and generates analytical dashboards. It is designed to be hosted on a local PC or internal server, allowing users to access the dashboard through their web browser.
 
-## Requirements
+## Features
 
-- **Python**: `>=3.11`
-- **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
-- **Platform**: Linux, macOS, or Windows (WSL recommended)
-- **AI (Optional)**: [Ollama](https://ollama.com/) for local assistant features
+- **Analytics Dashboards**: Visualizes workflow state, issue velocity, and priority distribution.
+- **Interactive Data Filtering**: Charts support drill-down filtering to inspect the underlying issue data.
+- **Local AI Integration**: Supports issue summarization and contextual chat using local LLMs via [Ollama](https://ollama.com/), keeping data on-premises.
+- **Customizable Workflows**: Uses YAML configuration to map existing GitLab labels to standardized semantic workflow stages.
 
-## Core Configuration
+---
 
-To start with live data, you must configure both your environment and your domain rules. These define what is fetched from GitLab and how it is categorized on your dashboard.
+## Visual Insights
 
-1.  **Environment (`.env`)**: Copy `.env.example` to `.env`. This file stores your `GITLAB_TOKEN` and the list of `PROJECT_IDS` to sync.
-2.  **Rules (`app/config/rules/`)**: The `default.yaml` file in this directory is a **template and example configuration**. It determines how issues are classified (Bug, Feature, etc.), validated, and grouped. 
-    *   **Action**: Create your own YAML file (e.g., `my_project.yaml`) in `app/config/rules/`.
-    *   **Guidance**: Without a valid rules file, the application will use the example defaults, which may not match your project's labels or workflow.
+### Executive Dashboard
+Get a high-level overview of your project's health, active workflow distribution, and recent issue velocity.
+![Executive Dashboard](docs/images/screenshots/fullsite.png)
 
-## Quick Start
+### Interactive Filtering
+Select any segment in the bar or donut charts to instantly filter the issue table and drill down into specific priorities or workflow states.
+![Interactive Filtering](docs/images/screenshots/issues_filtered.png)
 
-You can run GitLab Pulse either locally on your host or isolated within a Docker container. Both methods can auto-generate synthetic data for a zero-configuration demo.
+### Issue Velocity
+Track the rate of issues being opened versus closed over your selected timeframe.
+![Issue Velocity](docs/images/screenshots/daily_issues_velocity.png)
 
-### Option 1: Docker Evaluation (Recommended for Demos)
+### Priority Pulse
+Monitor the real-time distribution of issues by priority level to ensure your team focuses on what matters most.
+![Priority Pulse](docs/images/screenshots/open_issues_by_priority.png)
 
-For an isolated evaluation environment without installing Python dependencies on your host, use Docker. 
+### Milestone Timeline
+A horizontal Gantt-style view showing milestone health (overdue, on track, completed) and deadlines.
+![Milestone Timeline](docs/images/screenshots/release_timeline.png)
 
-```bash
-# Copy environment template
-cp .env.example .env
+---
 
-# Start the application using Docker Compose
-docker compose up --build
+## Architecture
+
+GitLab Pulse implements a standard **Medallion Data Architecture** (Bronze ➡️ Silver ➡️ Gold) for data processing.
+
+```mermaid
+flowchart LR
+    A[GitLab API] -->|Extract| B(Collector)
+    B -->|Raw JSON| C[("Bronze Data<br>(Raw)")]
+    C -->|Apply Rules| D(Processor)
+    D -->|Parquet| E[("Silver/Gold Data<br>(Analytics)")]
+    E -->|Render| F[Streamlit Dashboard]
+    F <-->|Chat & Summarize| G[Local AI / Ollama]
+    
+    classDef gitlab fill:#e24329,color:white,stroke:none
+    class A gitlab
 ```
 
-**What happens?**
-* The container builds and installs dependencies internally.
-* If no data exists, the container automatically generates and processes synthetic test data internally.
-* This generated data (and any AI chats) is saved to the `./data` directory on your host via volume mounting.
-* Open `http://localhost:8501` to view your dashboard.
+### Example Workflow Mapping
 
-*Note: This Docker setup is intended as an optional onboarding/testing path, not as a replacement for the native workflow.*
+The repository includes a template configuration (`app/config/rules/default.yaml`) that maps standard labels to a lifecycle. For instance, the label `workflow::implementation` is mapped to the "Active" phase.
 
-### Option 2: Native Host Setup (Recommended for Development)
+Visualize exactly where issues are sitting across your custom lifecycle stages on the dashboard:
+![Workflow Distribution](docs/images/screenshots/issues_by_workflow_state.png)
 
-The fastest way to set up the native Python environment on your host is via the included `setup.sh` script:
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Backlog: No Workflow Label
+    Backlog --> Architecture: architecture
+    Architecture --> Implementation: implementation
+    Implementation --> Review: review
+    Review --> Testing: test
+    Testing --> Done: done
+    Done --> [*]
+
+    classDef active fill:#1a7a62,color:white,stroke:none
+    classDef waiting fill:#b06000,color:white,stroke:none
+    classDef completed fill:#8a0ea8,color:white,stroke:none
+    classDef backlog fill:#3d5370,color:white,stroke:none
+
+    Backlog ::: backlog
+    Architecture ::: active
+    Implementation ::: active
+    Review ::: waiting
+    Testing ::: waiting
+    Done ::: completed
+```
+
+---
+
+## Quick Start (Synthetic Demo)
+
+To evaluate the dashboard without configuring API access to a live GitLab instance, you can generate synthetic project data locally.
+
+### Prerequisites
+- **Python**: `>=3.11`
+- **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
+
+### Native Setup (Mac/Linux/WSL)
+Run the automated setup script. It will verify prerequisites, install dependencies, and offer to generate local test data automatically.
 
 ```bash
 ./setup.sh
 ```
 
-**What happens?**
-* **Prerequisites Check**: Verifies Python and `uv` are installed.
-* **Dependencies**: Runs `uv sync` to install all required packages on your host.
-* **Configuration**: Copies `.env.example` to `.env` if it doesn't exist.
-* **Local Data (Optional)**: Prompts you to generate and process synthetic data locally so you can use the dashboard immediately without a GitLab connection.
-* **Result**: You are left with a fully configured local Python environment ready to run `uv run streamlit run app/dashboard/main.py`.
-
-### Option 3: Manual Native Setup
-
-If you prefer to run the steps manually instead of using `setup.sh`:
+### Docker Evaluation
+If you prefer not to install Python locally, you can spin up the entire stack, including synthetic data generation, via Docker:
 
 ```bash
-# Install dependencies
-uv sync
+cp .env.example .env
+docker compose up --build
+```
+*Your dashboard will be available at `http://localhost:8501`.*
 
-# Copy environment template
+---
+
+## Connecting Live GitLab Data
+
+Once you are ready to analyze your actual projects, the transition is simple:
+
+### 1. Configure the Environment
+Copy the example environment file and fill in your GitLab URL and Token.
+```bash
 cp .env.example .env
 ```
+Ensure you provide a Personal Access Token with the `read_api` scope, and specify the `PROJECT_IDS` (comma-separated) you want to sync.
 
-**For Synthetic Data (No GitLab Connection Needed):**
+### 2. Configure Your Rules
+The `app/config/rules/default.yaml` file is a **template and example configuration**. It determines how issues are classified (Bug, Feature, etc.), validated, and grouped.
+
+*   **Action**: Create your own YAML file (e.g., `my_project.yaml`) in `app/config/rules/`.
+*   **Guidance**: Map your team's specific GitLab labels to the workflow stages. You can restrict rules to specific projects by defining `project_ids` inside the YAML file.
+
+### 3. Run the Pipeline
+Fetch the data, process it into analytics, and launch the dashboard:
+
 ```bash
-# Generate synthetic test data
-uv run python tools/seeder.py --count 1000 --inject-errors
-
-# Process the data
-uv run python app/processor/main.py
-
-# Launch dashboard
-uv run streamlit run app/dashboard/main.py
-```
-
-**For Live GitLab Data:**
-```bash
-# 1. Edit .env and configure GITLAB_URL, GITLAB_TOKEN, and PROJECT_IDS
-
-# 2. Fetch data from GitLab
+# 1. Extract data from GitLab API
 uv run python app/collector/orchestrator.py
 
-# 3. Process the fetched data
+# 2. Transform into Parquet analytics
 uv run python app/processor/main.py
 
-# 4. Launch dashboard
+# 3. Launch the dashboard
 uv run streamlit run app/dashboard/main.py
 ```
 
-## Architecture
+---
 
-| Layer | Component | Description |
-|-------|-----------|-------------|
-| **L0** | `data/raw/` | Raw JSON from GitLab API |
-| **L1** | `app/collector/` | Hybrid REST+GraphQL collector |
-| **L2** | `app/processor/` | Domain logic & validation |
-| **L3** | `app/dashboard/` | Hierarchical Streamlit visualization |
+## Local AI Assistant
 
-## Production Deployment
+GitLab Pulse features a local AI assistant that summarizes long issue threads and highlights project risks.
 
-While GitLab Pulse can be run entirely on a laptop, deploying it for team use requires a few operational considerations:
+1. Install [Ollama](https://ollama.com/).
+2. Pull a model: `ollama pull llama3`
+3. Ensure the Ollama server is running: `ollama serve`
 
-### Minimal Deployment Steps
-1. Clone the repository on a server.
-2. `cp .env.example .env` and configure your `GITLAB_URL`, `GITLAB_TOKEN` (with `read_api`), and `PROJECT_IDS`.
-3. Set a secure `ADMIN_PASSWORD` in `.env` for dashboard changes.
-4. Schedule `uv run python app/collector/orchestrator.py` to run periodically (e.g., via cron) to ingest new data.
-5. Schedule `uv run python app/processor/main.py` to run after the collector to update analytics.
-6. Serve the dashboard as a long-running process: `uv run streamlit run app/dashboard/main.py`.
+By default, Pulse will connect to `http://localhost:11434`. Because the AI runs entirely on your hardware, your proprietary source code and issue discussions remain completely private.
 
-### Persistent Storage
-If deploying via Docker or Kubernetes, the `data/` directory must be mapped to a persistent volume. This directory stores the operational state of the application:
-- `data/raw/`, `data/processed/`, and `data/analytics/`: Built data lakes.
-- `data/state/`: Incremental sync cursors for the collector.
-- `data/ai/`: Persistent chat histories and AI summaries.
-- `data/config/layouts/`: User-saved dashboard layouts.
+---
 
-### Streamlit Scope
-The [Streamlit](https://streamlit.io/) dashboard is designed for **internal team use**, corporate VPNs, or local-only viewing. It includes a basic password lock for admin actions but is not designed or hardened to be exposed directly to the public internet without an external authentication proxy (like Cloudflare Access or OAuth2-Proxy).
+## Data Management & Testing
 
-## Configuration Files
-
-### Environment Variables
-
-Copy the provided template and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-Required for live GitLab sync:
-
-| Variable | Description | Required For |
-|---|---|---|
-| `GITLAB_URL` | GitLab instance URL (e.g. `https://gitlab.com`) | Live Sync |
-| `GITLAB_TOKEN` | Personal access token with `read_api` scope | Live Sync |
-| `PROJECT_IDS` | Comma-separated project IDs to sync | Live Sync |
-| `ADMIN_PASSWORD` | Password for destructive dashboard actions (default: `admin`) | Optional |
-| `OLLAMA_ENDPOINT` | Local or remote Ollama API URL (default: `http://localhost:11434`) | Optional |
-
-`tools/seeder.py` generates synthetic local Parquet files directly in `data/processed/` and does not require a GitLab connection. The example config file (`default.yaml`) ships with an empty `project_ids` list to act as a global fallback, meaning it is perfectly safe to use on a fresh clone. You must supply your own `PROJECT_IDS` (via `.env`) to process live data, or use the local seeded data.
-
-### Reset and Recreate Local Seeded Data
-
-If you want to discard the synthetic local dataset and generate a fresh one with more realistic totals, delete the seeded outputs and run the seeder again:
-
-```bash
-# Remove seeded Layer 1 files (adjust project IDs to match your seed)
-rm -f data/processed/issues_101.parquet data/processed/issues_102.parquet data/processed/issues_103.parquet
-
-# Optionally clear Layer 2 analytics output
-rm -f data/analytics/*.parquet
-
-# Optionally reset collector sync state
-rm -f data/state/sync_state.json
-
-# Recreate local seeded data with more volume
-uv run python tools/seeder.py --count 5000 --inject-errors --seed 42
-
-# Rebuild analytics
-uv run python app/processor/main.py
-```
-
-Increasing `--count` gives you more total tickets. By default, the seeder assigns an assignee to roughly 95% of generated issues, and you can override that with `--assignment-rate`.
-
-Synthetic issues now use local dashboard URLs by default, so clicking issue links during local testing stays inside your local environment instead of pointing at a fake GitLab host.
-
-### Local Data Manager
-
-For faster testing and validation, use the terminal manager:
+If you are developing locally and want to manage your synthetic datasets, use the built-in terminal manager:
 
 ```bash
 uv run python tools/local_data_manager.py
 ```
+This CLI allows you to reseed specific projects, clear data lakes, and adjust the assignment rates or team sizes for realistic testing. 
 
-It can:
-- detect local projects from `data/processed/issues_*.parquet`
-- show per-project counts, open/closed totals, assigned totals, and unique assignees
-- create or reseed local projects with different options
-- delete selected local projects or all detected local data
-- rebuild analytics after changes
-- reset, reseed, and rebuild in one flow
+> 🤖 **AI Support**: A dedicated `SKILL.md` is provided in the repository to help AI assistants automatically detect, manage, and interact with the local data manager script on your behalf.
 
-You can also use it non-interactively:
+---
 
-```bash
-# List detected local projects
-uv run python tools/local_data_manager.py --action list
+## Security & Deployment
 
-# Create or reseed specific projects
-uv run python tools/local_data_manager.py \
-  --action seed \
-  --project-ids 101,102,103 \
-  --count 5000 \
-  --assignment-rate 1.0 \
-  --max-team-members 8 \
-  --dashboard-url-base http://localhost:8501 \
-  --seed 42
+- **Least Privilege**: The `GITLAB_TOKEN` only requires `read_api`. The collector never requests write permissions.
+- **Persistent Storage**: If deploying via Docker, ensure the `./data` directory is mapped to a persistent volume. This holds your compiled Parquet data, sync state, and AI chat histories.
+- **Intranet Ready**: The Streamlit dashboard is designed for internal team use or corporate VPNs. It contains an optional `ADMIN_PASSWORD` (set in `.env`) for administrative actions like manually extracting data from GitLab API and transforming it into Parquet analytics.
 
-# Delete specific local projects
-uv run python tools/local_data_manager.py --action delete --project-ids 101,102,103
-```
+---
 
-The seeder now supports:
-- `--assignment-rate` to control how many issues get an assignee
-- `--max-team-members` to cap the number of distinct assignees and simulate a realistic team size
-- `--dashboard-url-base` to control where synthetic issue links should open
+## Documentation
 
-When you open a seeded issue from the dashboard, the overview details dialog now renders the issue from local parquet data instead of calling the GitLab API. This makes local feature testing possible even when the issue URL points back to your local dashboard.
+For deep technical insights, system architecture, and operational procedures, please refer to the comprehensive guides located in the `docs/guidelines/` directory:
 
-If your dashboard runs on a different host or port, regenerate the data with a matching base URL:
+- **[Developer Guidelines (docs/guidelines/GUIDE_Developer.md)](docs/guidelines/GUIDE_Developer.md)**: Details the core philosophy, coding standards, design patterns (Strategy, Factory, Singleton), and Streamlit configuration rules required for contributing to the codebase.
+- **[Operations Guide (docs/guidelines/GUIDE_Operations.md)](docs/guidelines/GUIDE_Operations.md)**: Explains the data update lifecycle, caching mechanisms, the UI-based Admin Panel, project auto-discovery, and how to automate pipeline runs using cron.
 
-```bash
-uv run python tools/seeder.py \
-  --count 5000 \
-  --projects 101,102,103 \
-  --dashboard-url-base http://192.168.1.50:8501
-```
-
-### Rules Configuration
-
-The `app/config/rules/default.yaml` file serves as a **global example configuration**. To customize how GitLab Pulse interprets your project data, you should create your own YAML file in the `app/config/rules/` folder.
-
-Edit your configuration to customize:
-- **Classification Rules**: Define Type, Severity, and Priority using flexible matching:
-  ```yaml
-  classification:
-    type:
-      Bug:
-        labels: ["type::bug"]
-        title: ["contains:fix", "contains:crash"]
-  ```
-- **Validation**: Enforce required labels (e.g., Bugs must have Severity).
-- **Contexts & Workflows**: Slice data by domain and define process stages.
-
-By default, `project_ids` is empty in `default.yaml` — the rules apply globally to all projects. Add specific IDs only when you need per-project rule overrides via additional YAML files.
-
-## Security
-
-Before deploying or sharing your instance, consider these core security principles:
-
-- **Secrets Management**: Your `.env` file contains sensitive tokens. It must **never** be committed to version control. The repository ignores it by default.
-- **Least Privilege**: The required `GITLAB_TOKEN` only needs the `read_api` scope. No write permissions are necessary or requested by the collector.
-- **Data Privacy**: All AI interactions, summaries, and chat histories are processed by the configured `OLLAMA_ENDPOINT`. If you use the default local Ollama installation (`http://localhost:11434`), your data never leaves your infrastructure. However, if you configure a proxy pointing to a cloud LLM provider, your chat histories and issue data will be sent to that external service. All generated summaries and histories are persisted locally in `data/ai/`.
-
-## AI Assistant
-
-GitLab Pulse includes a **local AI assistant** powered by [Ollama](https://ollama.com/). This enables context-aware issue summarization and chat without sending data to external APIs.
-
-### Setup
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model
-ollama pull llama3
-
-# Start the server (if not already running)
-ollama serve
-```
-
-### Features
-
-- **Executive Summary:** Generates a structured summary (Technical Details, Status, Next Steps) for any issue.
-- **Chat Interface:** Ask follow-up questions with full issue context.
-- **Staleness Detection:** Automatically flags when an issue has changed since the last summary.
-- **Multi-Server Support:** Configure remote Ollama servers via the sidebar (Settings > 🤖 AI Settings).
-- **Persistence:** Summaries and chat history are saved to `data/ai/` for future sessions.
-
-
-## Testing
-
-```bash
-# Run unit tests
-uv run pytest tests/ -v
-
-# Generate test data with errors
-uv run python tools/seeder.py --count 10000 --inject-errors
-
-# Generate test data with a bounded team size
-uv run python tools/seeder.py --count 10000 --assignment-rate 1.0 --max-team-members 8
-
-# Profile Layer 2 performance
-uv run python -m cProfile -s time app/processor/main.py
-```
-
-## Troubleshooting
-
-### Common Setup Failures
-
-- **Missing `.env` file**: If you forget to run `cp .env.example .env`, the collector cannot authenticate with GitLab. Live syncs will fail.
-- **Empty Dashboard (No Data)**: The dashboard reads from pre-calculated Parquet files. If your dashboard is empty, you either haven't fetched data (`app/collector/orchestrator.py`) or haven't processed it (`app/processor/main.py`). For synthetic data, run `tools/seeder.py` first.
-- **GitLab 401 Unauthorized**: Your `GITLAB_TOKEN` in `.env` is invalid, expired, or missing the `read_api` scope.
-- **AI Assistant "Connection Refused"**: The dashboard expects Ollama to be running at the configured `OLLAMA_ENDPOINT` (default: `http://localhost:11434`). Ensure you ran `ollama serve` and pulled a model.
-- **Data Loss on Restart**: If you run this in a container and lose synced issues or chat history on restart, ensure the `data/` directory is mapped to a persistent volume.
-
-## Q&A
-
-### Data Inclusion Logic
-**Q: What are "Backlog" items?**
-**A:** "Backlog" is the default classification for any issue that **does not match** any specific workflow stage defined in `rules.yaml`. These issues are considered `waiting` (Inventory) and have not yet entered the active development process.
-
-### Multi-Context Issues
-**Q: What if an issue belongs to multiple contexts (e.g., "R&D" and "Customer")?**
-**A:**
-- **Metrics & Charts**: The issue is counted **only once** (deduplicated).
-- **Issue Table**: The issue appears **twice** (or more), once for each context, allowing you to see it in every relevant slice.
+---
 
 ## License
 
