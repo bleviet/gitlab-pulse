@@ -219,11 +219,6 @@ def main() -> None:
         st.session_state["show_filtered_issues_dialog"] = False
         st.session_state["filtered_issues_stage"] = None
         st.session_state["filtered_issues_state"] = None
-        
-        # Clear any retained chart selection state
-        for key in list(st.session_state.keys()):
-            if key.startswith("prev_sel_"):
-                del st.session_state[key]
 
     if view_id == "overview":
         # Overview is now the Flow view (Value Stream)

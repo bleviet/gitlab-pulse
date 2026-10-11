@@ -26,6 +26,7 @@ from app.dashboard.engine import (
     StreamlitGridRow,
     render_streamlit_grid,
 )
+from app.dashboard.pointer_refresh import inject_pointer_refresh
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.utils import normalize_assignee_labels, sort_hierarchy
 from app.dashboard.widgets import charts, features, tables
@@ -453,26 +454,18 @@ def render_overview(
         stage_filter: str | None = None,
         state_filter: str | None = None,
     ) -> None:
-        prev_key = f"prev_sel_{chart_id}"
-        if selection_dict and selection_dict.get("selection", {}).get("points"):
-            pts = selection_dict["selection"]["points"]
-            
-            if pts != st.session_state.get(prev_key):
-                st.session_state[prev_key] = pts
-                st.session_state["show_filtered_issues_dialog"] = True
-                st.session_state["filtered_issues_selection"] = pts
-                st.session_state["filtered_issues_stage"] = stage_filter
-                st.session_state["filtered_issues_state"] = state_filter
-                st.session_state["filtered_issues_source"] = chart_id
-        else:
-            if st.session_state.get(prev_key):
-                st.session_state[prev_key] = []
-                # If this chart was the source of the active dialog, clear it
-                if st.session_state.get("filtered_issues_source") == chart_id:
-                    st.session_state["show_filtered_issues_dialog"] = False
-                    st.session_state["filtered_issues_selection"] = []
-                    st.session_state["show_issue_dialog"] = False
-                    st.session_state["selected_issue_url"] = ""
+        if not (selection_dict and selection_dict.get("selection", {}).get("points")):
+            return
+        st.session_state["show_filtered_issues_dialog"] = True
+        st.session_state["filtered_issues_selection"] = selection_dict["selection"]["points"]
+        st.session_state["filtered_issues_stage"] = stage_filter
+        st.session_state["filtered_issues_state"] = state_filter
+        st.session_state["filtered_issues_source"] = chart_id
+        # Rebuild the charts (new keys) to clear their selection while the modal
+        # dialog blocks chart clicks; doing it on dismiss drops clicks made during
+        # that rebuild.
+        st.session_state["chart_reset_counter"] = chart_reset_suffix + 1
+        st.rerun()
 
     def render_panel_header(title: str, meta: str | None = None) -> None:
         """Render a compact, theme-aware panel heading."""
@@ -724,6 +717,7 @@ def render_overview(
     )
 
     st.markdown("<br>", unsafe_allow_html=True)
+    inject_pointer_refresh()
 
     # Display Filtered Issues Dialog
     if st.session_state.get("show_filtered_issues_dialog", False):
@@ -814,8 +808,6 @@ def render_overview(
             _show_filtered_issues_dialog(filtered_df)
         else:
             st.session_state["show_filtered_issues_dialog"] = False
-            if source_chart:
-                st.session_state[f"prev_sel_{source_chart}"] = []
             st.toast("No issues matched this selection.", icon="ℹ️")
 
     # Open single native issue dialog if selected from the table (not within filtered modal)
@@ -830,7 +822,6 @@ def render_overview(
 def _reset_filtered_issues_dialog() -> None:
     """Clear the filtered-issues dialog state when the dialog is dismissed."""
     st.session_state["show_filtered_issues_dialog"] = False
-    st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
     st.session_state["filtered_issues_stage"] = None
     st.session_state["filtered_issues_state"] = None
     st.session_state["show_issue_dialog"] = False
