@@ -25,7 +25,7 @@ further down is written for web pages; translate it with these rules:
 - **Custom CSS** is a last resort: extend `get_global_css()` in `theme.py` only
   for effects `config.toml` cannot express, and check it in light and dark.
   Do not add per-widget `st.markdown("<style>...")` blocks.
-- **Fonts** are self-hosted in `app/static/`; do not add new font families.
+- **Fonts** are self-hosted in `app/dashboard/static/`; do not add new font families.
 - **Motion and layout tricks** (staggered reveals, overlapping grids, noise
   backgrounds) generally do not apply inside Streamlit; prefer clear hierarchy,
   consistent spacing, and readable charts. Widgets render inside the layout

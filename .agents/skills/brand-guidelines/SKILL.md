@@ -23,8 +23,8 @@ here. They are mapped as follows; change the mapping, not the tokens:
 | `--bg`, `--bg-card`, `--text`, `--accent` (link), `--brand` (primary) | `.streamlit/config.toml` `[theme.dark]` / `[theme.light]` (`backgroundColor`, `secondaryBackgroundColor`, `textColor`, `linkColor`, `primaryColor`) and their `.sidebar` tables |
 | `--chart-1` ... `--chart-8` (dark) | `.streamlit/config.toml` `chartCategoricalColors` |
 | Semantic data colors (issue type, stage, severity, milestone), light and dark | `_SEMANTIC_LIGHT` / `_SEMANTIC_DARK` in `app/dashboard/theme.py`, read via `get_palette()` |
-| Fonts | Self-hosted in `app/static/` and registered in `[[theme.fontFaces]]`; `FONT_BODY` / `FONT_HEADING` / `FONT_CODE` in `theme.py` |
-| Logo, favicon | `app/static/logo.svg`, `app/static/favicon.png`, `docs/images/logo.svg` |
+| Fonts | Self-hosted in `app/dashboard/static/` (served at `/app/static/`) and registered in `[[theme.fontFaces]]`; `FONT_BODY` / `FONT_HEADING` / `FONT_CODE` in `theme.py` |
+| Logo, favicon | `app/dashboard/static/logo.svg`, `app/dashboard/static/favicon.png`, `docs/images/logo.svg` |
 
 The dashboard defaults to dark (`[theme] base = "dark"`); both modes must stay
 usable because users can switch in Streamlit settings. GitLab Pulse also uses

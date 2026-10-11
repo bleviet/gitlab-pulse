@@ -5,7 +5,7 @@ address = "0.0.0.0"
 # Re-enable both for public-facing or production deployments.
 enableCORS = false
 enableXsrfProtection = false
-enableStaticServing = false
+enableStaticServing = true
 
 [theme]
 base = "dark"
