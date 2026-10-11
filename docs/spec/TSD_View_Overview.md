@@ -63,6 +63,19 @@ The issue table supports:
 
 Selecting a row persists the issue URL in session state and opens the detail flow.
 
+### 4.3.1 Table and Board views
+
+The filtered-issues dialog offers a Table/Board switch (Table is the default; the choice is kept in `filtered_issues_view` in session state). The search box above the switch applies to both views.
+
+The Board view is a read-only Kanban layout:
+
+- columns are workflow stages, in the configured stage order; stages without issues are not shown
+- each issue appears once, even if it has several context rows
+- cards are sorted by priority rank (unset last), then days in stage (longest first)
+- each column shows at most 12 cards; the remainder is indicated as "+N more in Table view"
+- clicking a card opens the same issue details flow as selecting a table row
+- issue state changes are not possible from the board; they are made in GitLab
+
 ### 4.4 Local seeded issue details
 
 For locally seeded issues, the detail flow resolves from local parquet-backed data rather than assuming a live GitLab API lookup. This keeps local demo workflows usable end-to-end.

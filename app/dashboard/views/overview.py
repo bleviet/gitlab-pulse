@@ -827,7 +827,17 @@ def render_overview(
                 _show_issue_dialog(selected_row)
 
 
-@st.dialog("Filtered Issues", width="large")
+def _reset_filtered_issues_dialog() -> None:
+    """Clear the filtered-issues dialog state when the dialog is dismissed."""
+    st.session_state["show_filtered_issues_dialog"] = False
+    st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
+    st.session_state["filtered_issues_stage"] = None
+    st.session_state["filtered_issues_state"] = None
+    st.session_state["show_issue_dialog"] = False
+    st.session_state["selected_issue_url"] = ""
+
+
+@st.dialog("Filtered Issues", width="large", on_dismiss=_reset_filtered_issues_dialog)
 def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
     """Render issue details grid in a dialog when a chart is clicked."""
     selected_url = st.session_state.get("selected_issue_url", "")
@@ -837,16 +847,47 @@ def _show_filtered_issues_dialog(df: pd.DataFrame) -> None:
             _render_issue_details_content(selected_row, is_nested=True)
             return
 
-    if st.button("Close", key="close_filtered_issues_modal", type="primary", use_container_width=True):
-        st.session_state["show_filtered_issues_dialog"] = False
-        st.session_state["chart_reset_counter"] = st.session_state.get("chart_reset_counter", 0) + 1
-        st.session_state["filtered_issues_stage"] = None
-        st.session_state["filtered_issues_state"] = None
-        st.session_state["show_issue_dialog"] = False
-        st.session_state["selected_issue_url"] = ""
-        st.rerun()
+    search_col, view_col, count_col = st.columns(
+        [6, 1.6, 2.4], vertical_alignment="center"
+    )
+    with search_col:
+        search_query = st_keyup(
+            "",
+            placeholder="Search title, assignee, context, milestone, priority, stage...",
+            key="filter_title",
+            debounce=150,
+        )
+    if search_query:
+        searchable = df.assign(
+            priority=df["priority"].astype(object).fillna("Unset")
+        )
+        df = df[_build_issue_search_mask(searchable, search_query)]
 
-    _render_issue_detail_grid(df, compact=False)
+    persisted = st.session_state.get("filtered_issues_view", "Table")
+    with view_col:
+        view = st.segmented_control(
+            "View",
+            ["Table", "Board"],
+            key="filtered_issues_view_choice",
+            default=persisted,
+            label_visibility="collapsed",
+        ) or persisted
+    st.session_state["filtered_issues_view"] = view
+    with count_col:
+        target = "card" if view == "Board" else "row"
+        st.caption(f"{df['id'].nunique()} issues · select a {target} for details")
+
+    if view == "Board":
+        url = tables.issue_board(df, {"key": "filtered_issues_board"})
+        if url:
+            st.session_state["selected_issue_url"] = url
+            st.session_state["selected_issue_title"] = df.loc[
+                df["web_url"] == url, "title"
+            ].iloc[0]
+            st.session_state["show_issue_dialog"] = True
+            st.rerun()
+    else:
+        _render_issue_detail_grid(df, compact=False)
 
 def _get_selected_original_row(
     df: pd.DataFrame,
@@ -1252,13 +1293,6 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         detail card lookup).
     """
 
-    search_query = st_keyup(
-        "",
-        placeholder="Search title, assignee, context, milestone, priority, stage...",
-        key="filter_title",
-        debounce=150,
-    )
-
     # --- Apply Filters ---
     display_df = df
 
@@ -1284,9 +1318,6 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     
     # Always ensure the column exists if there's data, so the grid can render it
     display_df["quality_hints"] = quality_hint_series
-
-    if search_query:
-        display_df = display_df[_build_issue_search_mask(display_df, search_query)]
 
     # Reset index to ensure uniqueness for styling
     display_df = display_df.reset_index(drop=True)
@@ -1425,7 +1456,6 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         st.session_state["show_issue_dialog"] = False
         st.rerun()
 
-    st.caption("Select an issue to view details and AI insights.")
     tables.issue_detail_grid(
         styler if styler is not None else display_df,
         config={

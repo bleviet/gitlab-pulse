@@ -17,11 +17,11 @@ from app.dashboard.widgets.charts import (
     quality_gauge, error_distribution, milestone_timeline,
 )
 from app.dashboard.widgets.tables import (
-    issue_detail_grid
+    issue_detail_grid, issue_board
 )
 
 # Type alias for widget render functions
-WidgetRenderer = Callable[[pd.DataFrame, Optional[dict[str, Any]]], None]
+WidgetRenderer = Callable[[pd.DataFrame, Optional[dict[str, Any]]], object]
 
 
 class WidgetRegistry:
@@ -45,6 +45,7 @@ class WidgetRegistry:
 
         # Tables
         "table_issue_detail_grid": issue_detail_grid,
+        "table_issue_board": issue_board,
     }
 
     @classmethod

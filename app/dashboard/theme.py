@@ -234,6 +234,10 @@ def get_priority_colors() -> dict[str, str]:
         "Unset": p["unset"],
     }
 
+def priority_slug(name: object) -> str:
+    """Return a lowercase ``[a-z0-9]`` slug of a priority name (CSS/key safe)."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower()) or "unset"
+
 def get_issue_type_colors() -> dict[str, str]:
     """Return colors mapping for issue types."""
     p = get_palette()
@@ -433,6 +437,15 @@ def get_global_css() -> str:
     shadow = "rgba(0,0,0,0.50)" if mode == "dark" else "rgba(0,0,0,0.08)"
     shadow_hover = "rgba(0,0,0,0.80)" if mode == "dark" else "rgba(0,0,0,0.15)"
 
+    prio_colors = get_priority_colors()
+    neutral = get_palette()["neutral"]
+    stale = get_palette()["stale"]
+    board_prio_css = "".join(
+        f'''
+[class*="-ibcard-{priority_slug(n)}-"] {{ --ib-c: {c}; }}'''
+        for n, c in prio_colors.items()
+    )
+
     # Frontend-design chart palette (8 series)
     if mode == "dark":
         chart_vars = """
@@ -630,6 +643,20 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     color: {text_muted} !important;
     font-size: 0.78rem !important;
 }}
+
+/* Issue board: lanes, cards and card parts (app/dashboard/widgets/tables/issue_board.py) */
+[class*="-iblane-"] {{ background: {_with_alpha(text_color, 0.04, secondary_bg)}; border-radius: 10px; padding: 8px; }}
+[class*="-ibcard-"] {{ --ib-c: {neutral}; background: {secondary_bg}; border-left: 4px solid var(--ib-c); border-radius: 8px; padding: 8px 10px; gap: 0.2rem; box-shadow: 0 1px 3px {shadow}; }}{board_prio_css}
+[class*="-ibcard-"] .ib-head, [class*="-ibcard-"] .ib-foot {{ display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: {text_muted}; }}
+[class*="-ibcard-"] .ib-foot {{ justify-content: space-between; }}
+[class*="-ibcard-"] .ib-right {{ display: flex; align-items: center; gap: 8px; white-space: nowrap; }}
+[class*="-ibcard-"] .ib-assignee {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+.ib-chip {{ color: var(--ib-c); background: color-mix(in srgb, var(--ib-c) 15%, transparent); font-weight: 700; padding: 0 8px; border-radius: 999px; }}
+.ib-stale {{ color: {stale}; font-weight: 700; }}
+.ib-link {{ color: {primary}; text-decoration: none; font-size: 0.9rem; }}
+[class*="-ibcard-"] [data-testid="stMarkdown"], [class*="-ibcard-"] [data-testid="stMarkdownContainer"] {{ margin: 0 !important; }}
+[class*="-ibcard-"] [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; text-align: left; padding: 0; min-height: 0; line-height: 1.3; color: {text_color}; }}
+[class*="-ibcard-"] [data-testid="stButton"] button p {{ font-weight: 600; font-size: 0.92rem; line-height: 1.3; text-align: left; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }}
 
 /* Scrollbar */
 ::-webkit-scrollbar {{
