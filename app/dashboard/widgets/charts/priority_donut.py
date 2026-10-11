@@ -10,6 +10,7 @@ from app.dashboard.theme import (
     get_active_theme_mode,
     get_palette,
     get_plotly_font_color,
+    get_priority_colors,
     get_streamlit_theme_color,
     plotly_layout,
 )
@@ -31,7 +32,7 @@ def priority_donut(
     center_text = config.get("center_text", "OPEN<br>ISSUES")
     show_legend = config.get("show_legend", True)
 
-    if df.empty or "severity" not in df.columns:
+    if df.empty or "priority" not in df.columns:
         st.info("No priority data available.")
         return None
 
@@ -48,11 +49,15 @@ def priority_donut(
         st.info(f"No {state_filter if state_filter != 'all' else ''} issues.")
         return None
 
-    # Normalize severity
-    work_df["severity"] = work_df["severity"].astype(str).str.strip().str.title()
-    work_df.loc[work_df["severity"].isin(["None", "Nan", "<Na>", ""]), "severity"] = "Low"
-    
-    priority_counts = work_df["severity"].value_counts().reset_index()
+    # Normalize priority: missing values become "Unset"
+    priority = work_df["priority"].astype(object)
+    priority_text = priority.astype(str).str.strip()
+    is_unset = priority.isna() | priority_text.str.lower().isin(
+        ["", "none", "nan", "<na>"]
+    )
+    work_df["priority"] = priority_text.where(~is_unset, "Unset")
+
+    priority_counts = work_df["priority"].value_counts().reset_index()
     priority_counts.columns = ["Priority", "Count"]
 
     total_issues = priority_counts["Count"].sum()
@@ -61,20 +66,20 @@ def priority_donut(
 
     palette = get_palette()
     
-    colors_map = {
-        "Critical": palette.get("critical", "#e74c3c"),
-        "High": palette.get("high", "#e67e22"),
-        "Medium": palette.get("medium", "#f1c40f"),
-        "Low": palette.get("low", "#2ecc71"),
-    }
-    
-    order = ["Critical", "High", "Medium", "Low"]
-    priority_counts["Sort"] = priority_counts["Priority"].map(lambda x: order.index(x) if x in order else 99)
-    priority_counts = priority_counts.sort_values("Sort")
+    colors_map = get_priority_colors()
+    neutral = palette.get("neutral", "#95a5a6")
+
+    if "priority_rank" in work_df.columns:
+        ranks = work_df.groupby("priority")["priority_rank"].min().astype(float)
+        priority_counts["Rank"] = priority_counts["Priority"].map(ranks)
+    else:
+        priority_counts["Rank"] = float("nan")
+    priority_counts["IsUnset"] = priority_counts["Priority"] == "Unset"
+    priority_counts = priority_counts.sort_values(["IsUnset", "Rank", "Priority"])
     
     labels = priority_counts["Priority"].tolist()
     values = priority_counts["Count"].tolist()
-    colors = [colors_map.get(lbl, palette.get("neutral", "#95a5a6")) for lbl in labels]
+    colors = [colors_map.get(lbl, neutral) for lbl in labels]
 
     text_color = get_plotly_font_color()
     mode = get_active_theme_mode()

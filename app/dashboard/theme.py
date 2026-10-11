@@ -224,6 +224,16 @@ def get_severity_colors() -> dict[str, str]:
         "Unset": p["unset"],
     }
 
+def get_priority_colors() -> dict[str, str]:
+    """Return colors mapping for priorities."""
+    p = get_palette()
+    return {
+        "P1": p["p1"],
+        "P2": p["p2"],
+        "P3": p["p3"],
+        "Unset": p["unset"],
+    }
+
 def get_issue_type_colors() -> dict[str, str]:
     """Return colors mapping for issue types."""
     p = get_palette()

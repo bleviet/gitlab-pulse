@@ -25,6 +25,8 @@ It also accepts:
 - **Closed Issues by Priority**
 - **Daily New vs. Closed Issues**
 
+The priority donuts use the `priority` classification, ordered by `priority_rank`, with unclassified issues shown as "Unset".
+
 ### 3.2 Row 2
 
 - **Issues by Workflow State**

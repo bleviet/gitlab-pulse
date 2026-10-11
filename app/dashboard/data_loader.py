@@ -41,7 +41,7 @@ def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
             df[col] = pd.to_datetime(df[col], utc=True)
 
     # Convert category columns for memory efficiency
-    for col in ["state", "work_item_type", "issue_type", "severity", "team"]:
+    for col in ["state", "work_item_type", "issue_type", "severity", "priority", "team"]:
         if col in df.columns:
             df[col] = df[col].astype("category")
 

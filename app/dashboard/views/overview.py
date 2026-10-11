@@ -56,7 +56,7 @@ _ISSUE_GRID_SEARCH_COLUMNS = (
     "title",
     "stage",
     "days_in_stage",
-    "severity",
+    "priority",
     "context",
     "milestone",
     "assignee",
@@ -251,13 +251,12 @@ def _priority_cell_style(value: object) -> str | None:
 def _selection_mask_for_value(df: pd.DataFrame, value: str) -> pd.Series:
     """Build a chart-selection mask against the overview DataFrame."""
     normalized_value = value.strip()
-    severity_mask = df["severity"].astype(str).str.contains(
-        normalized_value, case=False, na=False
-    )
-    if normalized_value.lower() == "low":
-        severity_mask = severity_mask | df["severity"].isna() | df["severity"].astype(
-            str
-        ).str.strip().str.lower().isin(["none", "nan", "<na>", ""])
+    priority_text = df["priority"].astype(object).astype(str).str.strip().str.lower()
+    priority_mask = priority_text == normalized_value.lower()
+    if normalized_value.lower() == "unset":
+        priority_mask = priority_mask | priority_text.isin(
+            ["none", "nan", "<na>", ""]
+        )
 
     assignee_mask = normalize_assignee_labels(df["assignee"]).str.contains(
         normalized_value, case=False, na=False
@@ -266,7 +265,7 @@ def _selection_mask_for_value(df: pd.DataFrame, value: str) -> pd.Series:
     return (
         df["stage"].astype(str).str.contains(normalized_value, case=False, na=False)
         | assignee_mask
-        | severity_mask
+        | priority_mask
         | df["state"].astype(str).str.contains(normalized_value, case=False, na=False)
     )
 
@@ -1263,21 +1262,24 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
     # --- Apply Filters ---
     display_df = df
 
-    # Sort by Hierarchy (Parent -> Child) or Staleness
+    # Sort by priority rank then staleness, then group by hierarchy
+    display_df = display_df.sort_values(
+        ["priority_rank", "days_in_stage"], ascending=[True, False], na_position="last"
+    )
     if "parent_id" in display_df.columns:
         display_df = sort_hierarchy(display_df, parent_col="parent_id", id_col="iid", title_col="title")
-    else:
-        display_df = display_df.sort_values("days_in_stage", ascending=False)
 
     # Select Columns (keep 'id' for AI status lookup, 'iid' for numeric sorting)
     # We also keep 'state' and 'labels' temporarily for quality hint calculation.
     cols_to_show = [
         "id", "iid", "web_url", "title", "stage", "days_in_stage",
-        "severity", "context", "milestone", "assignee", "state", "labels"
+        "priority", "context", "milestone", "assignee", "state", "labels"
     ]
     cols = [c for c in cols_to_show if c in display_df.columns]
 
     display_df = display_df[cols].copy()
+    if "priority" in display_df.columns:
+        display_df["priority"] = display_df["priority"].astype(object).fillna("Unset")
     quality_hint_series = display_df.apply(_issue_quality_hints_text, axis=1)
     
     # Always ensure the column exists if there's data, so the grid can render it
@@ -1349,7 +1351,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             help="Days since last update in this stage",
             format="%d days",
         ),
-        "severity": st.column_config.TextColumn("Priority", width="small"),
+        "priority": st.column_config.TextColumn("Priority", width="small"),
         "context": st.column_config.TextColumn("Context", width="small"),
         "milestone": st.column_config.TextColumn("Milestone", width="small"),
         "quality_hints": st.column_config.TextColumn("Quality Hints", width="large"),
@@ -1357,7 +1359,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
 
     # Apply styling if context or priority columns are present.
     styler = None
-    if "context" in display_df.columns or "severity" in display_df.columns:
+    if "context" in display_df.columns or "priority" in display_df.columns:
         from app.dashboard.data_loader import load_labels
 
         label_styles = load_labels()
@@ -1375,8 +1377,8 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
         styler = display_df.style
         if "context" in display_df.columns:
             styler = styler.map(highlight_context, subset=["context"])
-        if "severity" in display_df.columns:
-            styler = styler.map(_priority_cell_style, subset=["severity"])
+        if "priority" in display_df.columns:
+            styler = styler.map(_priority_cell_style, subset=["priority"])
 
     # Compact mode: title + assignee only (stage/priority context via chart clicks)
     if compact:
@@ -1387,7 +1389,7 @@ def _render_issue_detail_grid(df: pd.DataFrame, compact: bool = False) -> pd.Dat
             "title",
             "stage",
             "days_in_stage",
-            "severity",
+            "priority",
             "milestone",
             "assignee",
             "quality_hints",

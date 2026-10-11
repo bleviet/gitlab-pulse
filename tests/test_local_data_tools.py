@@ -101,9 +101,9 @@ def test_selection_mask_matches_unassigned_assignee_rows() -> None:
     """Clicking the Unassigned assignee bar should match null and blank assignees."""
     df = pd.DataFrame(
         [
-            {"id": 1, "assignee": None, "stage": "Todo", "severity": None, "state": "opened"},
-            {"id": 2, "assignee": "", "stage": "Doing", "severity": "medium", "state": "opened"},
-            {"id": 3, "assignee": "alice", "stage": "Done", "severity": "high", "state": "closed"},
+            {"id": 1, "assignee": None, "stage": "Todo", "priority": None, "state": "opened"},
+            {"id": 2, "assignee": "", "stage": "Doing", "priority": "medium", "state": "opened"},
+            {"id": 3, "assignee": "alice", "stage": "Done", "priority": "high", "state": "closed"},
         ]
     )
 
@@ -396,7 +396,7 @@ def test_selection_mask_for_quality_signal_matches_filtered_issue_rows() -> None
 
 
 def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None:
-    """Grid search should match assignee, context, milestone, and severity cells."""
+    """Grid search should match assignee, context, milestone, and priority cells."""
     df = pd.DataFrame(
         [
             {
@@ -404,7 +404,7 @@ def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None
                 "title": "Stabilize auth redirect",
                 "stage": "Review",
                 "days_in_stage": 4,
-                "severity": "high",
+                "priority": "high",
                 "context": "customer",
                 "milestone": "v1.2",
                 "assignee": "alex",
@@ -414,7 +414,7 @@ def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None
                 "title": "Refine local search indexing",
                 "stage": "In Progress",
                 "days_in_stage": 9,
-                "severity": "medium",
+                "priority": "medium",
                 "context": "platform",
                 "milestone": "v1.3",
                 "assignee": "sam",
@@ -436,7 +436,7 @@ def test_build_issue_search_mask_supports_fuzzy_matches() -> None:
                 "title": "Improve milestone summary",
                 "stage": "Testing",
                 "days_in_stage": 2,
-                "severity": "critical",
+                "priority": "critical",
                 "context": "security",
                 "milestone": "Release 24",
                 "assignee": "taylor",

@@ -16,10 +16,11 @@
 1. Load `data/processed/issues_{project_id}.parquet`
 2. Enrich metrics
 3. Apply classification mappings
-4. Assign workflow stage and stage type
-5. Explode matching contexts into multiple logical rows
-6. Validate issues against configured rules
-7. Merge orphan-context handling into both analytics and quality outputs
+4. Rank priority by its position in the rule's classification order (`priority_rank`)
+5. Assign workflow stage and stage type
+6. Explode matching contexts into multiple logical rows
+7. Validate issues against configured rules
+8. Merge orphan-context handling into both analytics and quality outputs
 
 ## 3. Implemented Behaviors
 

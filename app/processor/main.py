@@ -11,6 +11,7 @@ import pandas as pd
 from app.processor.enricher import (
     apply_classification,
     enrich_metrics,
+    enrich_priority_rank,
     enrich_workflow_stage,
     explode_contexts,
 )
@@ -118,6 +119,7 @@ class Processor:
         # Enrich with metrics
         df = enrich_metrics(df, rule)
         df = apply_classification(df, rule)
+        df = enrich_priority_rank(df, rule)
         df = enrich_workflow_stage(df, rule)
 
         # Context explosion (Data Explosion pattern)

@@ -289,6 +289,37 @@ def _match_text(text: str, pattern: str) -> Optional[str|bool]:
     return None
 
 
+def enrich_priority_rank(
+    df: pd.DataFrame,
+    rule: Optional[DomainRule] = None,
+) -> pd.DataFrame:
+    """Rank issues by the position of their priority in the rule's order.
+
+    Args:
+        df: DataFrame, optionally with a 'priority' column
+        rule: Domain rule whose ``classification["priority"]`` key order
+            defines the rank (first key is the most urgent)
+
+    Returns:
+        DataFrame with a nullable Int64 'priority_rank' column (0-based).
+        Unset, unknown, or unranked priorities are NA.
+    """
+    df["priority_rank"] = pd.Series(pd.NA, index=df.index, dtype="Int64")
+
+    if df.empty or rule is None or "priority" not in df.columns:
+        return df
+
+    priority_values = rule.classification.get("priority")
+    if not priority_values:
+        return df
+
+    ranks = {name: i for i, name in enumerate(priority_values)}
+    df["priority_rank"] = (
+        df["priority"].astype(object).map(ranks).astype("Int64")
+    )
+    return df
+
+
 def enrich_workflow_stage(
     df: pd.DataFrame,
     rule: Optional[DomainRule] = None,
