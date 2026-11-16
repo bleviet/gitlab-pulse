@@ -1,8 +1,8 @@
 """Analytics layout of the Overview page.
 
-The chart grid (three rows of panels) for stepping back: the priority donuts,
-the daily new-vs-closed line, the workflow-state bars, the release timeline and
-the quality signals. A click on a chart segment filters the issue board below
+The chart grid for stepping back: the release timeline, the priority donuts,
+the quality signals, the daily new-vs-closed line and the workflow-state bars,
+which stay pinned above the issue board while it scrolls. A click on a chart segment filters the issue board below
 the grid and keeps the segment highlighted (see
 ``issue_panel.apply_chart_selection``). A click in a donut's centre selects all
 open (or closed) issues, so there is no separate open-vs-closed chart.
@@ -30,19 +30,25 @@ from app.dashboard.views.issue_panel import (
 from app.dashboard.widgets import charts
 
 
-def render_analytics_charts(
+def render_analytics_layout(
     unique_df: pd.DataFrame,
     stages: list[str],
     timeline_df: pd.DataFrame,
     active_milestone: str | None,
+    board: Callable[[], None],
 ) -> None:
-    """Render the three chart rows of the Analytics layout.
+    """Render the Analytics layout: chart rows, then the pinned stage row and board.
+
+    Rows: release timeline and closed issues by priority; open issues by
+    priority, quality signals (open issues) and daily new vs. closed; issues
+    by workflow state, which stays pinned above the board while it scrolls.
 
     Args:
         unique_df: Overview issues, one row per issue.
         stages: Stages with open issues, in workflow order.
         timeline_df: Issues before the milestone filter, for the timeline.
         active_milestone: Milestone picked in the sidebar or the timeline.
+        board: Renders the issue board below the workflow-state row.
     """
     palette = get_palette()
     panel_label_color = with_alpha(get_plotly_font_color(), 0.72)
@@ -132,7 +138,7 @@ def render_analytics_charts(
                 selection = charts.priority_bar(
                     unique_df[unique_df["stage"] == stage],
                     config={
-                        "height": 200,
+                        "height": 160,
                         "key": chart_key(f"analytics_stage_bar_{index}", f"stage_bar_{index}"),
                     },
                 )
@@ -144,7 +150,7 @@ def render_analytics_charts(
             timeline_df,
             config={
                 "key": f"analytics_timeline_{key_suffix}",
-                "height": 150,
+                "height": 200,
                 "highlight_milestone": active_milestone,
             },
         )
@@ -162,37 +168,56 @@ def render_analytics_charts(
         selection = charts.error_distribution(
             _build_overview_quality_signal_df(unique_df),
             config={
-                "height": 150,
+                "height": 200,
                 "key": chart_key("analytics_quality_signals", "quality_signal_chart"),
             },
         )
         select(selection, "quality_signal_chart")
 
-    rows = [
-        StreamlitGridRow(
-            cells=(
-                panel_cell("analytics_open_priority", 3, "Open Issues by Priority", open_priority),
-                panel_cell("analytics_closed_priority", 3, "Closed Issues by Priority", closed_priority),
-                panel_cell("analytics_velocity", 6, "Daily New vs. Closed Issues", velocity),
-            )
-        ),
-        StreamlitGridRow(
-            cells=(
-                panel_cell(
-                    "analytics_workflow_state", GRID_COLUMNS, "Issues by Workflow State", workflow_state
-                ),
-            )
-        ),
-        StreamlitGridRow(
-            cells=(
-                panel_cell("analytics_timeline", 8, "Release Timeline", timeline, meta="Milestones"),
-                panel_cell(
-                    "analytics_quality_signals", 4, "Issue Quality Signals", quality_signals,
-                    meta="Hints",
-                ),
-            )
-        ),
-    ]
     with st.container(key="overview_analytics"):
-        for row in rows:
-            render_streamlit_grid([row], total_columns=GRID_COLUMNS)
+        render_streamlit_grid(
+            [
+                StreamlitGridRow(
+                    cells=(
+                        panel_cell(
+                            "analytics_timeline", 9, "Release Timeline", timeline, meta="Milestones"
+                        ),
+                        panel_cell(
+                            "analytics_closed_priority", 3, "Closed Issues by Priority",
+                            closed_priority,
+                        ),
+                    )
+                ),
+                StreamlitGridRow(
+                    cells=(
+                        panel_cell(
+                            "analytics_open_priority", 3, "Open Issues by Priority", open_priority
+                        ),
+                        panel_cell(
+                            "analytics_quality_signals", 3, "Issue Quality Signals",
+                            quality_signals, meta="Hints",
+                        ),
+                        panel_cell("analytics_velocity", 6, "Daily New vs. Closed Issues", velocity),
+                    )
+                ),
+            ],
+            total_columns=GRID_COLUMNS,
+        )
+    # The workflow-state row and the board share a container, so the row can
+    # stay pinned above the board while the board scrolls (see theme CSS).
+    with st.container(key="analytics_flow"):
+        with st.container(key="analytics_workflow"):
+            render_streamlit_grid(
+                [
+                    StreamlitGridRow(
+                        cells=(
+                            panel_cell(
+                                "analytics_workflow_state", GRID_COLUMNS,
+                                "Issues by Workflow State", workflow_state,
+                            ),
+                        )
+                    )
+                ],
+                total_columns=GRID_COLUMNS,
+            )
+        board()

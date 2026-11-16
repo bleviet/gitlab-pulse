@@ -21,7 +21,7 @@ from app.dashboard.views.issue_panel import (
     render_issue_panel,
     sync_issue_state_from_query,
 )
-from app.dashboard.views.overview_analytics import render_analytics_charts
+from app.dashboard.views.overview_analytics import render_analytics_layout
 from app.dashboard.views.overview_summary import render_summary_bar
 from app.dashboard.widgets import charts
 
@@ -138,11 +138,12 @@ def render_overview(
     )
 
     if layout == "Analytics":
-        render_analytics_charts(unique_df, stages, timeline_source, active_milestone)
-        render_issue_panel(
-            df,
+        render_analytics_layout(
+            unique_df,
             stages,
-            toolbar=_render_issues_label,
+            timeline_source,
+            active_milestone,
+            board=lambda: render_issue_panel(df, stages, toolbar=_render_issues_label),
         )
     else:
         _render_release_rail(timeline_source, active_milestone)

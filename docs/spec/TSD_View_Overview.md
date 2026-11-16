@@ -76,15 +76,15 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 
 ### 3.4 Analytics layout
 
-`render_analytics_charts` in `app/dashboard/views/overview_analytics.py`: three rows of panels, based on the original chart grid.
+`render_analytics_layout` in `app/dashboard/views/overview_analytics.py`: three rows of panels, based on the original chart grid, then the board.
 
 | Row | Panels |
 |---|---|
-| 1 | Open Issues by Priority (donut), Closed Issues by Priority (donut), Daily New vs. Closed Issues (7 days) |
-| 2 | Issues by Workflow State (priority bars per stage) |
-| 3 | Release Timeline (two thirds of the width), Issue Quality Signals (one third) |
+| 1 | Release Timeline (three quarters of the width), Closed Issues by Priority (donut) |
+| 2 | Open Issues by Priority (donut), Issue Quality Signals, Daily New vs. Closed Issues (7 days) |
+| 3 | Issues by Workflow State (priority bars per stage); stays pinned below the header while the board scrolls |
 
-The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
+The quality signals count open issues only, so they sit next to the open-issues donut. The workflow-state row and the board share a container, so the row is released where the board ends; its stage columns line up with the board's lanes. The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
 
 The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
 

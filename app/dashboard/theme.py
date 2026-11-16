@@ -647,6 +647,16 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 }}
 .ov-label {{ display: inline-block; font-size: 0.68rem; font-weight: 700; line-height: 1.5; letter-spacing: 0.14em; text-transform: uppercase; color: {text_muted}; white-space: nowrap; }}
 .st-key-overview_releases {{ gap: 0; }}
+/* Analytics: the workflow-state row stays pinned above the board. */
+.st-key-analytics_flow > .st-key-analytics_workflow,
+.st-key-analytics_flow > :has(> .st-key-analytics_workflow) {{
+    position: sticky;
+    top: 2.5rem;
+    z-index: 60;
+    background: {bg};
+    padding-bottom: 0.5rem;
+    box-shadow: 0 10px 14px -10px {shadow};
+}}
 /* Overview layout switch: pinned into Streamlit's header bar, top right, left
    of the app menu. It takes no space in the page flow. */
 [data-testid="stLayoutWrapper"]:has(> .st-key-overview_layout_bar),
