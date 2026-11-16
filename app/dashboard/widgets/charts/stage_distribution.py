@@ -135,7 +135,7 @@ def stage_distribution(
 
     if show_stage_filter:
         # Visible stages filter — placed above the total so it aligns with the issue list header
-        with st.expander("🔍 Filters", expanded=False):
+        with st.expander("Filters", icon=":material/filter_alt:", expanded=False):
             selected_stages = st.multiselect(
                 "Visible Stages",
                 options=all_stages,
@@ -331,7 +331,7 @@ def stage_distribution(
             category_orders={"stage": sorted_stages},
         )
         fig.update_traces(
-            marker_color=palette["primary"],
+            marker_color=palette["opened"],
             marker_line_width=0,
             textposition="auto",
             textfont={"color": chart_text_color},

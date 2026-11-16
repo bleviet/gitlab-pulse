@@ -22,13 +22,6 @@ FONT_BODY    = "'Manrope', sans-serif"
 FONT_HEADING = "'Space Grotesk', 'SpaceGrotesk', sans-serif"
 FONT_CODE    = "'Space Mono', 'SpaceMono', monospace"
 
-_GOOGLE_FONTS_URL = (
-    "https://fonts.googleapis.com/css2?"
-    "family=Manrope:wght@400;500;600;700;800"
-    "&family=Space+Grotesk:wght@400;500;600;700"
-    "&display=swap"
-)
-
 # --- Color Parsing Utilities ---
 
 def _parse_rgb_from_color(value: str) -> tuple[int, int, int] | None:
@@ -122,6 +115,7 @@ _SEMANTIC_LIGHT: dict[str, str] = {
 
     # UI/Domain Shared
     "primary": "#ff512f",   # --brand
+    "accent": "#006ea3",    # --accent light
     "neutral": "#3d5370",   # --muted light
 
     # Severity — semantic red→orange→amber→green scale (not chart-indexed)
@@ -145,10 +139,11 @@ _SEMANTIC_LIGHT: dict[str, str] = {
     "burnup_task_fill": "#374151",
     "burnup_task_area": "#E5E7EB",
     "ms_complete": "#006ea3",         # --accent light
-    "ms_incomplete": "#b51c3c",       # --chart-4 Rose
+    "ms_incomplete": "#b06000",       # --chart-6 Amber
     "ms_on_track": "#1a7a62",         # --chart-7 Mint
-    "ms_overdue": "#ff512f",          # --brand
+    "ms_overdue": "#b51c3c",          # --chart-4 Rose
     "ms_highlight": "#b06000",        # --chart-6 Amber
+    "now_marker": "#dd2476",          # --brand-2 (theme-independent)
 
     # Grid details (zebra stripes etc.)
     "surface_hover": "#dce3f0",
@@ -171,6 +166,7 @@ _SEMANTIC_DARK: dict[str, str] = {
 
     # UI/Domain Shared
     "primary": "#ff512f",   # --brand
+    "accent": "#00f2fe",    # --accent dark
     "neutral": "#7a8fa8",   # --muted dark
 
     # Severity — semantic red→orange→amber→green scale (not chart-indexed)
@@ -194,10 +190,11 @@ _SEMANTIC_DARK: dict[str, str] = {
     "burnup_task_fill": "#0c1123",    # --bg-card
     "burnup_task_area": "#4facfe",    # --chart-1 Cyan
     "ms_complete": "#00f2fe",         # --accent dark
-    "ms_incomplete": "#f5576c",       # --chart-4 Rose
+    "ms_incomplete": "#f4a44a",       # --chart-6 Amber
     "ms_on_track": "#56d4b0",         # --chart-7 Mint
-    "ms_overdue": "#ff512f",          # --brand
+    "ms_overdue": "#f5576c",          # --chart-4 Rose
     "ms_highlight": "#f4a44a",        # --chart-6 Amber
+    "now_marker": "#dd2476",          # --brand-2 (theme-independent)
 
     # Grid details (zebra stripes etc.)
     "surface_hover": "#121c35",
@@ -480,8 +477,6 @@ def get_global_css() -> str:
 
     return f"""
 <style>
-@import url('{_GOOGLE_FONTS_URL}');
-
 /* ── Design tokens ──────────────────────────────────────────────────── */
 :root {{{chart_vars}
 }}
@@ -606,7 +601,7 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 
 /* Reduce default Streamlit top whitespace so content starts near the app brand */
 [data-testid="stMainBlockContainer"] {{
-    padding-top: 0.75rem !important;
+    padding-top: 0.5rem !important;
 }}
 
 /* Tighten the default app header/toolbar chrome by ~20px */
@@ -644,6 +639,85 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     font-size: 0.78rem !important;
 }}
 
+/* Overview (app/dashboard/views/overview.py): one column; the release rail,
+   the summary pills and the board share the same edges. */
+[data-testid="stMainBlockContainer"] {{
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+}}
+.ov-label {{ display: inline-block; font-size: 0.68rem; font-weight: 700; line-height: 1.5; letter-spacing: 0.14em; text-transform: uppercase; color: {text_muted}; white-space: nowrap; }}
+.st-key-overview_releases {{ gap: 0; }}
+/* Overview layout switch: pinned into Streamlit's header bar, top right, left
+   of the app menu. It takes no space in the page flow. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-overview_layout_bar),
+.st-key-overview_layout_bar {{ position: fixed !important; top: 0.35rem; right: 3.5rem; z-index: 999991; width: auto !important; margin: 0 !important; }}
+.st-key-overview_layout_bar [data-testid="stButtonGroup"] button {{ min-height: 1.8rem; padding: 0.05rem 0.7rem; font-size: 0.8rem; }}
+/* Toolbar row: summary pills on the left; count, search, view on the right.
+   It wraps on narrow screens. */
+.st-key-issue_panel {{ gap: 0.5rem; }}
+.st-key-issue_panel_toolbar {{ flex-wrap: nowrap; align-items: flex-start !important; }}
+.st-key-issue_panel_toolbar_left {{ flex: 1 1 0 !important; min-width: 0; flex-wrap: wrap; row-gap: 0.3rem; column-gap: 0.35rem; }}
+.st-key-issue_panel_actions {{ flex: none !important; }}
+.st-key-issue_panel_toolbar_left [data-testid="stMarkdown"], .st-key-issue_panel_toolbar_left [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
+.st-key-issue_panel_actions {{ gap: 0.5rem; }}
+.st-key-issue_panel_actions [data-testid="stButton"] button,
+.st-key-issue_panel_actions [data-testid="stButtonGroup"] button {{ min-height: 1.9rem; padding: 0.1rem 0.7rem; font-size: 0.82rem; }}
+.ov-divider {{ display: inline-block; width: 1px; height: 1.2rem; background: {border}; vertical-align: middle; }}
+/* Pills: compact, and the picked one in the accent colour (orange is kept for primary actions). */
+.st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] {{ gap: 0.3rem; }}
+.st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] button,
+[class*="st-key-lane_pills_"] [data-testid="stButtonGroup"] button {{ min-height: 1.7rem; padding: 0.05rem 0.45rem; font-size: 0.76rem; }}
+.st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] button p {{ gap: 0.3rem; }}
+.st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] button[kind="pillsActive"],
+[class*="st-key-lane_pills_"] [data-testid="stButtonGroup"] button[kind="pillsActive"] {{ background: {_with_alpha(get_palette()["accent"], 0.14, secondary_bg)}; border-color: {_with_alpha(get_palette()["accent"], 0.7, border)}; color: {text_color}; }}
+[class*="st-key-lane_pills_"] [data-testid="stButtonGroup"] button {{ min-height: 1.35rem; padding: 0 0.35rem; font-size: 0.72rem; }}
+[class*="st-key-lane_pills_"] [data-testid="stButtonGroup"] {{ gap: 0.2rem; }}
+[class*="st-key-lane_pills_"] [data-testid="stButtonGroup"] {{ gap: 0.25rem; }}
+
+/* Lane header: title, thin priority bar, priority pills. */
+[class*="st-key-lane_head_"] {{ gap: 0.25rem; min-height: 3.6rem; }}
+[class*="st-key-lane_head_"] [data-testid="stMarkdown"], [class*="st-key-lane_head_"] [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
+.ib-pbar {{ display: flex; gap: 2px; height: 4px; margin: 0.2rem 0 0; border-radius: 999px; overflow: hidden; background: {_with_alpha(text_color, 0.06, secondary_bg)}; }}
+.ib-pbar span {{ min-width: 3px; }}
+
+/* Board: lanes keep a readable width; on a small screen the board scrolls
+   sideways instead of squeezing the cards. */
+.st-key-issue_board_wrap > div > [data-testid="stHorizontalBlock"],
+.st-key-issue_board_wrap [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] [class*="issue_board-iblane"]) {{
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+}}
+.st-key-issue_board_wrap [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"] [class*="issue_board-iblane"]) {{
+    min-width: 15rem;
+}}
+/* Lanes grow with the window, between 320 px and 1000 px. Streamlit fixes the
+   height on the wrapper of a fixed-height container. */
+[data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"]) {{ height: clamp(300px, calc(100vh - 15rem), 1100px) !important; }}
+[class*="issue_board-iblane"] {{ height: 100% !important; }}
+/* A wide lane (large screen) shows its cards in several columns. */
+[class*="issue_board-iblane"] {{ display: grid !important; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-content: start; }}
+.st-key-search_palette {{ gap: 0.75rem; }}
+.st-key-search_palette iframe[title="st_keyup.st_keyup"] {{ height: 46px !important; }}
+.st-key-search_results, .st-key-search_recent {{ gap: 0; }}
+.st-key-search_recent [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; padding: 0.35rem 0.5rem; border-radius: 8px; }}
+.st-key-search_results [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; padding: 0.35rem 0.5rem; border-radius: 8px; }}
+.st-key-search_results [data-testid="stButton"] button:hover {{ background: {_with_alpha(text_color, 0.06, secondary_bg)}; }}
+.st-key-search_results [data-testid="stButton"] button p {{ text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.st-key-issue_panel_chips, .st-key-issue_panel_actions {{ gap: 0.5rem; }}
+.st-key-issue_panel {{ gap: 0.6rem; }}
+/* st_keyup sizes its input to the iframe; with a collapsed label it would stretch */
+.ib-lane-head {{ display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.85rem; margin-bottom: 0.1rem; color: {text_color}; }}
+.ib-lane-head small {{ color: {text_muted}; }}
+.ib-lane-head.ib-lane-hl b {{ color: {get_palette()["accent"]}; }}
+[class*="-iblane-hl-"] {{ outline: 2px solid {get_palette()["accent"]}; outline-offset: -2px; background: {_with_alpha(get_palette()["accent"], 0.07, secondary_bg)} !important; }}
+.st-key-issue_panel [data-baseweb="tab"] p {{ font-size: 1rem; font-weight: 700; }}
+.st-key-issue_panel [data-testid="stTabs"] h1 {{ font-size: 1.3rem; }}
+.st-key-issue_panel [data-testid="stTabs"] h2 {{ font-size: 1.15rem; }}
+.st-key-issue_panel [data-testid="stTabs"] h3 {{ font-size: 1.02rem; }}
+.st-key-issue_panel [data-testid="stTabs"] :is(h1, h2, h3) {{ padding: 0.9rem 0 0.25rem; }}
+
 /* Issue board: lanes, cards and card parts (app/dashboard/widgets/tables/issue_board.py) */
 [class*="-iblane-"] {{ background: {_with_alpha(text_color, 0.04, secondary_bg)}; border-radius: 10px; padding: 8px; }}
 [class*="-ibcard-"] {{ --ib-c: {neutral}; background: {secondary_bg}; border-left: 4px solid var(--ib-c); border-radius: 8px; padding: 8px 10px; gap: 0.2rem; box-shadow: 0 1px 3px {shadow}; }}{board_prio_css}
@@ -651,6 +725,7 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 [class*="-ibcard-"] .ib-foot {{ justify-content: space-between; }}
 [class*="-ibcard-"] .ib-right {{ display: flex; align-items: center; gap: 8px; white-space: nowrap; }}
 [class*="-ibcard-"] .ib-assignee {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+[class*="-ibsel"] {{ outline: 2px solid {get_palette()["accent"]}; outline-offset: -2px; }}
 .ib-chip {{ color: var(--ib-c); background: color-mix(in srgb, var(--ib-c) 15%, transparent); font-weight: 700; padding: 0 8px; border-radius: 999px; }}
 .ib-stale {{ color: {stale}; font-weight: 700; }}
 .ib-link {{ color: {primary}; text-decoration: none; font-size: 0.9rem; }}

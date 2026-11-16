@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.theme import (
+    FONT_CODE,
     get_active_theme_mode,
     get_palette,
     get_plotly_font_color,
@@ -27,12 +28,17 @@ def milestone_timeline(
         config: Optional configuration
             - key: widget key
             - height: chart height in pixels
+            - style: ``"default"`` or ``"rail"``, a thin band with a centre
+              rail, round markers alternating above and below it, and a
+              "NOW" line
+            - title: rail style only, a small label at the top left
 
     Returns:
         Selection state dictionary (if supported) or None
     """
     config = config or {}
     widget_key = config.get("key", "milestone_timeline")
+    rail = config.get("style") == "rail"
     raw_height = config.get("height", 160)
     timeline_height = max(80, min(int(raw_height), 320))
 
@@ -204,6 +210,9 @@ def milestone_timeline(
         date_counts[date_key] = count + 1
 
     chart_df["y_pos"] = y_positions
+    # Rail style: in date order, milestones alternate above and below the
+    # rail, so neighbours never overlap.
+    chart_df["lane_y"] = [0.5 if index % 2 == 0 else -0.5 for index in range(len(chart_df))]
 
     # Create scatter plot
     fig = go.Figure()
@@ -227,23 +236,29 @@ def milestone_timeline(
             is_dim = opacity_val < 1.0
             fig.add_trace(go.Scatter(
                 x=group_df["date"],
-                y=group_df["y_pos"],
+                y=group_df["lane_y"] if rail else group_df["y_pos"],
                 mode="markers+text",
                 name=status,
                 showlegend=not is_dim,  # only one legend entry per status
                 opacity=float(opacity_val),
                 marker=dict(
-                    size=group_df["size"],
+                    # Rail style: round dots with a ring in the page
+                    # background colour, so they read as pins on the rail.
+                    size=group_df["size"] - 3 if rail else group_df["size"],
                     color=color,
-                    symbol="diamond",
+                    symbol="circle" if rail else "diamond",
                     line=dict(
-                        width=group_df["line_width"],
+                        width=group_df["line_width"] + 2 if rail else group_df["line_width"],
                         color=group_df["line_color"],
                     ),
                 ),
                 text=group_df["title"],
-                textposition="top center",
-                textfont=dict(size=10),
+                textposition=(
+                    ["top center" if y > 0 else "bottom center" for y in group_df["lane_y"]]
+                    if rail
+                    else "top center"
+                ),
+                textfont=dict(size=9 if rail else 10),
                 hovertemplate=(
                     "<b>%{text}</b><br>"
                     "Due: %{customdata[0]}<br>"
@@ -254,8 +269,101 @@ def milestone_timeline(
                 customdata=list(zip(group_df["date_str"], group_df["issues"], group_df["title"], strict=False)),
             ))
 
-    # Add vertical line for today using shape (avoids annotation arithmetic issues)
     today_str = now.strftime("%Y-%m-%d")
+    date_range = [
+        (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
+        (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
+    ]
+    if rail:
+        text_color = get_plotly_font_color()
+        # Soft band with a centre rail, then the "now" line on top.
+        fig.add_shape(
+            type="rect",
+            xref="paper",
+            x0=0, x1=1,
+            y0=-1.15, y1=1.15,
+            fillcolor=with_alpha(text_color, 0.05),
+            line=dict(width=0),
+            layer="below",
+        )
+        fig.add_shape(
+            type="line",
+            xref="paper",
+            x0=0, x1=1,
+            y0=0, y1=0,
+            line=dict(width=4, color=with_alpha(text_color, 0.12)),
+            layer="below",
+        )
+        fig.add_shape(
+            type="line",
+            x0=today_str, x1=today_str,
+            y0=-1.15, y1=1.15,
+            line=dict(width=2, color=palette["now_marker"]),
+        )
+        # Below the band: milestone names sit above and inside it.
+        fig.add_annotation(
+            x=today_str,
+            y=-1.15,
+            yanchor="top",
+            text="<b>NOW</b>",
+            showarrow=False,
+            font=dict(size=10, family=FONT_CODE, color=palette["now_marker"]),
+        )
+        title = config.get("title")
+        if title:
+            fig.add_annotation(
+                x=0,
+                xref="paper",
+                xanchor="left",
+                y=1.15,
+                yanchor="bottom",
+                text=f"<b>{title}</b>",
+                showarrow=False,
+                font=dict(size=9, color=with_alpha(text_color, 0.6)),
+            )
+        fig.update_layout(
+            **plotly_layout(
+                height=timeline_height,
+                show_xgrid=True,
+                show_ygrid=False,
+                legend_pos="none",
+                margin=dict(l=0, r=0, t=2, b=22),
+            )
+        )
+        fig.update_xaxes(
+            type="date",
+            range=date_range,
+            tickformat="%b %y",
+            tickfont=dict(family=FONT_CODE, size=9),
+            gridcolor=with_alpha(text_color, 0.08),
+        )
+        fig.update_yaxes(showticklabels=False, range=[-1.9, 1.9])
+    else:
+        _add_horizontal_today_and_axes(fig, today_str, date_range, timeline_height, palette)
+
+    show_modebar = st.session_state.get("show_chart_controls", False)
+
+    selection = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode=["points"],
+        key=widget_key,
+        config={"displayModeBar": show_modebar}
+    )
+
+    return selection
+
+
+def _add_horizontal_today_and_axes(
+    fig: go.Figure,
+    today_str: str,
+    date_range: list[str],
+    timeline_height: int,
+    palette: Any,
+) -> None:
+    """Add the "Today" line, layout and axes of the horizontal timeline."""
+    # Add vertical line for today using shape (avoids annotation arithmetic issues)
     fig.add_shape(
         type="line",
         x0=today_str, x1=today_str,
@@ -282,27 +390,8 @@ def milestone_timeline(
         )
     )
     
-    fig.update_xaxes(
-        type="date",
-        range=[
-            (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
-            (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
-        ],
-    )
+    fig.update_xaxes(type="date", range=date_range)
     fig.update_yaxes(
         showticklabels=False,
         range=[-0.8, 2.2],  # Shifted down so top-row labels aren't clipped
     )
-
-    show_modebar = st.session_state.get("show_chart_controls", False)
-
-    selection = st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=["points"],
-        key=widget_key,
-        config={"displayModeBar": show_modebar}
-    )
-
-    return selection

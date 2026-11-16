@@ -32,7 +32,7 @@ st.set_page_config(
     page_title="GitLab Pulse",
     page_icon=_FAVICON,
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # Global CSS: only residual styling not covered by config.toml theming
@@ -178,16 +178,16 @@ def main() -> None:
 
     # Page navigation
     pages = {
-        "📊 Overview": "overview",
-        "🎨 Custom View (experimental)": "custom",
+        ":material/dashboard: Overview": "overview",
+        ":material/dashboard_customize: Custom View (experimental)": "custom",
     }
 
     # Conditionally add Admin tab
     if st.session_state.get("is_admin"):
-        pages["⚡ Admin"] = "admin"
+        pages[":material/admin_panel_settings: Admin"] = "admin"
 
     # --- MAIN NAVIGATION (Persistent Radio Button) ---
-    # We use st.radio with 'horizontal' to mimic a tab bar but with state persistence
+    # In the sidebar, so the Overview gives its full height to the issue board.
 
     # Ensure current page is valid
     current_page = st.session_state.get("current_page", list(pages.keys())[0])
@@ -195,14 +195,14 @@ def main() -> None:
         current_page = list(pages.keys())[0]
         st.session_state.current_page = current_page
 
-    selected_page = st.radio(
-        "Navigation",
-        options=list(pages.keys()),
-        index=list(pages.keys()).index(current_page),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="main_nav_radio"
-    )
+    with st.sidebar:
+        st.divider()
+        selected_page = st.radio(
+            "Page",
+            options=list(pages.keys()),
+            index=list(pages.keys()).index(current_page),
+            key="main_nav_radio"
+        )
 
     # Update session state if changed
     if selected_page != st.session_state.get("current_page"):
@@ -211,14 +211,6 @@ def main() -> None:
 
     # Dynamic rendering based on selection
     view_id = pages[selected_page]
-
-    # Clear overview dialog state when navigating away so it never persists across views
-    if view_id != "overview":
-        st.session_state["show_issue_dialog"] = False
-        st.session_state["selected_issue_url"] = ""
-        st.session_state["show_filtered_issues_dialog"] = False
-        st.session_state["filtered_issues_stage"] = None
-        st.session_state["filtered_issues_state"] = None
 
     if view_id == "overview":
         # Overview is now the Flow view (Value Stream)
@@ -282,17 +274,17 @@ def main() -> None:
         # Header with edit mode controls
         col1, col2, col3 = st.columns([6, 1, 1])
         with col1:
-            st.header(f"🎨 {layout_data.get('name', current_layout)}")
+            st.header(f":material/dashboard_customize: {layout_data.get('name', current_layout)}")
         if edit_mode:
             with col2:
-                if st.button("💾 Save", use_container_width=True):
+                if st.button("Save", icon=":material/save:", use_container_width=True):
                     save_layout(current_layout, layout_data)
                     st.success("Layout saved!")
             with col3:
-                st.button("❌ Exit Edit", use_container_width=True, on_click=_exit_edit_mode)
+                st.button("Exit Edit", icon=":material/close:", use_container_width=True, on_click=_exit_edit_mode)
 
         if edit_mode:
-            st.info("🔧 Edit Mode: Drag widgets to rearrange. Resize using handles. Add new from sidebar.")
+            st.info("Edit Mode: Drag widgets to rearrange. Resize using handles. Add new from sidebar.")
 
         # Render Grid Engine
         from app.dashboard.engine import render_grid

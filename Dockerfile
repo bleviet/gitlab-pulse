@@ -15,7 +15,7 @@ RUN useradd -m -U -s /bin/bash appuser
 WORKDIR /app
 
 # Ensure data directory exists with subdirectories so bind mounts don't create them as root
-RUN mkdir -p data/raw data/processed data/analytics data/state data/ai data/config/layouts && \
+RUN mkdir -p data/raw data/processed data/analytics data/state data/config/layouts && \
     chown -R appuser:appuser /app
 
 # Switch to non-root user

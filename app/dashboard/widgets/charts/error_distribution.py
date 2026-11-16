@@ -42,7 +42,7 @@ def error_distribution(
     palette = get_palette()
     chart_colors = [
         palette["task"],
-        palette["primary"],
+        palette["waiting"],
         palette["epic"],
         palette["bug"],
         palette["high"],

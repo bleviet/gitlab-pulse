@@ -7,9 +7,14 @@ enableCORS = false
 enableXsrfProtection = false
 enableStaticServing = true
 
+[client]
+# Hide the "Deploy" button and developer options; keeps the header thin.
+toolbarMode = "minimal"
+
 [theme]
 base = "dark"
 font = "Manrope"
+headingFont = "SpaceGrotesk"
 baseRadius = "0.5rem"
 buttonRadius = "full"
 showSidebarBorder = true

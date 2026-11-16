@@ -136,7 +136,7 @@ def issue_detail_grid(
         # Filters expander (Skip if explicitly disabled or if using Styler which implies external control)
         # We only show filters for raw DataFrames
         if config.get("enable_filters", True):
-            with st.expander("🔍 Filters", expanded=False):
+            with st.expander("Filters", icon=":material/filter_alt:", expanded=False):
                 filter_cols = st.columns(3)
 
                 # Stage filter

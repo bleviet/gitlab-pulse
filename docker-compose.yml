@@ -7,7 +7,7 @@ services:
     ports:
       - "8501:8501" # Expose Streamlit dashboard port
     volumes:
-      - ./data:/app/data # Persist data and AI chats
+      - ./data:/app/data # Persist data
     env_file:
       - .env
     environment:

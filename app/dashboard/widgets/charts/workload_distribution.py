@@ -54,7 +54,7 @@ def workload_distribution(
             "Backlog": stage_colors.get("backlog", palette["neutral"]),
             "To Do": stage_colors.get("waiting", palette["waiting"]),
             "In Progress": stage_colors.get("active", palette["active"]),
-            "Review": stage_colors.get("review", palette["primary"]),
+            "Review": stage_colors.get("review", palette["epic"]),
             "Done": stage_colors.get("completed", palette["completed"]),
         },
     )

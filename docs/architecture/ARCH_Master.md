@@ -2,11 +2,11 @@
 
 Version: 1.1  
 Status: Current implementation reference  
-Scope: End-to-end data flow from GitLab ingestion through local analytics, dashboard rendering, and AI assistance.
+Scope: End-to-end data flow from GitLab ingestion through local analytics and dashboard rendering.
 
 ## 1. Executive Summary
 
-**GitLab Pulse** is a local-first analytics platform for GitLab issue data. It ingests issues from GitLab or synthetic local seed data, normalizes them into Parquet, enriches them with rules-based workflow and quality metadata, and renders them in a Streamlit dashboard with optional local Ollama-backed AI assistance.
+**GitLab Pulse** is a local-first analytics platform for GitLab issue data. It ingests issues from GitLab or synthetic local seed data, normalizes them into Parquet, enriches them with rules-based workflow and quality metadata, and renders them in a Streamlit dashboard.
 
 The architecture follows a layered data pipeline:
 
@@ -15,7 +15,6 @@ The architecture follows a layered data pipeline:
 | **Layer 0** | Raw | `data/raw/` | Audit copy of GitLab API issue payloads |
 | **Layer 1** | Processed | `data/processed/` | Standardized technical mirror (`issues_*`, `milestones_*`, `labels_*`) |
 | **Layer 2** | Analytics | `data/analytics/` | Enriched analytics dataset and quality hints |
-| **Layer 4** | AI Memory | `data/ai/` | Persistent summaries and chat history per issue |
 
 ## 2. Layer 1: Data Acquisition
 
@@ -103,33 +102,15 @@ The Overview page is the main curated workflow view. It currently includes:
 - milestone release timeline
 - open vs. closed issues
 - issue quality signals
-- issue drill-down table with fuzzy search and AI status markers
-- issue details dialog and AI assistant integration
+- one column: a release rail, a line of summary pills, and the issue board (or a table) whose lane headers show each stage's priority mix; summary and lane pills filter the board
+- issue detail shown in place of the board, next to the lane or table it was opened from
+- Ctrl/Cmd+K search panel with quick Open/Closed/All filter and the sidebar filters
 
 ### 4.4 Caching
 
 The dashboard uses `@st.cache_data` with short TTLs for analytics loading, including a 2-minute TTL on the main data loaders.
 
-## 5. Layer 4: AI Services
-
-**Role:** Provide local, persistent issue summarization and follow-up chat.
-
-### 5.1 Implemented components
-
-- `app/ai/models.py`
-- `app/ai/service.py`
-- dashboard integration in `app/dashboard/widgets/features/ai_assistant.py`
-- sidebar AI endpoint configuration in `app/dashboard/sidebar.py`
-
-### 5.2 Implemented behavior
-
-- health-check the configured Ollama endpoint
-- list available models from Ollama
-- generate a structured summary for a selected issue
-- persist summary and chat history in `data/ai/chat_{issue_id}.parquet`
-- mark summaries as stale when `issue.updated_at > ref_issue_updated_at`
-
-## 6. Local Data Tooling
+## 5. Local Data Tooling
 
 The repository supports a fully local demo and validation workflow:
 
@@ -138,7 +119,7 @@ The repository supports a fully local demo and validation workflow:
 
 This allows dashboard and processor testing without a live GitLab connection.
 
-## 7. Operational Notes
+## 6. Operational Notes
 
 - The app is designed for internal or local use, not direct public internet exposure.
 - Admin actions are password-gated in the Streamlit UI, but broader production auth should still be handled externally.

@@ -13,7 +13,9 @@ from app.dashboard.utils import normalize_assignee_labels
 _TITLE_MAX_CHARS = 70
 
 
-def build_board_columns(df: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
+def build_board_columns(
+    df: pd.DataFrame, stages: list[str] | None = None
+) -> list[tuple[str, pd.DataFrame]]:
     """Group issues into board columns, one per workflow stage.
 
     Each issue appears once, even if Layer 2 emitted several context rows for it.
@@ -23,13 +25,16 @@ def build_board_columns(df: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
 
     Args:
         df: Analytics issues with at least ``stage`` and ``id`` columns.
+        stages: Explicit columns, in display order. Columns without issues are
+            kept (empty) so the board can line up with another grid; issues in
+            other stages are left out.
 
     Returns:
-        List of ``(stage, cards)`` tuples in display order. Stages without
-        issues are not included.
+        List of ``(stage, cards)`` tuples in display order. Without ``stages``,
+        stages without issues are not included.
     """
     if df.empty or "stage" not in df.columns:
-        return []
+        return [(stage, df.iloc[0:0]) for stage in stages or []]
 
     issues = df.drop_duplicates(subset="id") if "id" in df.columns else df
     issues = issues.assign(
@@ -46,11 +51,12 @@ def build_board_columns(df: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
     )
     issues = issues.assign(stage=issues["stage"].astype(str))
 
-    if "stage_order" in issues.columns:
-        order = issues.groupby("stage")["stage_order"].min().sort_values(kind="stable")
-        stages = list(order.index)
-    else:
-        stages = sorted(issues["stage"].unique())
+    if stages is None:
+        if "stage_order" in issues.columns:
+            order = issues.groupby("stage")["stage_order"].min().sort_values(kind="stable")
+            stages = list(order.index)
+        else:
+            stages = sorted(issues["stage"].unique())
 
     cards = issues.drop(columns=["_rank", "_days"])
     return [(stage, cards[cards["stage"] == stage]) for stage in stages]
@@ -104,13 +110,67 @@ def _footer_html(card: Mapping[Hashable, Any]) -> str:
     )
 
 
+def _render_card(
+    card: Mapping[Hashable, Any], key: str, selected: bool = False
+) -> str | None:
+    """Render one issue card; return its ``web_url`` when it was clicked."""
+    slug = priority_slug(_priority_text(card))
+    marker = "-ibsel" if selected else ""
+    clicked: str | None = None
+    with st.container(key=f"{key}-ibcard-{slug}-{card.get('id')}{marker}"):
+        st.markdown(_header_html(card), unsafe_allow_html=True)
+        title = _truncate(str(card.get("title", "")))
+        if st.button(title, key=f"{key}_{card.get('id')}", type="tertiary"):
+            url = card.get("web_url")
+            clicked = url if isinstance(url, str) and url else None
+        st.markdown(_footer_html(card), unsafe_allow_html=True)
+    return clicked
+
+
+def issue_card_list(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str | None:
+    """Render issues as one scrollable column of cards, in the given order.
+
+    Args:
+        df: Issues to list, one row per issue, already sorted.
+        config: Optional settings: ``key`` (widget key prefix, default
+            ``"issue_card_list"``), ``height`` (px, default 620), ``max_cards``
+            (default 100) and ``selected_url`` (card to mark as current).
+
+    Returns:
+        The ``web_url`` of the card clicked in this run, or None.
+    """
+    config = config or {}
+    key = str(config.get("key", "issue_card_list"))
+    max_cards = int(config.get("max_cards", 100))
+    selected_url = config.get("selected_url")
+
+    clicked: str | None = None
+    with st.container(
+        height=int(config.get("height", 620)), border=False, key=f"{key}-iblane-0"
+    ):
+        for card in df.head(max_cards).to_dict("records"):
+            card_clicked = _render_card(
+                card, key, selected=card.get("web_url") == selected_url
+            )
+            clicked = card_clicked or clicked
+    if len(df) > max_cards:
+        st.caption(f"+{len(df) - max_cards} more; narrow the filter or search")
+    return clicked
+
+
 def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str | None:
     """Render a read-only Kanban board of issues grouped by stage.
 
     Args:
         df: Analytics issues (see ``build_board_columns``).
         config: Optional settings: ``key`` (widget key prefix, default
-            ``"issue_board"``), ``lane_height`` (px, default 620) and ``max_cards`` (cards per column, default 50).
+            ``"issue_board"``), ``lane_height`` (px, default 620), ``max_cards``
+            (cards per column, default 50), ``stages`` (explicit columns, see
+            ``build_board_columns``), ``highlight_stage`` (column to mark),
+            ``min_columns`` (grid width in columns, so a board with fewer
+            columns keeps the same column width) and ``lane_header`` (a
+            callable ``(index, stage, cards)`` that renders a column's header
+            instead of the default title and count).
 
     Returns:
         The ``web_url`` of the card clicked in this run, or None.
@@ -120,31 +180,31 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
     max_cards = int(config.get("max_cards", 50))
     lane_height = int(config.get("lane_height", 620))
 
-    columns = build_board_columns(df)
+    highlight_stage = config.get("highlight_stage")
+    columns = build_board_columns(df, config.get("stages"))
     if not columns:
         st.info("No issues to display")
         return None
 
     clicked: str | None = None
-    slots = st.columns(len(columns))
-    for i, (slot, (stage, cards)) in enumerate(zip(slots, columns, strict=True)):
+    slots = st.columns(max(len(columns), int(config.get("min_columns", 0))))
+    for i, (slot, (stage, cards)) in enumerate(zip(slots, columns, strict=False)):
+        lane_kind = "iblane-hl" if stage == highlight_stage else "iblane"
         with slot:
-            st.markdown(
-                f"**{html.escape(stage)}** <small>({len(cards)})</small>",
-                unsafe_allow_html=True,
-            )
-            with st.container(height=lane_height, border=False, key=f"{key}-iblane-{i}"):
+            lane_header = config.get("lane_header")
+            if lane_header is not None:
+                lane_header(i, stage, cards)
+            else:
+                st.markdown(
+                    f'<div class="ib-lane-head{" ib-lane-hl" if lane_kind == "iblane-hl" else ""}">'
+                    f"<b>{html.escape(stage)}</b> <small>{len(cards)}</small></div>",
+                    unsafe_allow_html=True,
+                )
+            with st.container(height=lane_height, border=False, key=f"{key}-{lane_kind}-{i}"):
+                if cards.empty:
+                    st.caption("No issues")
                 for card in cards.head(max_cards).to_dict("records"):
-                    slug = priority_slug(_priority_text(card))
-                    with st.container(key=f"{key}-ibcard-{slug}-{card.get('id')}"):
-                        st.markdown(_header_html(card), unsafe_allow_html=True)
-                        title = _truncate(str(card.get("title", "")))
-                        if st.button(
-                            title, key=f"{key}_{card.get('id')}", type="tertiary"
-                        ):
-                            url = card.get("web_url")
-                            clicked = url if isinstance(url, str) and url else None
-                        st.markdown(_footer_html(card), unsafe_allow_html=True)
+                    clicked = _render_card(card, key) or clicked
             if len(cards) > max_cards:
                 st.caption(f"+{len(cards) - max_cards} more in Table view")
     return clicked

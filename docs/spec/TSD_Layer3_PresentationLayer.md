@@ -58,9 +58,9 @@ This hybrid model is the current shipped design: edit with `streamlit-elements`,
 
 The active navigation in `app/dashboard/main.py` currently exposes:
 
-- `📊 Overview`
-- `🎨 Custom`
-- `⚡ Admin` when admin access is enabled in session state
+- `Overview`
+- `Custom View (experimental)`
+- `Admin` when admin access is enabled in session state
 
 ### 3.2 Custom view controls
 

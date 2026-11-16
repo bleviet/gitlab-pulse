@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 def render_admin_view() -> None:
     """Render the Admin Interface for pipeline control."""
-    st.header("⚡ Admin Operations")
+    st.header(":material/admin_panel_settings: Admin Operations")
     
     st.markdown("""
     Use this panel to manually trigger data updates or manage the dashboard cache.
@@ -36,7 +36,7 @@ def render_admin_view() -> None:
         st.subheader("Dashboard Cache")
         st.info("Manage the ephemeral data cache (L3).")
         
-        if st.button("Clear Cache", type="primary", help="Force reload of data from disk"):
+        if st.button("Clear Cache", help="Force reload of data from disk"):
             st.cache_data.clear()
             st.success("Cache cleared! Data will reload on next interaction.")
 

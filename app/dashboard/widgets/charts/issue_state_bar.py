@@ -44,7 +44,7 @@ def issue_state_bar(
 
     palette = get_palette()
     color_map = {
-        "opened": palette["primary"],
+        "opened": palette["opened"],
         "closed": palette["neutral"],
     }
     max_count = max(int(state_counts["count"].max()), 1)

@@ -12,7 +12,9 @@ app/dashboard/
 ├── data_loader.py
 ├── sidebar.py
 ├── views/
-│   └── admin.py
+│   ├── admin.py
+│   ├── issue_data.py
+│   ├── issue_panel.py
 │   └── overview.py
 └── widgets/
     ├── kpis/
@@ -28,10 +30,8 @@ app/dashboard/
     │   ├── status_donut.py
     │   ├── workload_distribution.py
     │   └── work_type_distribution.py
-    ├── tables/
-    │   └── issue_detail_grid.py
-    └── features/
-        └── ai_assistant.py
+    └── tables/
+        └── issue_detail_grid.py
 ```
 
 ## 2. Current Registry Surface
@@ -41,8 +41,6 @@ The current widget registry exposes 11 layout-builder widgets:
 - **KPIs:** `kpi_flow_metrics`, `kpi_stale_count`, `kpi_quality_score`
 - **Charts:** `chart_stage_distribution`, `chart_burnup_velocity`, `chart_workload_distribution`, `chart_work_type_distribution`, `chart_status_donut`, `chart_quality_gauge`, `chart_error_distribution`, `chart_milestone_timeline`
 - **Tables:** `table_issue_detail_grid`
-
-The AI assistant is modularized under `widgets/features/`, but it is not a layout-builder registry widget today. It is used from the overview drill-down flow.
 
 ## 3. Widget Interface
 

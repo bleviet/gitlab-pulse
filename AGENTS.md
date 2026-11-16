@@ -7,8 +7,7 @@ entry points only point here; see [Agent configuration layout](#agent-configurat
 GitLab Pulse is a local-first Streamlit analytics application for GitLab issue
 data. A collector pulls issues from the GitLab REST/GraphQL APIs (or a seeder
 generates synthetic data), a processor enriches and validates them against YAML
-rules into Parquet, and a Streamlit dashboard renders them, with optional local
-AI summaries and chat via Ollama.
+rules into Parquet, and a Streamlit dashboard renders them.
 
 ## Commands
 
@@ -44,7 +43,6 @@ per-layer specs are in `docs/spec/TSD_*.md`):
 | 1 Processed | `app/collector/` (`orchestrator.py`, `rest_client.py`, `gql_client.py`, `state.py`) | `data/processed/{issues,milestones,labels}_<project_id>.parquet`, `data/state/sync_state.json` |
 | 2 Analytics | `app/processor/` (`enricher.py`, `validator.py`, `rule_loader.py`) | `data/analytics/issues_valid.parquet`, `data/analytics/data_quality.parquet` |
 | 3 Presentation | `app/dashboard/` (Streamlit) | UI; layouts in `data/config/layouts/*.json` |
-| 4 AI | `app/ai/` (Ollama) | `data/ai/*.parquet` (summaries, chat history) |
 
 Shared Pydantic schemas live in `app/shared/schemas.py`. Rules are YAML files in
 `app/config/rules/` (`default.yaml` is the template); `RuleLoader` discovers
@@ -76,13 +74,13 @@ them, and a rule file may restrict itself to `project_ids`.
    skipped; a malformed rule file skips that team. A collector `404` with an
    existing `issues_<id>.parquet` is treated as local seeded data.
 8. **Dashboard composition.** Widgets are pure render functions
-   `(df, config) -> ...` under `app/dashboard/widgets/{charts,kpis,tables,features}/`,
+   `(df, config) -> ...` under `app/dashboard/widgets/{charts,kpis,tables}/`,
    exported from their package `__init__.py` and registered by string ID in
    `app/dashboard/registry.py`. Views (`app/dashboard/views/`) compose
    widgets; they should not accumulate data transformations. Keep modules
    cohesive and treat ~400-500 lines as a review signal for extraction
-   (`views/overview.py` is already well past it; do not grow it further
-   without extracting).
+   (`views/issue_data.py` and `views/issue_panel.py` are already past it; do
+   not grow them further without extracting).
 9. **Preserve behavior during refactors.** Session-state keys, cache TTLs,
    widget keys, and layout JSON shape are user-visible contracts. For risky
    refactors, first add characterization tests at the current boundary.

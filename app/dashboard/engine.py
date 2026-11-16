@@ -245,7 +245,7 @@ def render_grid(
             st.warning("No widgets yet. Use the Widget Toolbox in the sidebar to add widgets.")
             return None
 
-        st.caption(f"📐 Editing {len(layout_items)} widget(s) • Drag to reposition • Resize from corners • Click ✕ to delete")
+        st.caption(f"Editing {len(layout_items)} widget(s) • Drag to reposition • Resize from corners • Click ✕ to delete")
 
         # Inject CSS for grid visualization
         st.markdown("""
@@ -357,7 +357,7 @@ def render_grid(
                                     "&:hover": { "bgcolor": "#ef4444", "color": "white" }
                                 }
                             ),
-                            mui.Typography(f"📦 {widget_type}", sx={"fontWeight": "bold", "fontSize": "0.85rem"}),
+                            mui.Typography(widget_type, sx={"fontWeight": "bold", "fontSize": "0.85rem"}),
                             mui.Typography(f"({pos_info})", sx={"fontSize": "0.75rem", "color": "text.secondary"})
                         ]
                     )
@@ -486,7 +486,7 @@ def render_widget_toolbox() -> str | None:
     Returns:
         Widget type to add, or None
     """
-    st.sidebar.markdown("### 🧰 Widget Toolbox")
+    st.sidebar.markdown("### :material/widgets: Widget Toolbox")
 
     widget_info = WidgetRegistry.get_widget_info()
 
@@ -501,7 +501,7 @@ def render_widget_toolbox() -> str | None:
     selected_widget = None
 
     for category, widgets in categories.items():
-        with st.sidebar.expander(f"📦 {category.upper()}", expanded=True):
+        with st.sidebar.expander(category.upper(), expanded=True):
             for widget_id, name in widgets:
                 if st.button(f"+ {name}", key=f"add_{widget_id}"):
                     selected_widget = widget_id

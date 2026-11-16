@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from app.dashboard.views.overview import _selection_mask_for_value
+from app.dashboard.views.issue_data import _selection_mask_for_value
 from app.processor.enricher import enrich_priority_rank
 from app.processor.rule_loader import ClassificationMatch, DomainRule
 

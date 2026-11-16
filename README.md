@@ -6,7 +6,6 @@ GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extr
 
 - **Analytics Dashboards**: Visualizes workflow state, issue velocity, and priority distribution.
 - **Interactive Data Filtering**: Charts support drill-down filtering to inspect the underlying issue data.
-- **Local AI Integration**: Supports issue summarization and contextual chat using local LLMs via [Ollama](https://ollama.com/), keeping data on-premises.
 - **Customizable Workflows**: Uses YAML configuration to map existing GitLab labels to standardized semantic workflow stages.
 
 ---
@@ -14,23 +13,20 @@ GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extr
 ## Visual Insights
 
 ### Executive Dashboard
-Get a high-level overview of your project's health, active workflow distribution, and recent issue velocity.
-![Executive Dashboard](docs/images/screenshots/fullsite.png)
+Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the full charts (priority, daily velocity, workflow state, release timeline, quality signals) above the board for reviews. Switch between them at the top right of the page.
+![Compact layout](docs/images/screenshots/fullsite.png)
+![Analytics layout](docs/images/screenshots/fullsite_analytics.png)
 
 ### Interactive Filtering
-Select any segment in the bar or donut charts to instantly filter the issue table and drill down into specific priorities or workflow states.
+Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. Press Ctrl+K (⌘K on macOS) to search issues and change filters from a floating panel.
 ![Interactive Filtering](docs/images/screenshots/issues_filtered.png)
 
-### Issue Velocity
-Track the rate of issues being opened versus closed over your selected timeframe.
-![Issue Velocity](docs/images/screenshots/daily_issues_velocity.png)
-
-### Priority Pulse
-Monitor the real-time distribution of issues by priority level to ensure your team focuses on what matters most.
-![Priority Pulse](docs/images/screenshots/open_issues_by_priority.png)
+### Summary Pills
+Open issues, the last seven days, open issues per priority and quality hints are shown as pills in the board's toolbar row. Pick one to filter the board; pick it again to reset.
+![Summary Pills](docs/images/screenshots/summary_pills.png)
 
 ### Milestone Timeline
-A horizontal Gantt-style view showing milestone health (overdue, on track, completed) and deadlines.
+A thin rail above the board: milestones coloured by health (overdue, on track, complete), with a line marking today. Click one to filter by that milestone.
 ![Milestone Timeline](docs/images/screenshots/release_timeline.png)
 
 ---
@@ -46,7 +42,6 @@ flowchart LR
     C -->|Apply Rules| D(Processor)
     D -->|Parquet| E[("Silver/Gold Data<br>(Analytics)")]
     E -->|Render| F[Streamlit Dashboard]
-    F <-->|Chat & Summarize| G[Local AI / Ollama]
     
     classDef gitlab fill:#e24329,color:white,stroke:none
     class A gitlab
@@ -144,18 +139,6 @@ uv run streamlit run app/dashboard/main.py
 
 ---
 
-## Local AI Assistant
-
-GitLab Pulse features a local AI assistant that summarizes long issue threads and highlights project risks.
-
-1. Install [Ollama](https://ollama.com/).
-2. Pull a model: `ollama pull llama3`
-3. Ensure the Ollama server is running: `ollama serve`
-
-By default, Pulse will connect to `http://localhost:11434`. Because the AI runs entirely on your hardware, your proprietary source code and issue discussions remain completely private.
-
----
-
 ## Data Management & Testing
 
 If you are developing locally and want to manage your synthetic datasets, use the built-in terminal manager:
@@ -172,7 +155,7 @@ This CLI allows you to reseed specific projects, clear data lakes, and adjust th
 ## Security & Deployment
 
 - **Least Privilege**: The `GITLAB_TOKEN` only requires `read_api`. The collector never requests write permissions.
-- **Persistent Storage**: If deploying via Docker, ensure the `./data` directory is mapped to a persistent volume. This holds your compiled Parquet data, sync state, and AI chat histories.
+- **Persistent Storage**: If deploying via Docker, ensure the `./data` directory is mapped to a persistent volume. This holds your compiled Parquet data and sync state.
 - **Intranet Ready**: The Streamlit dashboard is designed for internal team use or corporate VPNs. It contains an optional `ADMIN_PASSWORD` (set in `.env`) for administrative actions like manually extracting data from GitLab API and transforming it into Parquet analytics.
 
 ---

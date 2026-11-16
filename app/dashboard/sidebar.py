@@ -59,7 +59,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         st.divider()
 
         # --- Filters (grouped in an expander) ---
-        with st.expander("🔎 Filters", expanded=True):
+        with st.expander("Filters", icon=":material/filter_alt:", expanded=True):
             # Domain/Team selector
             teams = ["All"]
             if not df.empty and "team" in df.columns:
@@ -71,6 +71,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                 options=teams,
                 index=0,
                 help="Filter issues by team or domain",
+                key="sidebar_team_selector",
             )
 
             # Context selector (for Data Explosion / sub-project filtering)
@@ -84,6 +85,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                 options=contexts,
                 index=0,
                 help="Filter by context (R&D project, Customer, etc.)",
+                key="sidebar_context_selector",
             )
 
             # Milestone selector
@@ -99,9 +101,15 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                 help="Filter specific milestone",
                 key="sidebar_milestone_selector"
             )
+            # The Overview search panel (Ctrl/Cmd+K) offers the same filters.
+            st.session_state["sidebar_filter_options"] = {
+                "team": teams,
+                "context": contexts,
+                "milestone": milestones,
+            }
 
         # --- Time Range (separate expander) ---
-        with st.expander("📅 Time Range", expanded=False):
+        with st.expander("Time Range", icon=":material/calendar_month:", expanded=False):
             # Calculate date bounds from data
             if not df.empty and "created_at" in df.columns:
                 min_date = df["created_at"].min().date()
@@ -109,6 +117,8 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             else:
                 max_date = datetime.now().date()
                 min_date = max_date - timedelta(days=365)
+
+            st.session_state["sidebar_date_bounds"] = (min_date, max_date)
 
             # Quick range buttons
             # Track which range is active for highlighting
@@ -199,7 +209,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                 start_date = end_date = date_range
 
         st.divider()
-        st.subheader("📐 Custom Views")
+        st.subheader(":material/grid_view: Custom Views")
 
         # --- Custom Views (Layout Builder) ---
         from app.dashboard.engine import list_layouts, load_layout, save_layout, create_layout, delete_layout
@@ -212,18 +222,18 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         col_layout, col_add, col_del = st.columns([3, 1, 1])
         with col_layout:
             selected_layout = st.selectbox(
-                "📐 View",
+                "View",
                 options=available_layouts,
                 index=available_layouts.index(current_layout) if current_layout in available_layouts else 0,
                 key="layout_selector",
                 label_visibility="collapsed",
             )
         with col_add:
-            if st.button("➕", help="Create new view", use_container_width=True):
+            if st.button("", icon=":material/add:", help="Create new view", use_container_width=True):
                 st.session_state["show_create_view"] = True
         with col_del:
             # Disable delete for default layout
-            if st.button("🗑️", help="Delete this view", disabled=selected_layout == "default", use_container_width=True):
+            if st.button("", icon=":material/delete:", help="Delete this view", disabled=selected_layout == "default", use_container_width=True):
                 st.session_state["show_delete_confirm"] = True
 
         if selected_layout != st.session_state.get("current_layout"):
@@ -231,7 +241,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             st.session_state["layout_data"] = load_layout(selected_layout)
 
         st.toggle(
-            "✏️ Edit Mode",
+            ":material/edit: Edit Mode",
             value=st.session_state.get("edit_mode", False),
             key="edit_mode_toggle",
             help="Enable to add/remove/arrange widgets"
@@ -239,7 +249,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         st.session_state["edit_mode"] = st.session_state.get("edit_mode_toggle", False)
         
         st.toggle(
-            "🛠️ Show Chart Controls",
+            ":material/tune: Show Chart Controls",
             value=st.session_state.get("show_chart_controls", False),
             key="show_chart_controls_toggle",
             help="Enable zoom, pan, and save image overlay on charts"
@@ -251,7 +261,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
             st.warning(f"Delete view '{selected_layout}'?")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("Delete", type="primary", use_container_width=True):
+                if st.button("Delete", use_container_width=True):
                     if delete_layout(selected_layout):
                         st.session_state["current_layout"] = "default"
                         st.session_state["layout_data"] = load_layout("default")
@@ -284,7 +294,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         # --- Widget Toolbox (Edit Mode Only) ---
         edit_mode = st.session_state.get("edit_mode", False)
         if edit_mode:
-            with st.expander("🧰 Widget Toolbox", expanded=True):
+            with st.expander("Widget Toolbox", icon=":material/widgets:", expanded=True):
                 from app.dashboard.registry import WidgetRegistry
                 from app.dashboard.engine import add_widget_to_layout
 
@@ -298,7 +308,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                         categories[cat].append((widget_id, info["name"]))
 
                 # KPIs
-                st.markdown("**📊 KPIs**")
+                st.markdown("**KPIs**")
                 for widget_id, name in categories["kpi"]:
                     if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
                         layout_data = st.session_state.get("layout_data", {})
@@ -307,7 +317,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                         st.rerun()
 
                 # Charts
-                st.markdown("**📈 Charts**")
+                st.markdown("**Charts**")
                 for widget_id, name in categories["chart"]:
                     if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
                         layout_data = st.session_state.get("layout_data", {})
@@ -316,7 +326,7 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
                         st.rerun()
 
                 # Tables
-                st.markdown("**📋 Tables**")
+                st.markdown("**Tables**")
                 for widget_id, name in categories["table"]:
                     if st.button(f"+ {name}", key=f"add_{widget_id}", use_container_width=True):
                         layout_data = st.session_state.get("layout_data", {})
@@ -338,118 +348,8 @@ def render_sidebar(df: pd.DataFrame) -> dict[str, Any]:
         st.divider()
         st.caption("v0.1.0")
 
-        # --- Ollama Server Settings ---
-        with st.expander("🤖 AI Settings"):
-            import json
-            from pathlib import Path
-
-            # State file path
-            state_dir = Path("data/state")
-            state_dir.mkdir(parents=True, exist_ok=True)
-            ollama_state_file = state_dir / "ollama_servers.json"
-
-            # Load saved servers
-            def load_saved_servers() -> list[str]:
-                if ollama_state_file.exists():
-                    try:
-                        with open(ollama_state_file, "r") as f:
-                            data = json.load(f)
-                            return data.get("servers", ["http://localhost:11434"])
-                    except Exception:
-                        pass
-                return ["http://localhost:11434"]
-
-            def save_servers(servers: list[str]):
-                with open(ollama_state_file, "w") as f:
-                    json.dump({"servers": servers}, f)
-
-            saved_servers = load_saved_servers()
-
-            # Initialize session state (Smart Auto-discovery)
-            if "ollama_endpoint" not in st.session_state:
-                # Default to None, then probe
-                active_endpoint = None
-
-                # Probing known servers to find the first working one
-                # This solves the issue of defaulting to an offline server when a working one exists
-                import requests
-                for server in saved_servers:
-                    try:
-                        # Short timeout for probing
-                        resp = requests.get(f"{server.rstrip('/')}/", timeout=0.5)
-                        if resp.status_code == 200:
-                            active_endpoint = server
-                            break
-                    except Exception:
-                        continue
-
-                # Fallback to first if none found (or if list empty, default)
-                if not active_endpoint:
-                     active_endpoint = saved_servers[0] if saved_servers else "http://localhost:11434"
-
-                st.session_state.ollama_endpoint = active_endpoint
-
-            # Server selection dropdown
-            server_options = saved_servers.copy()
-            current_idx = 0
-            if st.session_state.ollama_endpoint in server_options:
-                current_idx = server_options.index(st.session_state.ollama_endpoint)
-
-            selected_server = st.selectbox(
-                "Ollama Server",
-                options=server_options,
-                index=current_idx,
-                key="ollama_server_select"
-            )
-
-            if selected_server != st.session_state.ollama_endpoint:
-                st.session_state.ollama_endpoint = selected_server
-                st.rerun()
-
-            # Add new server
-            new_server = st.text_input(
-                "Add Server URL",
-                placeholder="http://192.168.1.100:11434",
-                key="new_ollama_server"
-            )
-
-            col_add, col_del = st.columns(2)
-
-            with col_add:
-                if st.button("➕ Add", disabled=not new_server):
-                    if new_server and new_server not in saved_servers:
-                        # Validate URL format
-                        if not new_server.startswith(("http://", "https://")):
-                            st.error("URL must start with http:// or https://")
-                        else:
-                            # Test connection
-                            import requests
-                            try:
-                                resp = requests.get(f"{new_server.rstrip('/')}/", timeout=2)
-                                if resp.status_code == 200:
-                                    saved_servers.append(new_server)
-                                    save_servers(saved_servers)
-                                    st.session_state.ollama_endpoint = new_server
-                                    st.success("✅ Server added!")
-                                    st.rerun()
-                                else:
-                                    st.error(f"Server responded with {resp.status_code}")
-                            except requests.RequestException as e:
-                                st.error(f"Connection failed: {e}")
-
-            with col_del:
-                if st.button("🗑️ Delete", disabled=(len(saved_servers) <= 1 or selected_server == "http://localhost:11434")):
-                    if selected_server in saved_servers:
-                        saved_servers.remove(selected_server)
-                        save_servers(saved_servers)
-                        st.session_state.ollama_endpoint = saved_servers[0]
-                        st.rerun()
-
-            # Show connection status
-            st.caption(f"**Active:** {st.session_state.ollama_endpoint}")
-
         # Admin Access
-        with st.expander("⚡ Admin Access"):
+        with st.expander("Admin Access", icon=":material/admin_panel_settings:"):
             import os
 
             if st.session_state.get("is_admin"):

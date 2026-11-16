@@ -96,3 +96,19 @@ def test_priority_slug() -> None:
     assert priority_slug("P1") == "p1"
     assert priority_slug("Very High!") == "veryhigh"
     assert priority_slug("!!!") == "unset"
+
+
+def test_explicit_stages_keep_empty_columns_and_drop_other_stages() -> None:
+    """Explicit columns line the board up with another grid."""
+    columns = build_board_columns(_issues(), stages=["Triage", "Review"])
+
+    assert [stage for stage, _ in columns] == ["Triage", "Review"]
+    assert columns[0][1].empty
+    assert columns[1][1]["id"].tolist() == [4, 5, 1, 3]
+
+
+def test_explicit_stages_on_empty_issues_still_return_columns() -> None:
+    """An empty board still has its columns, so lanes stay aligned."""
+    columns = build_board_columns(_issues().iloc[0:0], stages=["Backlog", "Review"])
+
+    assert [stage for stage, cards in columns if cards.empty] == ["Backlog", "Review"]
