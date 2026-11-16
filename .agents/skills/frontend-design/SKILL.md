@@ -69,7 +69,8 @@ All generated interfaces must respect the bahonavi brand system. Key rules:
 ### Color
 - **Dark theme is the default**. Start with `--bg: #050811` and the dark token set unless explicitly asked for light.
 - **Brand gradient** (`linear-gradient(135deg, #ff512f 0%, #dd2476 100%)`) is reserved for CTAs, step badges, and high-importance highlights — do not dilute it.
-- **Cyan accent** (`#00f2fe` dark / `#0097c4` light) marks informational elements, links, and chips.
+- **Cyan accent** (`#00f2fe` dark / `#006ea3` light) marks informational elements, links, section labels, and chips.
+- Headings use `--heading`, body text uses `--text`; do not set headings in the body color.
 - Use `--muted` grays for supporting text — never compete with the primary hierarchy.
 - Support light theme by overriding only the tokens documented in `brand-guidelines`.
 
@@ -77,11 +78,11 @@ All generated interfaces must respect the bahonavi brand system. Key rules:
 - **Display/Headings**: Space Grotesk (500, 700) — tight letter-spacing (`−0.03em` to `−0.04em`), line-height `1.03–1.12`.
 - **Body**: Manrope (400, 500, 700) — `line-height: 1.6`.
 - Section labels: uppercase Space Grotesk, `0.76rem`, `letter-spacing: 0.18em`.
-- Load from Google Fonts: `Space Grotesk` + `Manrope`.
+- Self-host `Space Grotesk` + `Manrope` as variable `woff2` files (`font-display: swap`). Do not load fonts from Google Fonts or any other third party.
 
 ### Layout Tokens
-- Border radius: `--r: 20px` for cards and panels.
-- Max content width: `--max: 1140px`.
+- Border radius: `--r: 20px` for cards and panels; `14px` for buttons; `999px` for chips.
+- Max content width: `--max: 1180px`.
 - Use `width: min(var(--max), calc(100% - 2.5rem)); margin: 0 auto` for containers.
 
 ### CSS Variable Usage
@@ -94,10 +95,10 @@ Always declare and consume the full token set in `:root` and `[data-theme="light
 Within the bahonavi brand constraints, push creative boundaries on:
 
 - **Typography**: Pair Space Grotesk's sharp geometry with Manrope's warmth. Use `clamp()` for fluid type scaling. Exploit letter-spacing, contrast between display and body weights, and `.grad-text` (background-clip gradient) for hero headlines.
-- **Color & Theme**: Commit fully to the dark-first aesthetic. Layer depth with `--surface`, `--bg-card`, and `--bg` as distinct elevation levels. Use the brand gradient sparingly but boldly.
+- **Color & Theme**: Commit fully to the dark-first aesthetic. Layer depth with `--bg`, `--bg-card`, `--bg-raise`, and `--surface` as distinct elevation levels. Use the brand gradient sparingly but boldly.
 - **Motion**: Prioritize CSS-only animations. One well-orchestrated page-load with staggered `animation-delay` reveals beats scattered micro-interactions. Use `backdrop-filter: blur()` for frosted glass navbars/modals. Animate logo nodes, radar ripples, and glows consistent with the homepage's animation language.
 - **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Grid-breaking elements. Generous negative space OR controlled density — never the forgettable middle ground.
-- **Backgrounds & Visual Depth**: Avoid flat solid backgrounds. Use radial gradients for hero glows (matching `--hero-glow-1`/`--hero-glow-2` tokens), noise textures, layered transparencies, and `box-shadow` drama. The `--shadow` token (`0 20px 60px rgba(0,0,0,0.36)`) sets the baseline — go deeper for featured elements.
+- **Backgrounds & Visual Depth**: Avoid flat solid backgrounds. Use the corner glows and blueprint grid described under Signature Patterns in `brand-guidelines`, radial gradients for hero glows, noise textures, layered transparencies, and `box-shadow` drama. The `--shadow` token (`0 20px 60px rgba(0,0,0,0.36)`) sets the baseline — go deeper for featured elements.
 
 ---
 
@@ -116,13 +117,13 @@ Within the bahonavi brand constraints, push creative boundaries on:
 Before delivering any UI output, verify:
 
 - [ ] Full CSS token set declared in `:root` (dark) and `[data-theme="light"]` override block
-- [ ] Google Fonts import for Space Grotesk + Manrope
+- [ ] Space Grotesk + Manrope self-hosted; no third-party font requests
 - [ ] Brand gradient used only on CTAs / high-importance highlights
 - [ ] No hardcoded hex values that belong to the token system
 - [ ] Responsive — tested at mobile, tablet, and desktop breakpoints
 - [ ] Dark theme renders correctly as the default
 - [ ] Animations are CSS-only (or Motion library for React) and feel deliberate
-- [ ] Accessibility: sufficient color contrast, `aria-label` on icon-only buttons, semantic HTML
+- [ ] Accessibility: sufficient color contrast, `aria-label` on icon-only buttons, semantic HTML, visible `:focus-visible` outline, motion disabled under `prefers-reduced-motion`
 
 ---
 
