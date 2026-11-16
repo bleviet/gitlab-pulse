@@ -97,7 +97,13 @@ def chart_key(base: str, chart_id: str) -> str:
 
 
 def _reset_charts(except_chart: str | None = None) -> None:
-    """Make the charts that hold a selection drop it, except ``except_chart``."""
+    """Make the charts that hold a selection drop it, except ``except_chart``.
+
+    Called whenever the filter changes another way than by a click in that
+    chart, so the chart's highlight never outlives its filter.
+    """
+    if except_chart is None:
+        st.session_state["issue_chart"] = None
     resets: dict[str, int] = st.session_state.setdefault("issue_chart_resets", {})
     signatures: dict[str, str] = st.session_state.setdefault("issue_chart_signatures", {})
     for chart_id in list(signatures):
@@ -134,11 +140,23 @@ def apply_chart_selection(
     if query:
         facets["query"] = query
     st.session_state["issue_summary"] = None
+    st.session_state["issue_chart"] = chart_id
     st.session_state["issue_facets"] = facets
     st.session_state["selected_issue_url"] = ""
     _reset_charts(except_chart=chart_id)
     _reset_table()
     st.rerun()
+
+
+def chart_priority_highlight(chart_id: str) -> str | None:
+    """Return the priority a chart should draw highlighted, if any.
+
+    Only for a chart whose own click set the board's current filter (charts
+    whose click targets are invisible draw their highlight themselves).
+    """
+    if st.session_state.get("issue_chart") != chart_id:
+        return None
+    return _get_facets().get("priority")
 
 
 def _set_facets(facets: IssueFacets) -> None:

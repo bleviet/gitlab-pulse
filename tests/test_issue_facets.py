@@ -175,7 +175,9 @@ def test_analytics_chart_selections_become_board_facets() -> None:
     stage_bar = facets_from_selection(
         "stage_bar_2", [{"x": "P1"}], stage_filter="Review", state_filter="opened"
     )
-    donut = facets_from_selection("closed_donut", [{"label": "P2"}], state_filter="closed")
+    donut = facets_from_selection(
+        "closed_donut", [{"customdata": ["P2", 76]}], state_filter="closed"
+    )
     state = facets_from_selection(
         "issue_state_chart", [{"y": "Closed Issues", "customdata": ["closed"]}]
     )
@@ -202,3 +204,16 @@ def test_velocity_point_selects_the_issues_created_or_closed_that_day() -> None:
     assert without_facet(closed, "day") == {"state": "closed"}
     assert facets_from_query(facets_to_query(closed)) == closed
     assert facets_from_query({"f_day": "not-a-date", "f_day_kind": "closed"}) == {}
+
+
+def test_donut_slice_and_centre_selections() -> None:
+    """A slice selects its priority; the centre selects the whole state."""
+    slice_ = facets_from_selection(
+        "open_donut", [{"x": 0.3, "y": 0.6, "customdata": ["P1", 83]}], state_filter="opened"
+    )
+    centre = facets_from_selection(
+        "closed_donut", [{"x": 0.0, "y": 0.0, "customdata": ["__all__", 592]}], state_filter="closed"
+    )
+
+    assert slice_ == {"state": "opened", "priority": "P1"}
+    assert centre == {"state": "closed"}

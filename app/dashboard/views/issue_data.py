@@ -507,6 +507,8 @@ class IssueFacets(TypedDict, total=False):
 
 
 FACET_QUERY_PREFIX = "f_"
+# ``customdata[0]`` of a priority donut's centre (``priority_donut.ALL_ISSUES``).
+DONUT_ALL_ISSUES = "__all__"
 _FACET_KEYS = ("stage", "state", "priority", "signal", "query", "recent", "day", "day_kind")
 RECENT_DAYS = 7
 _FACET_STATES = ("opened", "closed", "all")
@@ -565,9 +567,9 @@ def facets_from_selection(
     """Translate a Plotly selection in an Analytics chart into board facets.
 
     Args:
-        chart_id: ``velocity_chart``, ``issue_state_chart``,
-            ``quality_signal_chart``, or a priority chart (the donuts and the
-            workflow-state bars).
+        chart_id: ``open_donut``, ``closed_donut``, ``velocity_chart``,
+            ``issue_state_chart``, ``quality_signal_chart``, or a workflow-state
+            bar chart (``stage_bar_<n>``).
         points: Selected points as reported by ``st.plotly_chart``.
         stage_filter: Stage the chart is scoped to, if any.
         state_filter: Issue state the chart is scoped to, if any.
@@ -588,7 +590,12 @@ def facets_from_selection(
         str(customdata[0]).strip() if isinstance(customdata, list) and customdata else ""
     )
 
-    if isinstance(value, str) and value:
+    if chart_id in ("open_donut", "closed_donut"):
+        # Donut slices carry their priority in ``customdata``; the centre
+        # stands for all issues of the donut's state.
+        if first_custom and first_custom != DONUT_ALL_ISSUES:
+            raw["priority"] = first_custom
+    elif isinstance(value, str) and value:
         if chart_id == "velocity_chart":
             is_closed = point.get("curveNumber") == 1
             if first_custom:

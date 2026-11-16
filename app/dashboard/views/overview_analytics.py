@@ -1,10 +1,11 @@
 """Analytics layout of the Overview page.
 
-The original chart grid (three rows of panels) for stepping back: the priority
-donuts, the daily new-vs-closed line, the workflow-state bars, the release
-timeline, open vs. closed issues and the quality signals. A click on a chart
-segment filters the issue board below the grid and keeps the segment
-highlighted (see ``issue_panel.apply_chart_selection``).
+The chart grid (three rows of panels) for stepping back: the priority donuts,
+the daily new-vs-closed line, the workflow-state bars, the release timeline and
+the quality signals. A click on a chart segment filters the issue board below
+the grid and keeps the segment highlighted (see
+``issue_panel.apply_chart_selection``). A click in a donut's centre selects all
+open (or closed) issues, so there is no separate open-vs-closed chart.
 """
 
 from collections.abc import Callable
@@ -21,7 +22,11 @@ from app.dashboard.engine import (
 )
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.views.issue_data import _build_overview_quality_signal_df
-from app.dashboard.views.issue_panel import apply_chart_selection, chart_key
+from app.dashboard.views.issue_panel import (
+    apply_chart_selection,
+    chart_key,
+    chart_priority_highlight,
+)
 from app.dashboard.widgets import charts
 
 
@@ -87,6 +92,7 @@ def render_analytics_charts(
                 "height": 200,
                 "key": chart_key("analytics_priority_open", "open_donut"),
                 "show_legend": False,
+                "highlight": chart_priority_highlight("open_donut"),
             },
         )
         select(selection, "open_donut", state_filter="opened")
@@ -100,6 +106,7 @@ def render_analytics_charts(
                 "show_legend": False,
                 "state_filter": "closed",
                 "center_text": "CLOSED<br>ISSUES",
+                "highlight": chart_priority_highlight("closed_donut"),
             },
         )
         select(selection, "closed_donut", state_filter="closed")
@@ -151,13 +158,6 @@ def render_analytics_charts(
             st.session_state["timeline_reset_counter"] = key_suffix + 1
             st.rerun()
 
-    def issue_state() -> None:
-        selection = charts.issue_state_bar(
-            unique_df,
-            config={"height": 150, "key": chart_key("analytics_issue_state", "issue_state_chart")},
-        )
-        select(selection, "issue_state_chart")
-
     def quality_signals() -> None:
         selection = charts.error_distribution(
             _build_overview_quality_signal_df(unique_df),
@@ -185,10 +185,9 @@ def render_analytics_charts(
         ),
         StreamlitGridRow(
             cells=(
-                panel_cell("analytics_timeline", 6, "Release Timeline", timeline, meta="Milestones"),
-                panel_cell("analytics_issue_state", 3, "Open vs. Closed Issues", issue_state),
+                panel_cell("analytics_timeline", 8, "Release Timeline", timeline, meta="Milestones"),
                 panel_cell(
-                    "analytics_quality_signals", 3, "Issue Quality Signals", quality_signals,
+                    "analytics_quality_signals", 4, "Issue Quality Signals", quality_signals,
                     meta="Hints",
                 ),
             )

@@ -76,15 +76,19 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 
 ### 3.4 Analytics layout
 
-`render_analytics_charts` in `app/dashboard/views/overview_analytics.py`: the original three rows of panels, unchanged in content.
+`render_analytics_charts` in `app/dashboard/views/overview_analytics.py`: three rows of panels, based on the original chart grid.
 
 | Row | Panels |
 |---|---|
 | 1 | Open Issues by Priority (donut), Closed Issues by Priority (donut), Daily New vs. Closed Issues (7 days) |
 | 2 | Issues by Workflow State (priority bars per stage) |
-| 3 | Release Timeline (horizontal), Open vs. Closed Issues, Issue Quality Signals |
+| 3 | Release Timeline (two thirds of the width), Issue Quality Signals (one third) |
 
-A click on a chart segment filters the board below the grid (it does not open a dialog) and the segment stays highlighted by Plotly's own selection. When the filter changes another way (a chip, a pill, "Clear all", the search panel), the charts are rebuilt with new widget keys so the highlight disappears. In this layout the board's toolbar shows an "Issues" label instead of the summary pills, since the charts show the same counts.
+The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
+
+The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
+
+A click on a chart segment filters the board below the grid (it does not open a dialog) and the segment stays highlighted by Plotly's own selection (the donuts draw theirs, see above). When the filter changes another way (a chip, a pill, "Clear all", the search panel), the charts are rebuilt with new widget keys so the highlight disappears. In this layout the board's toolbar shows an "Issues" label instead of the summary pills, since the charts show the same counts.
 
 ## 4. Interactions
 
@@ -94,7 +98,7 @@ The board is always visible and shows all open issues until something filters it
 
 - a summary pill sets the base facets (3.2),
 - a lane pill adds `stage` and `priority` (3.3),
-- a chart click in the Analytics layout sets the facets the segment stands for (`facets_from_selection`): a donut slice its state and priority, a workflow-state bar its stage, open state and priority, a velocity point the day and created/closed, an open/closed bar the state, a quality bar the signal (3.4),
+- a chart click in the Analytics layout sets the facets the segment stands for (`facets_from_selection`): a donut slice its state and priority, a donut centre its state, a workflow-state bar its stage, open state and priority, a velocity point the day and created/closed, an open/closed bar the state, a quality bar the signal (3.4),
 - the search panel sets `query`, `state` and the sidebar filters (4.5).
 
 Open issues are the default: a missing `state` means `opened`, and only `closed` or `all` is shown as a chip (not next to a 7-day filter, which already says which issues it covers).
