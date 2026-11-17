@@ -45,6 +45,7 @@ from app.dashboard.views.issue_data import (
     priority_color_names,
     without_facet,
 )
+from app.dashboard.views.issue_pages import render_page_bar
 from app.dashboard.views.issue_search import inject_search_shortcut, render_search_box
 from app.dashboard.widgets import tables
 from app.dashboard.widgets.tables.issue_board import build_board_columns
@@ -53,7 +54,6 @@ _ISSUE_QUERY_KEYS = ("issue_source", "issue_project_id", "issue_iid")
 _SUMMARY_QUERY_KEY = "summary"
 _DEFAULT_FACETS: IssueFacets = {"state": "opened"}
 _LANE_HEIGHT = 440
-_TABLE_HEIGHT = 480
 _TIME_PRESETS = {"30 Days": 30, "90 Days": 90, "1 Year": 365, "All Time": None}
 _SIDEBAR_SELECTS = (
     ("team", "Domain / Team", "sidebar_team_selector"),
@@ -446,6 +446,8 @@ def _selected_table_rows(table_key: str) -> tuple[int, ...]:
 
 def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
     """Render the issue table; selecting a row opens that issue."""
+    page = render_page_bar("table", len(rows), on_change=_reset_table)
+    rows = rows.iloc[page.start:page.stop]
     table_key = f"issue_table_{st.session_state.get('issue_table_version', 0)}"
     selected_rows = _selected_table_rows(table_key)
     if selected_rows and selected_rows[0] < len(rows):
@@ -493,17 +495,18 @@ def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
     if rows["quality_hints"].ne("").any():
         column_order.append("quality_hints")
 
+    grid_config = {
+        "column_config": column_config,
+        "column_order": column_order,
+        # As tall as the page of rows: no scrolling inside.
+        "height": "content",
+        "selection_mode": "single-row",
+        "key": table_key,
+        "minimize_columns": False,
+        "enable_filters": False,
+    }
     tables.issue_detail_grid(
-        rows.style.map(_priority_cell_style, subset=["priority"]),
-        config={
-            "column_config": column_config,
-            "column_order": column_order,
-            "height": _TABLE_HEIGHT,
-            "selection_mode": "single-row",
-            "key": table_key,
-            "minimize_columns": False,
-            "enable_filters": False,
-        },
+        rows.style.map(_priority_cell_style, subset=["priority"]), config=grid_config
     )
 
 
@@ -1020,6 +1023,11 @@ def render_issue_panel(
             if board_issues.empty and not lane_counts:
                 st.info("No issues match the current filters.")
             else:
+                longest_lane = max(
+                    (len(cards) for _, cards in build_board_columns(board_issues, lanes)),
+                    default=0,
+                )
+                cards_page = render_page_bar("board", longest_lane, on_change=lambda: None)
                 with st.container(key="issue_board_wrap"):
                     clicked_url = tables.issue_board(
                         board_issues,
@@ -1027,7 +1035,10 @@ def render_issue_panel(
                             "key": "issue_board",
                             "stages": lanes,
                             "highlight_stage": highlight_stage,
-                            "lane_height": _LANE_HEIGHT,
+                            # As tall as the page of cards: no scrolling inside.
+                            "lane_height": None,
+                            "card_start": cards_page.start,
+                            "max_cards": cards_page.stop - cards_page.start,
                             "min_columns": len(chart_stages),
                             "lane_headers": lane_headers,
                             "lane_header": _lane_header_renderer(

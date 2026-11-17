@@ -7,16 +7,19 @@ place each one below the previous one. The script below measures them and sets
 CSS variables for the theme CSS:
 
 - ``--pulse-pin-top``: below the workflow-state row (or the header bar).
-- ``--pulse-board-top``: below the board's toolbar and chips.
-- ``--pulse-lanes-top``: below the lane headers.
-- ``--pulse-below-lanes``: the page content below the lanes.
-
-The lanes take the window height between the last two, so with the page
-scrolled to the bottom a whole lane is on the screen, right below the pinned
-rows.
+- ``--pulse-board-top``: below the board's toolbar and chips (the page bar
+  of ``issue_pages`` is pinned here).
+- ``--pulse-heads-top``: below the page bar (the lane headers are pinned
+  here).
 
 The lane headers' row cannot scroll sideways itself; the script keeps it in
 step with the lanes' row, which can.
+
+The issue table's column header cannot stick either: Streamlit's grid draws
+it on a canvas of its own inside the table. While that header is scrolled
+under the pinned rows, the script shows a copy of the canvas, pinned below
+them (``#pulse-table-head``). The copy is a picture: it does not take clicks,
+so sorting is done on the table's own header.
 """
 
 import streamlit as st
@@ -30,29 +33,51 @@ _PIN_SCRIPT = """
     [...document.querySelectorAll(`${parent} > *`)].find(
       (element) => element.matches(key) || element.querySelector(`:scope > ${key}`)
     );
+  const tableHeadCopy = () => {
+    let copy = document.getElementById("pulse-table-head");
+    if (!copy) {
+      copy = document.createElement("canvas");
+      copy.id = "pulse-table-head";
+      copy.style.cssText = "position:fixed; z-index:57; pointer-events:none; display:none;"
+        + " box-shadow:0 10px 14px -10px rgba(0,0,0,0.25);";
+      document.body.appendChild(copy);
+    }
+    return copy;
+  };
+  const pinTableHead = (top) => {
+    const copy = tableHeadCopy();
+    const table = document.querySelector('.st-key-issue_panel [data-testid="stDataFrame"]');
+    const head = table && [...table.querySelectorAll("canvas")].find(
+      (canvas) => canvas.getAttribute("data-testid") !== "data-grid-canvas"
+    );
+    const headBox = head && head.getBoundingClientRect();
+    const tableBox = table && table.getBoundingClientRect();
+    // Only while the header is under the pinned rows and rows are still shown.
+    if (!head || headBox.top >= top || tableBox.bottom < top + 2 * headBox.height) {
+      copy.style.display = "none";
+      return;
+    }
+    copy.width = head.width;
+    copy.height = head.height;
+    copy.getContext("2d").drawImage(head, 0, 0);
+    Object.assign(copy.style, {
+      display: "block", left: `${headBox.left}px`, top: `${top}px`,
+      width: `${headBox.width}px`, height: `${headBox.height}px`,
+    });
+  };
   const update = () => {
     const root = document.documentElement.style;
     const workflow = stickyChild(".st-key-analytics_flow", ".st-key-analytics_workflow");
     const head = stickyChild(".st-key-issue_panel", ".st-key-issue_panel_head");
-    const heads = stickyChild(".st-key-issue_board_wrap", '[class*="-ibheads"]');
+    const bar = stickyChild(".st-key-issue_panel", ".st-key-issue_page_bar");
     const pin = workflow ? workflow.offsetHeight : 0;
     const board = pin + (head ? head.offsetHeight : 0);
+    const headsTop = board + (bar ? bar.offsetHeight : 0);
     root.setProperty("--pulse-pin-top", `calc(2.5rem + ${pin}px)`);
     root.setProperty("--pulse-board-top", `calc(2.5rem + ${board}px)`);
-    root.setProperty(
-      "--pulse-lanes-top", `calc(2.5rem + ${board + (heads ? heads.offsetHeight : 0)}px)`
-    );
-    const lane = document.querySelector(
-      '[data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"])'
-    );
-    const main = document.querySelector('[data-testid="stMain"]');
-    if (lane && main) {
-      const laneBottom = lane.getBoundingClientRect().bottom
-        - main.getBoundingClientRect().top + main.scrollTop;
-      root.setProperty(
-        "--pulse-below-lanes", `${Math.max(0, Math.round(main.scrollHeight - laneBottom))}px`
-      );
-    }
+    root.setProperty("--pulse-heads-top", `calc(2.5rem + ${headsTop}px)`);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    pinTableHead(2.5 * rem + headsTop);
   };
   const lanesRow = '.st-key-issue_board_wrap [data-testid="stHorizontalBlock"]';
   document.addEventListener("scroll", (event) => {

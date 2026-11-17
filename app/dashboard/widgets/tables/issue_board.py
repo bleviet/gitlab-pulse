@@ -164,8 +164,11 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
     Args:
         df: Analytics issues (see ``build_board_columns``).
         config: Optional settings: ``key`` (widget key prefix, default
-            ``"issue_board"``), ``lane_height`` (px, default 620), ``max_cards``
-            (cards per column, default 50), ``stages`` (explicit columns, see
+            ``"issue_board"``), ``lane_height`` (px, default 620; None: as
+            tall as the cards, no scrolling inside), ``max_cards``
+            (cards per column, default 50; None: all), ``card_start`` (first
+            card shown in each column, for paging; default 0), ``stages``
+            (explicit columns, see
             ``build_board_columns``), ``highlight_stage`` (column to mark),
             ``min_columns`` (grid width in columns, so a board with fewer
             columns keeps the same column width), ``lane_header`` (a
@@ -179,8 +182,9 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
     """
     config = config or {}
     key = str(config.get("key", "issue_board"))
-    max_cards = int(config.get("max_cards", 50))
-    lane_height = int(config.get("lane_height", 620))
+    max_cards = config.get("max_cards", 50)
+    card_start = int(config.get("card_start", 0))
+    lane_height = config.get("lane_height", 620)
 
     highlight_stage = config.get("highlight_stage")
     columns = build_board_columns(df, config.get("stages"))
@@ -215,11 +219,19 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
                         unsafe_allow_html=True,
                     )
         with slot:
-            with st.container(height=lane_height, border=False, key=f"{key}-{lane_kind}-{i}"):
-                if cards.empty:
-                    st.caption("No issues")
-                for card in cards.head(max_cards).to_dict("records"):
+            with st.container(
+                height="content" if lane_height is None else int(lane_height),
+                border=False,
+                key=f"{key}-{lane_kind}-{i}",
+            ):
+                shown = cards.iloc[card_start:] if max_cards is None else cards.iloc[
+                    card_start:card_start + int(max_cards)
+                ]
+                if shown.empty:
+                    st.caption("No issues" if cards.empty else "No more issues")
+                for card in shown.to_dict("records"):
                     clicked = _render_card(card, key) or clicked
-            if len(cards) > max_cards:
-                st.caption(f"+{len(cards) - max_cards} more in Table view")
+            remaining = len(cards) - card_start - len(shown)
+            if remaining > 0:
+                st.caption(f"+{remaining} more on the next pages")
     return clicked

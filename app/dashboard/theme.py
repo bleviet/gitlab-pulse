@@ -669,7 +669,7 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_board_wrap > [class*="-ibheads"],
 .st-key-issue_board_wrap > :has(> [class*="-ibheads"]) {{
     position: sticky;
-    top: var(--pulse-board-top, 6rem);
+    top: var(--pulse-heads-top, 8rem);
     z-index: 58;
     background: {bg};
     padding-bottom: 0.4rem;
@@ -725,17 +725,31 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_board_wrap [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"] [class*="issue_board-iblane"]) {{
     min-width: 15rem;
 }}
-/* Lanes take the window height between the pinned rows and the content below
-   the lanes (see ``views.pinned_header``), between 240 px and 1100 px.
-   Streamlit fixes the height on the wrapper of a fixed-height container, as
-   its flex basis. */
-[data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"]) {{
-    flex: 0 0 auto !important;
-    height: clamp(240px, calc(100vh - var(--pulse-lanes-top, 14rem) - var(--pulse-below-lanes, 6rem)), 1100px) !important;
+/* Lanes are as tall as their cards (no scrolling inside); the lanes of a row
+   stretch to the tallest, so their backgrounds line up. */
+.st-key-issue_board_wrap [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] [class*="issue_board-iblane"]) {{ align-items: stretch !important; }}
+.st-key-issue_board_wrap [data-testid="stColumn"]:has([class*="issue_board-iblane"]) > [data-testid="stVerticalBlock"] {{ height: 100%; }}
+.st-key-issue_board_wrap [data-testid="stColumn"] [data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"]),
+.st-key-issue_board_wrap [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [class*="issue_board-iblane"] {{ flex: 1 1 auto; }}
+.st-key-issue_page_bar {{ gap: 0.4rem; justify-content: flex-end !important; }}
+.st-key-issue_page_bar > * {{ flex: 0 0 auto !important; width: auto !important; }}
+.st-key-issue_page_bar [data-testid="stCaptionContainer"] {{ margin: 0 0.3rem; white-space: nowrap; }}
+.st-key-issue_page_bar [data-testid="stCaptionContainer"] p {{ margin: 0; line-height: 2rem; }}
+/* The page bar (size control and pager) stays pinned below the toolbar; on
+   the board, the lane headers are pinned below it. */
+.st-key-issue_panel > .st-key-issue_page_bar,
+.st-key-issue_panel > :has(> .st-key-issue_page_bar) {{
+    position: sticky;
+    top: var(--pulse-board-top, 6rem);
+    z-index: 58;
+    background: {bg};
+    padding-bottom: 0.4rem;
 }}
-/* Little room below the board, so the lanes can use that height instead. */
-[data-testid="stMainBlockContainer"]:has(.st-key-issue_board_wrap) {{ padding-bottom: 1.5rem; }}
-[class*="issue_board-iblane"] {{ height: 100% !important; }}
+.st-key-issue_page_bar [data-testid="stButton"] button {{ min-height: 2rem; padding: 0 0.35rem; }}
+.st-key-issue_page_bar [data-testid="stButtonGroup"] button {{ min-height: 2rem; padding: 0.05rem 0.6rem; font-size: 0.82rem; }}
+/* The Overview ends right below the board's panel: no empty room to scroll
+   the table or lanes up under the pinned rows once everything is in view. */
+[data-testid="stMainBlockContainer"]:has(.st-key-issue_panel) {{ padding-bottom: 1rem; }}
 /* A wide lane (large screen) shows its cards in several columns. */
 [class*="issue_board-iblane"] {{ display: grid !important; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-content: start; }}
 /* Search field: compact until it has focus or holds a search, then wider

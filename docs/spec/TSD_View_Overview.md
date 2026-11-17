@@ -40,7 +40,7 @@ One column, one focus: the issue board, which starts high on the screen (on a 13
 - The page switch (Overview, Custom View, Admin) is in the sidebar, and Streamlit runs with `toolbarMode = "minimal"` (no "Deploy" button), so the page has no navigation row of its own.
 - The sidebar is collapsed by default; its active filters are shown as chips on the board (Compact layout).
 - On a narrow window the lanes keep a minimum width of 15rem and the board scrolls sideways, instead of squeezing the cards.
-- Lane height follows the window height (between 320 and 1000 px). A lane wider than two cards (large screens) shows its cards in several columns.
+- A lane is as tall as its page of cards (no scrolling inside, see Paging in 4.3); the lanes of a row stretch to the tallest. A lane wider than two cards (large screens) shows its cards in several columns.
 
 ### 3.1 Release rail
 
@@ -89,8 +89,8 @@ The quality signals count open issues only, so they sit next to the open-issues 
 How the pinned rows work (`app/dashboard/views/pinned_header.py`):
 
 - The lane headers are a row of their own above the lanes (`issue_board`), not the top of each lane. The lanes' row scrolls sideways on a small screen, and nothing inside a sideways-scrolling element can stick to the page. A script keeps the headers' row in step with the lanes' sideways scroll.
-- The pinned rows' heights depend on the screen and on the active filters, so the script measures them and sets CSS variables (`--pulse-pin-top`, `--pulse-board-top`, `--pulse-lanes-top`, `--pulse-below-lanes`) that the theme CSS uses as offsets.
-- The lanes take the window height between the pinned rows and the content below the lanes (at least 240 px), so with the page scrolled to the bottom a whole lane is visible right below its header. The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
+- The pinned rows' heights depend on the screen and on the active filters, so the script measures them and sets CSS variables (`--pulse-pin-top`, `--pulse-board-top`, `--pulse-heads-top`) that the theme CSS uses as offsets.
+- The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
 
 The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
 
@@ -122,6 +122,15 @@ The release timeline and sidebar milestone selector are synchronized bidirection
 ### 4.3 Issue board
 
 The board (`app/dashboard/views/issue_panel.py`) shows Board by default; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search field (4.5) applies to both views.
+
+**Paging** (`app/dashboard/views/issue_pages.py`). A bar above the table or the board, pinned below the toolbar while the page scrolls (on the board, the lane headers are pinned below it), sets how much is shown: 10 (default), 20 or 30 per page, with previous/next buttons when there is more than one page. The table and the lanes are exactly as tall as one page, with no scrolling inside; the page scrolls instead.
+
+- **Table, rows per page** (`height="content"`): the bar shows "11–20 of 408". The table's column header is drawn by Streamlit's grid on a canvas of its own inside the table, so CSS cannot pin it; while it is scrolled under the pinned rows, the script in `pinned_header` shows a copy of that canvas pinned below them. The copy is a picture and takes no clicks (sort on the table's own header).
+- **Board, cards per lane**: the pager turns all lanes together ("Page 2 of 11"); a lane with fewer cards shows "No more issues" on later pages, and each lane notes how many cards follow on the next pages.
+
+The Overview has only a small margin below the panel, so the page stops scrolling once the last row or card is in view, instead of moving the table or lanes up under the pinned rows.
+
+Each view keeps its own size and page in session state (`issue_table_rows`, `issue_board_rows`, and `_page`). A page is clamped when a filter leaves fewer rows; changing the table's page clears a row selection, so a click always opens the row shown.
 
 **Board.** Lanes are the stages that have open issues, in workflow order (`overview_stages`). Lanes without matching issues stay visible and empty. Other stages (for example "Done" for closed issues) are appended; when none of the issues is in one of those stages, only the stages with issues are shown, in the same column width. The board ignores the `stage` facet and marks that stage's lane instead, so the other stages stay visible for comparison; the caption shows the total and the count in the marked stage. Each lane shows at most 50 cards and scrolls on its own.
 

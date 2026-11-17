@@ -72,7 +72,8 @@ def issue_detail_grid(
             - zebra_stripes: bool (default True)
             - zebra_color: CSS color for zebra rows
             - key: widget key
-            - height: table height in pixels (default 400)
+            - height: table height in pixels (default 400), or "content" /
+              "stretch" as for ``st.dataframe``
 
     Returns:
         Selection object from st.dataframe
@@ -82,7 +83,8 @@ def issue_detail_grid(
     widget_key = config.get("key", "issue_detail_grid")
     selection_mode = config.get("selection_mode", "multi-row")
     zebra_stripes = config.get("zebra_stripes", True)
-    table_height = int(config.get("height", 400))
+    height_option = config.get("height", 400)
+    table_height = height_option if height_option in ("content", "stretch") else int(height_option)
 
     t = _table_theme()
     zebra_color = config.get("zebra_color") or t["row_alt"]
