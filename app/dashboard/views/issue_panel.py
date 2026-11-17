@@ -923,9 +923,8 @@ def render_issue_panel(
 ) -> None:
     """Render the issue board (or table) for the active facets.
 
-    The board drops the stage facet and marks that stage's lane instead, so
-    every lane stays visible under its chart column. The table applies all
-    facets.
+    The board and the table apply the same facets. The board keeps a lane for
+    every chart stage, empty ones included, and marks the stage facet's lane.
 
     Args:
         df: Overview issues after the sidebar filters, one row per issue and
@@ -940,34 +939,21 @@ def render_issue_panel(
     facets = _get_facets()
     effective = _with_default_state(facets)
     highlight_stage = facets.get("stage")
-    board_facets = without_facet(effective, "stage") if highlight_stage else effective
 
-    table_issues = collapse_issue_contexts(filter_issues(df, effective))
-    board_issues = collapse_issue_contexts(filter_issues(df, board_facets))
-    lanes = board_lanes(chart_stages, board_issues)
+    issues = collapse_issue_contexts(filter_issues(df, effective))
     # Lane headers count what the board shows without the stage and priority
-    # refinement, so every lane keeps its full priority mix.
-    header_facets = without_facet(board_facets, "priority")
-    lane_counts = lane_priority_counts(
-        collapse_issue_contexts(filter_issues(df, header_facets))
-    )
+    # refinement, so every lane keeps its full priority mix, and the lanes stay
+    # even when the refinement matches nothing.
+    header_facets = without_facet(without_facet(effective, "stage"), "priority")
+    header_issues = collapse_issue_contexts(filter_issues(df, header_facets))
+    lanes = board_lanes(chart_stages, header_issues)
+    lane_counts = lane_priority_counts(header_issues)
 
     selected_row = _selected_row(df)
     selected_url = "" if selected_row is None else str(selected_row["web_url"])
 
-    # The switch's own state is current even on the rerun it triggered.
-    current_view = st.session_state.get("filtered_issues_view_choice") or st.session_state.get(
-        "filtered_issues_view", _DEFAULT_VIEW
-    )
-    if current_view == "Board":
-        noun = "issue" if len(board_issues) == 1 else "issues"
-        count_caption = f"{len(board_issues)} {noun}"
-        if highlight_stage:
-            in_stage = int((board_issues["stage"].astype(str) == highlight_stage).sum())
-            count_caption += f" · {in_stage} in {highlight_stage}"
-    else:
-        noun = "issue" if len(table_issues) == 1 else "issues"
-        count_caption = f"{len(table_issues)} {noun}"
+    noun = "issue" if len(issues) == 1 else "issues"
+    count_caption = f"{len(issues)} {noun}"
 
     with st.container(border=True, key="issue_panel"):
         # Keyed so the toolbar and the chips stay pinned while the board scrolls.
@@ -978,7 +964,7 @@ def render_issue_panel(
             list_caption = ""
             if view == "Board":
                 # The side list is the lane the issue was opened from.
-                columns = build_board_columns(board_issues, lanes)
+                columns = build_board_columns(issues, lanes)
                 lane = next(
                     (
                         (stage, cards)
@@ -988,17 +974,17 @@ def render_issue_panel(
                     None,
                 )
                 if lane is None:
-                    ordered = pd.concat([cards for _, cards in columns]) if columns else board_issues
+                    ordered = pd.concat([cards for _, cards in columns]) if columns else issues
                 else:
                     ordered = lane[1]
                     noun = "issue" if len(ordered) == 1 else "issues"
                     list_caption = f"{lane[0]} · {len(ordered)} {noun}"
             else:
-                rows = _prepare_issue_rows(table_issues) if not table_issues.empty else None
+                rows = _prepare_issue_rows(issues) if not issues.empty else None
                 ordered = (
-                    table_issues.set_index("id").loc[rows["id"]].reset_index()
+                    issues.set_index("id").loc[rows["id"]].reset_index()
                     if rows is not None
-                    else table_issues
+                    else issues
                 )
             list_col, detail_col = st.columns([0.3, 0.7], gap="medium")
             with list_col:
@@ -1022,17 +1008,17 @@ def render_issue_panel(
                     selected_row, ordered["web_url"].astype(str).tolist(), back_label
                 )
         elif view == "Board":
-            if board_issues.empty and not lane_counts:
+            if issues.empty and not lane_counts:
                 st.info("No issues match the current filters.")
             else:
                 longest_lane = max(
-                    (len(cards) for _, cards in build_board_columns(board_issues, lanes)),
+                    (len(cards) for _, cards in build_board_columns(issues, lanes)),
                     default=0,
                 )
                 cards_page = render_page_bar("board", longest_lane, on_change=lambda: None)
                 with st.container(key="issue_board_wrap"):
                     clicked_url = tables.issue_board(
-                        board_issues,
+                        issues,
                         {
                             "key": "issue_board",
                             "stages": lanes,
@@ -1051,7 +1037,7 @@ def render_issue_panel(
                 if clicked_url:
                     _select_issue(clicked_url)
                     st.rerun()
-        elif table_issues.empty:
+        elif issues.empty:
             st.info("No issues match the current filters.")
         else:
-            _render_issue_table(_prepare_issue_rows(table_issues), facets)
+            _render_issue_table(_prepare_issue_rows(issues), facets)
