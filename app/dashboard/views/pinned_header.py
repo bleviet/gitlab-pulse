@@ -12,6 +12,10 @@ CSS variables for the theme CSS:
 - ``--pulse-heads-top``: below the page bar (the lane headers are pinned
   here).
 
+The Analytics workflow-state row is pinned only while it, the toolbar and the
+page bar leave at least 15rem of the window free below them (narrow windows
+stack its charts and make it tall).
+
 The lane headers' row cannot scroll sideways itself; the script keeps it in
 step with the lanes' row, which can.
 
@@ -70,13 +74,19 @@ _PIN_SCRIPT = """
     const workflow = stickyChild(".st-key-analytics_flow", ".st-key-analytics_workflow");
     const head = stickyChild(".st-key-issue_panel", ".st-key-issue_panel_head");
     const bar = stickyChild(".st-key-issue_panel", ".st-key-issue_page_bar");
-    const pin = workflow ? workflow.offsetHeight : 0;
-    const board = pin + (head ? head.offsetHeight : 0);
-    const headsTop = board + (bar ? bar.offsetHeight : 0);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const headHeight = head ? head.offsetHeight : 0;
+    const barHeight = bar ? bar.offsetHeight : 0;
+    // Pinned only while at least 15rem of the window stays free below the pinned rows.
+    const fits = workflow
+      && workflow.offsetHeight + headHeight + barHeight <= window.innerHeight - 2.5 * rem - 15 * rem;
+    if (workflow) workflow.style.position = fits ? "" : "static";
+    const pin = fits ? workflow.offsetHeight : 0;
+    const board = pin + headHeight;
+    const headsTop = board + barHeight;
     root.setProperty("--pulse-pin-top", `calc(2.5rem + ${pin}px)`);
     root.setProperty("--pulse-board-top", `calc(2.5rem + ${board}px)`);
     root.setProperty("--pulse-heads-top", `calc(2.5rem + ${headsTop}px)`);
-    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     pinTableHead(2.5 * rem + headsTop);
   };
   const lanesRow = '.st-key-issue_board_wrap [data-testid="stHorizontalBlock"]';
