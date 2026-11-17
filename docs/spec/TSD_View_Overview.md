@@ -44,7 +44,7 @@ One column, one focus: the issue board, which starts high on the screen (on a 13
 
 ### 3.1 Release rail
 
-`milestone_timeline` with `style="rail"`: a soft band with a centre rail, round markers coloured by status (complete, incomplete, on track, overdue) that alternate above and below the rail in date order, their names next to them, and a pink line labelled "NOW" for today. Clicking a milestone sets the milestone filter (4.2).
+`milestone_timeline` with `style="rail"`: a soft band with a centre rail, round markers coloured by status (complete, incomplete, on track, overdue) that alternate above and below the rail in date order, their names next to them, and a pink line labelled "NOW" for today. Active milestones without a due date are drawn as neutral "Unscheduled" markers in a "No due date" section after the latest dated milestone (at least 90 days ahead), in natural version order (`v2.4.9` before `v2.4.10`); their hover shows "Due: Not set". Closed milestones without a due date are hidden. Clicking a milestone sets the milestone filter (4.2).
 
 ### 3.2 Summary pills
 

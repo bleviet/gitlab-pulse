@@ -1,5 +1,6 @@
 """Milestone Timeline Chart Widget."""
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -15,6 +16,18 @@ from app.dashboard.theme import (
     plotly_layout,
     with_alpha,
 )
+
+_UNDATED_GAP = pd.Timedelta(days=30)
+_UNDATED_STEP = pd.Timedelta(days=21)
+
+
+def _natural_key(title: str) -> tuple[tuple[int, int, str], ...]:
+    """Sort key that orders embedded numbers numerically (v2.4.9 < v2.4.10)."""
+    return tuple(
+        (0, int(part), "") if part.isdigit() else (1, 0, part)
+        for part in re.split(r"(\d+)", title)
+        if part
+    )
 
 
 def milestone_timeline(
@@ -116,8 +129,9 @@ def milestone_timeline(
         due_date = row.get("due_date")
         start_date = row.get("start_date")
 
-        # Skip milestones without a due date
-        if pd.isna(due_date):
+        undated = pd.isna(due_date)
+        # Closed milestones without a due date stay hidden
+        if undated and state == "closed":
             continue
 
         # Normalize timezones
@@ -131,7 +145,7 @@ def milestone_timeline(
                 start_date = start_date.tz_localize("UTC")
 
         # Use due date as marker position
-        marker_date = due_date
+        marker_date = pd.NaT if undated else due_date
 
         # Determine status and color
         stats = milestone_issue_stats.get(ms_id, {"total": 0, "closed": 0})
@@ -143,7 +157,10 @@ def milestone_timeline(
         has_highlight = bool(highlight_title)
 
         palette = get_palette()
-        if state == "closed":
+        if undated:
+            color = palette["neutral"]
+            status = "Unscheduled"
+        elif state == "closed":
             if all_issues_closed:
                 color = palette["ms_complete"]
                 status = "Complete"
@@ -170,7 +187,7 @@ def milestone_timeline(
             line_color = palette["ms_highlight"]
 
         # Format date for display
-        date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "No date"
+        date_str = marker_date.strftime("%Y-%m-%d") if pd.notna(marker_date) else "Not set"
 
         scatter_data.append({
             "date": marker_date,
@@ -190,6 +207,25 @@ def milestone_timeline(
         return None
 
     chart_df = pd.DataFrame(scatter_data)
+    chart_df["date"] = pd.to_datetime(chart_df["date"], utc=True)
+
+    # Undated milestones go after the dated window, in natural version order
+    undated_mask = chart_df["status"] == "Unscheduled"
+    separator_x = None
+    undated_end = None
+    if undated_mask.any():
+        window_end = now + pd.Timedelta(days=90)
+        latest_due = chart_df.loc[~undated_mask, "date"].max()
+        if pd.notna(latest_due):
+            window_end = max(window_end, latest_due)
+        order = sorted(
+            chart_df.index[undated_mask],
+            key=lambda i: _natural_key(str(chart_df.at[i, "title"])),
+        )
+        rank = pd.Series(range(len(order)), index=order)
+        chart_df.loc[order, "date"] = window_end + _UNDATED_GAP + rank * _UNDATED_STEP
+        separator_x = (window_end + _UNDATED_GAP / 2).strftime("%Y-%m-%d")
+        undated_end = chart_df.loc[undated_mask, "date"].max()
 
     # Sort by date for staggering calculation
     chart_df = chart_df.sort_values("date").reset_index(drop=True)
@@ -224,6 +260,7 @@ def milestone_timeline(
         "Incomplete": palette["ms_incomplete"],
         "On Track": palette["ms_on_track"],
         "Overdue": palette["ms_overdue"],
+        "Unscheduled": palette["neutral"],
     }
 
     for status, color in status_colors.items():
@@ -272,7 +309,11 @@ def milestone_timeline(
     today_str = now.strftime("%Y-%m-%d")
     date_range = [
         (now - pd.Timedelta(days=270)).strftime("%Y-%m-%d"),
-        (now + pd.Timedelta(days=90)).strftime("%Y-%m-%d"),
+        (
+            undated_end + _UNDATED_GAP / 2
+            if undated_end is not None
+            else now + pd.Timedelta(days=90)
+        ).strftime("%Y-%m-%d"),
     ]
     if rail:
         text_color = get_plotly_font_color()
@@ -309,6 +350,27 @@ def milestone_timeline(
             showarrow=False,
             font=dict(size=10, family=FONT_CODE, color=palette["now_marker"]),
         )
+        if separator_x is not None:
+            fig.add_shape(
+                type="line",
+                x0=separator_x, x1=separator_x,
+                y0=-1.15, y1=1.15,
+                line=dict(
+                    width=2, dash="dot", color=with_alpha(palette["neutral"], 0.8)
+                ),
+            )
+            fig.add_annotation(
+                x=separator_x,
+                y=-1.15,
+                yanchor="top",
+                text="No due date",
+                showarrow=False,
+                font=dict(
+                    size=10,
+                    family=FONT_CODE,
+                    color=with_alpha(palette["neutral"], 0.8),
+                ),
+            )
         title = config.get("title")
         if title:
             fig.add_annotation(
@@ -340,6 +402,24 @@ def milestone_timeline(
         fig.update_yaxes(showticklabels=False, range=[-1.9, 1.9])
     else:
         _add_horizontal_today_and_axes(fig, today_str, date_range, timeline_height, palette)
+        if separator_x is not None:
+            fig.add_shape(
+                type="line",
+                x0=separator_x, x1=separator_x,
+                y0=0, y1=1,
+                yref="paper",
+                line=dict(
+                    width=2, dash="dot", color=with_alpha(palette["neutral"], 0.8)
+                ),
+            )
+            fig.add_annotation(
+                x=separator_x,
+                y=1.05,
+                yref="paper",
+                text="No due date",
+                showarrow=False,
+                font=dict(size=10, color=get_plotly_font_color()),
+            )
 
     show_modebar = st.session_state.get("show_chart_controls", False)
 
