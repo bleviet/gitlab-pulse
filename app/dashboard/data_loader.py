@@ -35,6 +35,10 @@ def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
 
     df = pd.read_parquet(filepath)
 
+    # Priority is optional in rules; keep the column so consumers can rely on it
+    if not df.empty and "priority" not in df.columns:
+        df["priority"] = pd.NA
+
     # Ensure datetime columns are proper types
     for col in ["created_at", "updated_at", "closed_at"]:
         if col in df.columns:
