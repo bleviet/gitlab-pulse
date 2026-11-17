@@ -163,8 +163,11 @@ def priority_donut(
     fig.update_xaxes(visible=False, range=[-1.08, 1.08], fixedrange=True, constrain="domain")
     fig.update_yaxes(visible=False, range=[-1.08, 1.08], fixedrange=True, scaleanchor="x", scaleratio=1)
 
+    # The hole shrinks with the chart, so the centre text does too.
+    total_size = min(28, round(height * 0.14))
+    caption_size = min(12, round(height * 0.07))
     fig.add_annotation(
-        text=f"<b style='font-size:28px; color:{text_color};'>{total_issues}</b><br><span style='font-size:12px; color:{text_color};'>{center_text}</span>",
+        text=f"<b style='font-size:{total_size}px; color:{text_color};'>{total_issues}</b><br><span style='font-size:{caption_size}px; color:{text_color};'>{center_text}</span>",
         x=0, y=0,
         xref="x", yref="y",
         font=dict(family="Inter, sans-serif"),

@@ -23,6 +23,7 @@ from app.dashboard.views.issue_panel import (
 )
 from app.dashboard.views.overview_analytics import render_analytics_layout
 from app.dashboard.views.overview_summary import render_summary_bar
+from app.dashboard.views.pinned_header import inject_pinned_header_script
 from app.dashboard.widgets import charts
 
 _LAYOUTS = {"Compact": ":material/view_agenda:", "Analytics": ":material/insert_chart:"}
@@ -127,6 +128,7 @@ def render_overview(
     sync_issue_state_from_query(df)
     layout = _current_layout()
     _render_layout_switch()
+    inject_pinned_header_script()
 
     unique_df = df.drop_duplicates(subset=["id"]) if "id" in df.columns else df
     stages = overview_stages(unique_df)

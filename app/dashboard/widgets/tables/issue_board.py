@@ -187,10 +187,19 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
         return None
 
     clicked: str | None = None
-    slots = st.columns(max(len(columns), int(config.get("min_columns", 0))))
-    for i, (slot, (stage, cards)) in enumerate(zip(slots, columns, strict=False)):
+    column_count = max(len(columns), int(config.get("min_columns", 0)))
+    # The headers are a row of their own, not the top of each lane, so they can
+    # stay pinned while the page scrolls: the lanes' row scrolls sideways on a
+    # small screen, and nothing inside a sideways-scrolling row can stick to
+    # the page (see the theme CSS and ``views.pinned_header``).
+    with st.container(key=f"{key}-ibheads"):
+        head_slots = st.columns(column_count)
+    slots = st.columns(column_count)
+    for i, (head_slot, slot, (stage, cards)) in enumerate(
+        zip(head_slots, slots, columns, strict=False)
+    ):
         lane_kind = "iblane-hl" if stage == highlight_stage else "iblane"
-        with slot:
+        with head_slot:
             lane_header = config.get("lane_header")
             if lane_header is not None:
                 lane_header(i, stage, cards)
@@ -200,6 +209,7 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
                     f"<b>{html.escape(stage)}</b> <small>{len(cards)}</small></div>",
                     unsafe_allow_html=True,
                 )
+        with slot:
             with st.container(height=lane_height, border=False, key=f"{key}-{lane_kind}-{i}"):
                 if cards.empty:
                     st.caption("No issues")

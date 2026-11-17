@@ -1124,7 +1124,9 @@ def render_issue_panel(
         count_caption = f"{len(table_issues)} {noun}"
 
     with st.container(border=True, key="issue_panel"):
-        view = _render_panel_header(facets, count_caption, toolbar)
+        # Keyed so the toolbar and the chips stay pinned while the board scrolls.
+        with st.container(key="issue_panel_head"):
+            view = _render_panel_header(facets, count_caption, toolbar)
 
         if selected_row is not None:
             list_caption = ""

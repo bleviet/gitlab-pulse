@@ -95,7 +95,7 @@ def render_analytics_layout(
         selection = charts.priority_donut(
             unique_df,
             config={
-                "height": 200,
+                "height": 150,
                 "key": chart_key("analytics_priority_open", "open_donut"),
                 "show_legend": False,
                 "highlight": chart_priority_highlight("open_donut"),
@@ -107,7 +107,7 @@ def render_analytics_layout(
         selection = charts.priority_donut(
             unique_df,
             config={
-                "height": 200,
+                "height": 150,
                 "key": chart_key("analytics_priority_closed", "closed_donut"),
                 "show_legend": False,
                 "state_filter": "closed",
@@ -120,7 +120,7 @@ def render_analytics_layout(
     def velocity() -> None:
         selection = charts.daily_velocity_line(
             unique_df,
-            config={"height": 200, "key": chart_key("analytics_velocity", "velocity_chart")},
+            config={"height": 150, "key": chart_key("analytics_velocity", "velocity_chart")},
         )
         select(selection, "velocity_chart")
 
@@ -138,7 +138,7 @@ def render_analytics_layout(
                 selection = charts.priority_bar(
                     unique_df[unique_df["stage"] == stage],
                     config={
-                        "height": 160,
+                        "height": 115,
                         "key": chart_key(f"analytics_stage_bar_{index}", f"stage_bar_{index}"),
                     },
                 )
@@ -150,7 +150,7 @@ def render_analytics_layout(
             timeline_df,
             config={
                 "key": f"analytics_timeline_{key_suffix}",
-                "height": 200,
+                "height": 150,
                 "highlight_milestone": active_milestone,
             },
         )
@@ -168,7 +168,7 @@ def render_analytics_layout(
         selection = charts.error_distribution(
             _build_overview_quality_signal_df(unique_df),
             config={
-                "height": 200,
+                "height": 150,
                 "key": chart_key("analytics_quality_signals", "quality_signal_chart"),
             },
         )

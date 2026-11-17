@@ -655,8 +655,30 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     z-index: 60;
     background: {bg};
     padding-bottom: 0.5rem;
+}}
+/* The board's toolbar and filter chips, then its lane headers, stay pinned
+   while the board scrolls: below the header bar, or in Analytics below the
+   pinned workflow-state row (the offsets are set by ``views.pinned_header``). */
+.st-key-issue_panel > .st-key-issue_panel_head,
+.st-key-issue_panel > :has(> .st-key-issue_panel_head) {{
+    position: sticky;
+    top: var(--pulse-pin-top, 2.5rem);
+    z-index: 59;
+    background: {bg};
+    padding: 0.4rem 0;
+}}
+.st-key-issue_board_wrap > [class*="-ibheads"],
+.st-key-issue_board_wrap > :has(> [class*="-ibheads"]) {{
+    position: sticky;
+    top: var(--pulse-board-top, 6rem);
+    z-index: 58;
+    background: {bg};
+    padding-bottom: 0.4rem;
     box-shadow: 0 10px 14px -10px {shadow};
 }}
+/* Follows the lanes' sideways scroll (set by the script), no scrollbar. */
+[class*="-ibheads"] [data-testid="stHorizontalBlock"] {{ flex-wrap: nowrap !important; overflow-x: hidden; }}
+[class*="-ibheads"] [data-testid="stColumn"] {{ min-width: 15rem; }}
 /* Overview layout switch: pinned into Streamlit's header bar, top right, left
    of the app menu. It takes no space in the page flow. */
 [data-testid="stLayoutWrapper"]:has(> .st-key-overview_layout_bar),
@@ -702,9 +724,16 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_board_wrap [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"] [class*="issue_board-iblane"]) {{
     min-width: 15rem;
 }}
-/* Lanes grow with the window, between 320 px and 1000 px. Streamlit fixes the
-   height on the wrapper of a fixed-height container. */
-[data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"]) {{ height: clamp(300px, calc(100vh - 15rem), 1100px) !important; }}
+/* Lanes take the window height between the pinned rows and the content below
+   the lanes (see ``views.pinned_header``), between 240 px and 1100 px.
+   Streamlit fixes the height on the wrapper of a fixed-height container, as
+   its flex basis. */
+[data-testid="stLayoutWrapper"]:has(> [class*="issue_board-iblane"]) {{
+    flex: 0 0 auto !important;
+    height: clamp(240px, calc(100vh - var(--pulse-lanes-top, 14rem) - var(--pulse-below-lanes, 6rem)), 1100px) !important;
+}}
+/* Little room below the board, so the lanes can use that height instead. */
+[data-testid="stMainBlockContainer"]:has(.st-key-issue_board_wrap) {{ padding-bottom: 1.5rem; }}
 [class*="issue_board-iblane"] {{ height: 100% !important; }}
 /* A wide lane (large screen) shows its cards in several columns. */
 [class*="issue_board-iblane"] {{ display: grid !important; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-content: start; }}

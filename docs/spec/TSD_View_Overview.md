@@ -84,7 +84,13 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 | 2 | Open Issues by Priority (donut), Issue Quality Signals, Daily New vs. Closed Issues (7 days) |
 | 3 | Issues by Workflow State (priority bars per stage); stays pinned below the header while the board scrolls |
 
-The quality signals count open issues only, so they sit next to the open-issues donut. The workflow-state row and the board share a container, so the row is released where the board ends; its stage columns line up with the board's lanes. The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
+The quality signals count open issues only, so they sit next to the open-issues donut. The workflow-state row and the board share a container, so the row is released where the board ends; its stage columns line up with the board's lanes. Below that row, the board's toolbar and filter chips and then its lane headers are pinned as well; in the Compact layout the same two rows are pinned below Streamlit's header bar.
+
+How the pinned rows work (`app/dashboard/views/pinned_header.py`):
+
+- The lane headers are a row of their own above the lanes (`issue_board`), not the top of each lane. The lanes' row scrolls sideways on a small screen, and nothing inside a sideways-scrolling element can stick to the page. A script keeps the headers' row in step with the lanes' sideways scroll.
+- The pinned rows' heights depend on the screen and on the active filters, so the script measures them and sets CSS variables (`--pulse-pin-top`, `--pulse-board-top`, `--pulse-lanes-top`, `--pulse-below-lanes`) that the theme CSS uses as offsets.
+- The lanes take the window height between the pinned rows and the content below the lanes (at least 240 px), so with the page scrolled to the bottom a whole lane is visible right below its header. The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
 
 The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
 
