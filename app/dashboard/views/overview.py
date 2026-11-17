@@ -68,11 +68,6 @@ def _render_layout_switch() -> None:
         )
 
 
-def _render_issues_label() -> None:
-    """Left part of the board toolbar in the Analytics layout."""
-    st.markdown('<span class="ov-label">Issues</span>', unsafe_allow_html=True)
-
-
 def _write_layout_query(layout: str) -> None:
     if layout == "Analytics":
         if st.query_params.get(_LAYOUT_QUERY_KEY) != "analytics":
@@ -145,7 +140,11 @@ def render_overview(
             stages,
             timeline_source,
             active_milestone,
-            board=lambda: render_issue_panel(df, stages, toolbar=_render_issues_label),
+            # The charts above show the stages and the filters, so the board
+            # keeps only the search and the view switch.
+            board=lambda: render_issue_panel(
+                df, stages, show_filters=False, lane_headers=False
+            ),
         )
     else:
         _render_release_rail(timeline_source, active_milestone)

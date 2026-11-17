@@ -22,7 +22,12 @@ def priority_bar(
 
     Args:
         df: DataFrame of issues
-        config: Optional configuration
+        config: Optional configuration; ``highlight`` names a priority whose
+            bar stays fully coloured while the others are dimmed, and
+            ``dimmed`` dims every bar (for a chart beside the one whose
+            selection is active). The chart draws this itself rather than
+            relying on Plotly's selection, which Streamlit drops whenever the
+            figure changes.
     """
     config = config or {}
     height = config.get("height", 250)
@@ -88,6 +93,12 @@ def priority_bar(
         textposition="outside",
         textfont=dict(color=get_plotly_font_color(), size=12) 
     )
+    highlight = config.get("highlight")
+    if highlight is not None or config.get("dimmed"):
+        # One trace per priority; 0.2 is the opacity Plotly gives unselected
+        # points.
+        for trace in fig.data:
+            trace.opacity = 1.0 if trace.name == highlight else 0.2
 
     fig.update_layout(
         **plotly_layout(

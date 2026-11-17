@@ -23,6 +23,7 @@ from app.dashboard.engine import (
 from app.dashboard.theme import get_palette, get_plotly_font_color, with_alpha
 from app.dashboard.views.issue_data import _build_overview_quality_signal_df
 from app.dashboard.views.issue_panel import (
+    active_chart,
     apply_chart_selection,
     chart_key,
     chart_priority_highlight,
@@ -128,6 +129,10 @@ def render_analytics_layout(
         if not stages:
             st.info("No stage data available.")
             return
+        # The stages are separate charts, so each draws the selection itself:
+        # the clicked chart its selected bar, the others all dimmed.
+        active = active_chart() or ""
+        stage_bar_active = active.startswith("stage_bar_")
         for index, (column, stage) in enumerate(zip(st.columns(len(stages)), stages, strict=True)):
             with column:
                 st.markdown(
@@ -140,6 +145,8 @@ def render_analytics_layout(
                     config={
                         "height": 115,
                         "key": chart_key(f"analytics_stage_bar_{index}", f"stage_bar_{index}"),
+                        "highlight": chart_priority_highlight(f"stage_bar_{index}"),
+                        "dimmed": stage_bar_active and active != f"stage_bar_{index}",
                     },
                 )
                 select(selection, f"stage_bar_{index}", stage_filter=stage, state_filter="opened")

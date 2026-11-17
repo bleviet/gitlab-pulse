@@ -106,10 +106,12 @@ def _reset_charts(except_chart: str | None = None) -> None:
         st.session_state["issue_chart"] = None
     resets: dict[str, int] = st.session_state.setdefault("issue_chart_resets", {})
     signatures: dict[str, str] = st.session_state.setdefault("issue_chart_signatures", {})
+    confirmed: dict[str, bool] = st.session_state.setdefault("issue_chart_confirmed", {})
     for chart_id in list(signatures):
         if chart_id != except_chart:
             resets[chart_id] = resets.get(chart_id, 0) + 1
             del signatures[chart_id]
+            confirmed.pop(chart_id, None)
 
 
 def apply_chart_selection(
@@ -123,20 +125,37 @@ def apply_chart_selection(
     Plotly keeps reporting a selection on every rerun, so a selection is only
     applied when it differs from the last one seen for that chart. The chart's
     facets replace the board's filter (the search text is kept); the other
-    charts drop their highlight.
+    charts drop their highlight. Clicking the segment that set the filter again
+    removes it.
     """
     points = (selection or {}).get("selection", {}).get("points") or []
     signatures: dict[str, str] = st.session_state.setdefault("issue_chart_signatures", {})
+    # Charts whose selection was reported again on a later run: Plotly keeps
+    # it, so an empty selection from them afterwards is the user deselecting.
+    # (A chart that redraws its highlight, like the donuts, loses the
+    # selection on the next run instead and is never confirmed.)
+    confirmed: dict[str, bool] = st.session_state.setdefault("issue_chart_confirmed", {})
     if not points:
         signatures.pop(chart_id, None)
+        if confirmed.pop(chart_id, False) and st.session_state.get("issue_chart") == chart_id:
+            _clear_chart_filter()
         return
     signature = json.dumps(points, sort_keys=True, default=str)
     if signatures.get(chart_id) == signature:
+        confirmed[chart_id] = True
         return
     signatures[chart_id] = signature
+    confirmed[chart_id] = False
 
     facets = facets_from_selection(chart_id, points, stage_filter, state_filter)
-    query = _get_facets().get("query")
+    current = _get_facets()
+    query = current.get("query")
+    # For a chart that redraws its highlight, a second click on the segment
+    # arrives as a new selection of the same thing.
+    if st.session_state.get("issue_chart") == chart_id and without_facet(
+        current, "query"
+    ) == facets:
+        _clear_chart_filter()
     if query:
         facets["query"] = query
     st.session_state["issue_summary"] = None
@@ -146,6 +165,22 @@ def apply_chart_selection(
     _reset_charts(except_chart=chart_id)
     _reset_table()
     st.rerun()
+
+
+def _clear_chart_filter() -> None:
+    """Drop the filter a chart set (a second click on its segment), keeping the
+    search text. Analytics shows no filter chips, so this is how a chart filter
+    is removed there.
+    """
+    query = _get_facets().get("query")
+    _set_facets(IssueFacets(query=query) if query else IssueFacets())
+    st.rerun()
+
+
+def active_chart() -> str | None:
+    """Return the chart whose click set the board's current filter, if any."""
+    chart = st.session_state.get("issue_chart")
+    return str(chart) if chart else None
 
 
 def chart_priority_highlight(chart_id: str) -> str | None:
@@ -985,6 +1020,7 @@ def _render_panel_header(
     facets: IssueFacets,
     count_caption: str,
     toolbar: Callable[[], None] | None,
+    show_filters: bool,
 ) -> str:
     """Render the board's header: one toolbar row, then chips if filtered.
 
@@ -1037,7 +1073,7 @@ def _render_panel_header(
 
     chips = facet_chips(facets)
     sidebar_chips = _sidebar_filter_chips()
-    if chips or sidebar_chips:
+    if show_filters and (chips or sidebar_chips):
         with st.container(
             key="issue_panel_chips", horizontal=True, vertical_alignment="center"
         ):
@@ -1073,6 +1109,8 @@ def render_issue_panel(
     df: pd.DataFrame,
     chart_stages: list[str],
     toolbar: Callable[[], None] | None = None,
+    show_filters: bool = True,
+    lane_headers: bool = True,
 ) -> None:
     """Render the issue board (or table) for the active facets.
 
@@ -1085,6 +1123,10 @@ def render_issue_panel(
             context.
         chart_stages: Stages with open issues, in workflow order (the lanes).
         toolbar: Renders the left part of the board's toolbar row.
+        show_filters: Show the active filters as chips, with the issue count.
+            Off where the charts above show the filters (Analytics).
+        lane_headers: Show a header above each lane. Off where the stages are
+            shown above the board (Analytics).
     """
     facets = _get_facets()
     effective = _with_default_state(facets)
@@ -1126,7 +1168,7 @@ def render_issue_panel(
     with st.container(border=True, key="issue_panel"):
         # Keyed so the toolbar and the chips stay pinned while the board scrolls.
         with st.container(key="issue_panel_head"):
-            view = _render_panel_header(facets, count_caption, toolbar)
+            view = _render_panel_header(facets, count_caption, toolbar, show_filters)
 
         if selected_row is not None:
             list_caption = ""
@@ -1188,6 +1230,7 @@ def render_issue_panel(
                             "highlight_stage": highlight_stage,
                             "lane_height": _LANE_HEIGHT,
                             "min_columns": len(chart_stages),
+                            "lane_headers": lane_headers,
                             "lane_header": _lane_header_renderer(
                                 facets, lane_counts, priority_color_names(df)
                             ),

@@ -645,7 +645,6 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
 }}
-.ov-label {{ display: inline-block; font-size: 0.68rem; font-weight: 700; line-height: 1.5; letter-spacing: 0.14em; text-transform: uppercase; color: {text_muted}; white-space: nowrap; }}
 .st-key-overview_releases {{ gap: 0; }}
 /* Analytics: the workflow-state row stays pinned above the board. */
 .st-key-analytics_flow > .st-key-analytics_workflow,
@@ -690,6 +689,9 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_panel_toolbar {{ flex-wrap: nowrap; align-items: flex-start !important; }}
 .st-key-issue_panel_toolbar_left {{ flex: 1 1 0 !important; min-width: 0; flex-wrap: wrap; row-gap: 0.3rem; column-gap: 0.35rem; }}
 .st-key-issue_panel_actions {{ flex: none !important; }}
+/* Right-aligned also when the toolbar has nothing on the left (Analytics). */
+.st-key-issue_panel_toolbar > .st-key-issue_panel_actions,
+.st-key-issue_panel_toolbar > :has(> .st-key-issue_panel_actions) {{ margin-left: auto; }}
 .st-key-issue_panel_toolbar_left [data-testid="stMarkdown"], .st-key-issue_panel_toolbar_left [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
 .st-key-issue_panel_actions {{ gap: 0.5rem; }}
 .st-key-issue_panel_actions [data-testid="stButton"] button,

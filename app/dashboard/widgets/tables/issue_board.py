@@ -168,9 +168,11 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
             (cards per column, default 50), ``stages`` (explicit columns, see
             ``build_board_columns``), ``highlight_stage`` (column to mark),
             ``min_columns`` (grid width in columns, so a board with fewer
-            columns keeps the same column width) and ``lane_header`` (a
+            columns keeps the same column width), ``lane_header`` (a
             callable ``(index, stage, cards)`` that renders a column's header
-            instead of the default title and count).
+            instead of the default title and count) and ``lane_headers``
+            (False: no column headers, for a page that shows the stages
+            above the board; default True).
 
     Returns:
         The ``web_url`` of the card clicked in this run, or None.
@@ -192,23 +194,26 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
     # stay pinned while the page scrolls: the lanes' row scrolls sideways on a
     # small screen, and nothing inside a sideways-scrolling row can stick to
     # the page (see the theme CSS and ``views.pinned_header``).
-    with st.container(key=f"{key}-ibheads"):
-        head_slots = st.columns(column_count)
+    head_slots: list[Any] = [None] * column_count
+    if config.get("lane_headers", True):
+        with st.container(key=f"{key}-ibheads"):
+            head_slots = list(st.columns(column_count))
     slots = st.columns(column_count)
     for i, (head_slot, slot, (stage, cards)) in enumerate(
         zip(head_slots, slots, columns, strict=False)
     ):
         lane_kind = "iblane-hl" if stage == highlight_stage else "iblane"
-        with head_slot:
-            lane_header = config.get("lane_header")
-            if lane_header is not None:
-                lane_header(i, stage, cards)
-            else:
-                st.markdown(
-                    f'<div class="ib-lane-head{" ib-lane-hl" if lane_kind == "iblane-hl" else ""}">'
-                    f"<b>{html.escape(stage)}</b> <small>{len(cards)}</small></div>",
-                    unsafe_allow_html=True,
-                )
+        if head_slot is not None:
+            with head_slot:
+                lane_header = config.get("lane_header")
+                if lane_header is not None:
+                    lane_header(i, stage, cards)
+                else:
+                    st.markdown(
+                        f'<div class="ib-lane-head{" ib-lane-hl" if lane_kind == "iblane-hl" else ""}">'
+                        f"<b>{html.escape(stage)}</b> <small>{len(cards)}</small></div>",
+                        unsafe_allow_html=True,
+                    )
         with slot:
             with st.container(height=lane_height, border=False, key=f"{key}-{lane_kind}-{i}"):
                 if cards.empty:
