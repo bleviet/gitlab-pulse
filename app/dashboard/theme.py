@@ -745,6 +745,11 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-search_results [data-testid="stButton"] button:hover {{ background: {_with_alpha(text_color, 0.06, secondary_bg)}; }}
 .st-key-search_results [data-testid="stButton"] button p {{ text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .st-key-issue_panel_chips, .st-key-issue_panel_actions {{ gap: 0.5rem; }}
+/* Filter chips: the same size as the summary pills in the toolbar above. */
+.st-key-issue_panel_chips {{ gap: 0.3rem; }}
+.st-key-issue_panel_chips [data-testid="stButton"] button {{ min-height: 2rem; padding: 0 0.6rem 0 0.45rem; border-radius: 999px; gap: 0.3rem; }}
+.st-key-issue_panel_chips [data-testid="stButton"] button p {{ font-size: 0.875rem; }}
+.st-key-issue_panel_chips [data-testid="stButton"] button [data-testid="stIconMaterial"] {{ font-size: 1rem; }}
 .st-key-issue_panel {{ gap: 0.6rem; }}
 /* st_keyup sizes its input to the iframe; with a collapsed label it would stretch */
 .ib-lane-head {{ display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.85rem; margin-bottom: 0.1rem; color: {text_color}; }}
