@@ -786,11 +786,6 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .ib-lane-head small {{ color: {text_muted}; }}
 .ib-lane-head.ib-lane-hl b {{ color: {get_palette()["accent"]}; }}
 [class*="-iblane-hl-"] {{ outline: 2px solid {get_palette()["accent"]}; outline-offset: -2px; background: {_with_alpha(get_palette()["accent"], 0.07, secondary_bg)} !important; }}
-.st-key-issue_panel [data-baseweb="tab"] p {{ font-size: 1rem; font-weight: 700; }}
-.st-key-issue_panel [data-testid="stTabs"] h1 {{ font-size: 1.3rem; }}
-.st-key-issue_panel [data-testid="stTabs"] h2 {{ font-size: 1.15rem; }}
-.st-key-issue_panel [data-testid="stTabs"] h3 {{ font-size: 1.02rem; }}
-.st-key-issue_panel [data-testid="stTabs"] :is(h1, h2, h3) {{ padding: 0.9rem 0 0.25rem; }}
 
 /* Issue board: lanes, cards and card parts (app/dashboard/widgets/tables/issue_board.py) */
 [class*="-iblane-"] {{ background: {_with_alpha(text_color, 0.04, secondary_bg)}; border-radius: 10px; padding: 8px; }}
@@ -799,13 +794,11 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 [class*="-ibcard-"] .ib-foot {{ justify-content: space-between; }}
 [class*="-ibcard-"] .ib-right {{ display: flex; align-items: center; gap: 8px; white-space: nowrap; }}
 [class*="-ibcard-"] .ib-assignee {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-[class*="-ibsel"] {{ outline: 2px solid {get_palette()["accent"]}; outline-offset: -2px; }}
 .ib-chip {{ color: var(--ib-c); background: color-mix(in srgb, var(--ib-c) 15%, transparent); font-weight: 700; padding: 0 8px; border-radius: 999px; }}
 .ib-stale {{ color: {stale}; font-weight: 700; }}
-.ib-link {{ color: {primary}; text-decoration: none; font-size: 0.9rem; }}
 [class*="-ibcard-"] [data-testid="stMarkdown"], [class*="-ibcard-"] [data-testid="stMarkdownContainer"] {{ margin: 0 !important; }}
-[class*="-ibcard-"] [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; text-align: left; padding: 0; min-height: 0; line-height: 1.3; color: {text_color}; }}
-[class*="-ibcard-"] [data-testid="stButton"] button p {{ font-weight: 600; font-size: 0.92rem; line-height: 1.3; text-align: left; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }}
+[class*="-ibcard-"] .ib-title {{ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-align: left; font-weight: 600; font-size: 0.92rem; line-height: 1.3; color: {text_color}; text-decoration: none; }}
+[class*="-ibcard-"] a.ib-title:hover {{ text-decoration: underline; }}
 
 /* Scrollbar */
 ::-webkit-scrollbar {{

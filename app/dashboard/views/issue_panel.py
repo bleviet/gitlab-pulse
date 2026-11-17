@@ -3,9 +3,8 @@
 The Overview main panel is the workflow-state chart with the issue board below
 it. Every chart click (the stage bars and the small charts in the right panel)
 sets the board's filters, and Ctrl/Cmd+K opens a search panel with the same
-filters. This module owns that filter state, the board and table, the issue
-detail, the search panel, the URL state that makes the view shareable, and the
-recently viewed list.
+filters. This module owns that filter state, the board and table, the search
+panel, and the URL state that makes the view shareable.
 """
 
 import html
@@ -15,24 +14,14 @@ from typing import Any, cast
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
-from gitlab.exceptions import GitlabError
 
 from app.dashboard.data_loader import load_labels
-from app.dashboard.theme import get_plotly_font_color, get_priority_colors, with_alpha
+from app.dashboard.theme import get_priority_colors
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.views.issue_data import (
     FACET_QUERY_PREFIX,
     IssueFacets,
-    _build_local_issue_details,
-    _cell,
-    _fmt,
-    _format_timestamp,
-    _is_local_issue_url,
-    _issue_quality_hints,
     _issue_quality_hints_text,
-    _load_issue_details,
-    _normalize_issue_labels,
     _priority_cell_style,
     board_lanes,
     collapse_issue_contexts,
@@ -50,10 +39,8 @@ from app.dashboard.views.issue_search import inject_search_shortcut, render_sear
 from app.dashboard.widgets import tables
 from app.dashboard.widgets.tables.issue_board import build_board_columns
 
-_ISSUE_QUERY_KEYS = ("issue_source", "issue_project_id", "issue_iid")
 _SUMMARY_QUERY_KEY = "summary"
 _DEFAULT_FACETS: IssueFacets = {"state": "opened"}
-_LANE_HEIGHT = 440
 _TIME_PRESETS = {"30 Days": 30, "90 Days": 90, "1 Year": 365, "All Time": None}
 _SIDEBAR_SELECTS = (
     ("team", "Domain / Team", "sidebar_team_selector"),
@@ -74,13 +61,6 @@ def _get_facets() -> IssueFacets:
 def _with_default_state(facets: IssueFacets) -> IssueFacets:
     """Return the facets with open issues as the default state."""
     return cast(IssueFacets, {**_DEFAULT_FACETS, **facets})
-
-
-def _reset_table() -> None:
-    """Give the issue table a fresh key so stale row selections are dropped."""
-    st.session_state["issue_table_version"] = (
-        st.session_state.get("issue_table_version", 0) + 1
-    )
 
 
 def chart_key(base: str, chart_id: str) -> str:
@@ -159,9 +139,7 @@ def apply_chart_selection(
     st.session_state["issue_summary"] = None
     st.session_state["issue_chart"] = chart_id
     st.session_state["issue_facets"] = facets
-    st.session_state["selected_issue_url"] = ""
     _reset_charts(except_chart=chart_id)
-    _reset_table()
     st.rerun()
 
 
@@ -211,7 +189,6 @@ def _set_search_query(query: str) -> None:
     else:
         facets.pop("query", None)
     st.session_state["issue_facets"] = cast(IssueFacets, facets)
-    st.session_state["selected_issue_url"] = ""
 
 
 def _set_facets(facets: IssueFacets) -> None:
@@ -220,26 +197,7 @@ def _set_facets(facets: IssueFacets) -> None:
     st.session_state["issue_facets"] = facets
     if not facets:
         st.session_state["issue_summary"] = None
-    st.session_state["selected_issue_url"] = ""
     _reset_charts()
-    _reset_table()
-
-
-def _select_issue(url: str) -> None:
-    """Open the issue with this URL in the detail pane, or close the pane.
-
-    The table is reset each time so it comes back without a checked row.
-    """
-    st.session_state["selected_issue_url"] = url
-    _reset_table()
-
-
-def _selected_row(df: pd.DataFrame) -> pd.Series | None:
-    url = str(st.session_state.get("selected_issue_url") or "")
-    if not url or "web_url" not in df.columns:
-        return None
-    matches = df[df["web_url"] == url]
-    return None if matches.empty else matches.iloc[0]
 
 
 def is_active_summary(item_id: str, item_facets: IssueFacets) -> bool:
@@ -262,9 +220,7 @@ def select_summary(item_id: str | None, item_facets: IssueFacets) -> None:
         facets["query"] = query
     st.session_state["issue_summary"] = item_id
     st.session_state["issue_facets"] = facets
-    st.session_state["selected_issue_url"] = ""
     _reset_charts()
-    _reset_table()
 
 
 def _select_lane_priority(pills_key: str, stage: str) -> None:
@@ -280,9 +236,7 @@ def _select_lane_priority(pills_key: str, stage: str) -> None:
             IssueFacets, {**_with_default_state(facets), "stage": stage, "priority": priority}
         )
     st.session_state["issue_facets"] = facets
-    st.session_state["selected_issue_url"] = ""
     _reset_charts()
-    _reset_table()
 
 
 # --- URL state ---------------------------------------------------------------
@@ -292,26 +246,12 @@ def _query_snapshot() -> dict[str, str]:
         key: str(st.query_params[key])
         for key in st.query_params
         if key.startswith(FACET_QUERY_PREFIX)
-        or key in _ISSUE_QUERY_KEYS
         or key == _SUMMARY_QUERY_KEY
     }
 
 
-def _issue_url_from_query(df: pd.DataFrame, params: dict[str, str]) -> str:
-    required = {"web_url", "project_id", "iid"}
-    if not required.issubset(df.columns):
-        return ""
-    try:
-        project_id = int(params.get("issue_project_id", ""))
-        issue_iid = int(params.get("issue_iid", ""))
-    except ValueError:
-        return ""
-    matches = df[(df["project_id"] == project_id) & (df["iid"] == issue_iid)]
-    return "" if matches.empty else str(matches.iloc[0].get("web_url") or "")
-
-
-def sync_issue_state_from_query(df: pd.DataFrame) -> None:
-    """Adopt the facets, picked summary pill and selected issue from the URL.
+def sync_issue_state_from_query() -> None:
+    """Adopt the facets and the picked summary pill from the URL.
 
     The URL only differs from what this session last wrote on a fresh page
     load or when a shared or seeded link is opened, so in-app changes are never
@@ -326,20 +266,14 @@ def sync_issue_state_from_query(df: pd.DataFrame) -> None:
     from_url = facets_from_query(current)
     _sync_search_box(from_url)
     st.session_state["issue_facets"] = from_url
-    st.session_state["selected_issue_url"] = _issue_url_from_query(df, current)
 
 
-def _write_query_state(selected_row: pd.Series | None) -> None:
-    """Mirror the facets, picked summary pill and selected issue into the URL."""
+def _write_query_state() -> None:
+    """Mirror the facets and the picked summary pill into the URL."""
     desired: dict[str, str] = facets_to_query(_get_facets())
     summary_id = st.session_state.get("issue_summary")
     if summary_id:
         desired[_SUMMARY_QUERY_KEY] = str(summary_id)
-    if selected_row is not None:
-        desired["issue_project_id"] = str(int(selected_row["project_id"]))
-        desired["issue_iid"] = str(int(selected_row["iid"]))
-        if _is_local_issue_url(selected_row.get("web_url")):
-            desired["issue_source"] = "local"
 
     current = _query_snapshot()
     if current != desired:
@@ -395,12 +329,12 @@ def _set_time_range(label: str) -> None:
     st.session_state["active_range"] = label
 
 
-def finish_issue_state(df: pd.DataFrame) -> None:
+def finish_issue_state() -> None:
     """Write the URL state and install the search shortcut.
 
     Call once per run, after the Overview is rendered.
     """
-    _write_query_state(_selected_row(df))
+    _write_query_state()
     inject_search_shortcut()
 
 
@@ -435,26 +369,10 @@ def _prepare_issue_rows(issues: pd.DataFrame) -> pd.DataFrame:
     return rows
 
 
-def _selected_table_rows(table_key: str) -> tuple[int, ...]:
-    state = st.session_state.get(table_key, {})
-    selection = getattr(state, "selection", None)
-    if selection is None and isinstance(state, dict):
-        selection = state.get("selection", {})
-    rows = getattr(selection, "rows", None)
-    if rows is None and isinstance(selection, dict):
-        rows = selection.get("rows", [])
-    return tuple(rows or ())
-
-
 def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
-    """Render the issue table; selecting a row opens that issue."""
-    page = render_page_bar("table", len(rows), on_change=_reset_table)
+    """Render the issue table; the title links to the issue in GitLab."""
+    page = render_page_bar("table", len(rows))
     rows = rows.iloc[page.start:page.stop]
-    table_key = f"issue_table_{st.session_state.get('issue_table_version', 0)}"
-    selected_rows = _selected_table_rows(table_key)
-    if selected_rows and selected_rows[0] < len(rows):
-        _select_issue(str(rows.iloc[selected_rows[0]]["web_url"]))
-        st.rerun()
 
     label_styles = load_labels()
     context_options = sorted(
@@ -502,262 +420,13 @@ def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
         "column_order": column_order,
         # As tall as the page of rows: no scrolling inside.
         "height": "content",
-        "selection_mode": "single-row",
-        "key": table_key,
+        "on_select": "ignore",
+        "key": "issue_table",
         "minimize_columns": False,
         "enable_filters": False,
     }
     tables.issue_detail_grid(
         rows.style.map(_priority_cell_style, subset=["priority"]), config=grid_config
-    )
-
-
-# --- Issue detail ------------------------------------------------------------
-
-def _render_issue_detail(row: pd.Series, ordered_urls: list[str], back_label: str) -> None:
-    """Render the selected issue next to the list."""
-    project_id_val = row.get("project_id")
-    issue_iid_val = row.get("iid")
-    if pd.isna(project_id_val) or pd.isna(issue_iid_val):
-        st.error("This issue is missing the GitLab metadata required to load its details.")
-        return
-
-    is_local_issue = _is_local_issue_url(row.get("web_url"))
-    if is_local_issue:
-        issue_details = _build_local_issue_details(row)
-    else:
-        try:
-            with st.spinner("Loading issue details from GitLab..."):
-                issue_details = _load_issue_details(int(project_id_val), int(issue_iid_val))
-        except ValueError as exc:
-            st.error(str(exc))
-            return
-        except GitlabError as exc:
-            st.error(f"Failed to load issue details from GitLab: {exc}")
-            return
-
-    url = str(row.get("web_url") or "")
-    web_url = _fmt(issue_details["web_url"] or row.get("web_url"))
-    iid = _fmt(row.get("iid"))
-    title = _fmt(issue_details["title"] or row.get("title"))
-
-    position = ordered_urls.index(url) if url in ordered_urls else -1
-    previous_url = ordered_urls[position - 1] if position > 0 else ""
-    next_url = (
-        ordered_urls[position + 1] if 0 <= position < len(ordered_urls) - 1 else ""
-    )
-
-    st.markdown(f"#### #{iid} — {_cell(title)}")
-    with st.container(
-        key="issue_detail_actions", horizontal=True, vertical_alignment="center"
-    ):
-        if st.button(
-            "",
-            icon=":material/chevron_left:",
-            key="issue_detail_previous",
-            help="Previous issue in the list",
-            disabled=not previous_url,
-        ):
-            _select_issue(previous_url)
-            st.rerun()
-        if st.button(
-            "",
-            icon=":material/chevron_right:",
-            key="issue_detail_next",
-            help="Next issue in the list",
-            disabled=not next_url,
-        ):
-            _select_issue(next_url)
-            st.rerun()
-        if web_url != "—":
-            st.link_button(
-                "Open locally" if is_local_issue else "Open in GitLab",
-                web_url,
-                type="primary",
-            )
-        if st.button(
-            back_label,
-            icon=":material/arrow_back:",
-            key="issue_detail_close",
-            type="tertiary",
-        ):
-            _select_issue("")
-            st.rerun()
-
-    _render_tag_chips(row, label_styles=load_labels())
-
-    details_tab, activity_tab = st.tabs(["Details", "Activity"])
-    with details_tab:
-        col_content, col_meta = st.columns([0.68, 0.32], gap="medium")
-        with col_content:
-            description = issue_details["description"].strip()
-            if description:
-                st.markdown(description)
-            else:
-                st.caption("_No description provided._")
-            if is_local_issue:
-                st.caption("Local seeded issue details are rendered directly from parquet data.")
-        with col_meta:
-            _render_dialog_meta(row)
-
-    with activity_tab:
-        if issue_details["notes"]:
-            for note in issue_details["notes"]:
-                author = note["author_name"] or note["author_username"] or "GitLab"
-                avatar = ":material/push_pin:" if note["system"] else ":material/chat:"
-                with st.chat_message("assistant", avatar=avatar):
-                    st.markdown(f"**{author}**")
-                    st.caption(_format_timestamp(note["created_at"], system_note=note["system"]))
-                    if note["body"].strip():
-                        st.markdown(note["body"])
-                    else:
-                        st.caption("_Empty comment._")
-        elif is_local_issue:
-            st.caption("_Local seeded issues do not include GitLab activity history._")
-        else:
-            st.caption("_No comments yet._")
-
-
-def _chip_html(text: str, bg: str, fg: str) -> str:
-    """Return an inline HTML badge/chip span."""
-    return (
-        f'<span style="background-color:{bg};color:{fg};border-radius:1em;'
-        f'padding:3px 10px;font-size:0.78em;font-weight:500;'
-        f'display:inline-block;white-space:nowrap;">{text}</span>'
-    )
-
-
-def _render_tag_chips(
-    row: pd.Series,
-    label_styles: dict[str, dict[str, str]] | None = None,
-) -> None:
-    """Render priority, issue type, stage, and GitLab label chips inline.
-
-    Args:
-        row: Issue data row.
-        label_styles: Pre-loaded label styles dict. When ``None`` the function
-            loads styles itself (backward-compatible but slower).
-    """
-    if label_styles is None:
-        from app.dashboard.data_loader import load_labels as _load_labels
-        label_styles = _load_labels()
-
-    chips_html: list[str] = []
-
-    _severity_colors: dict[str, tuple[str, str]] = {
-        "critical": ("#c0392b", "#ffffff"),
-        "high":     ("#e67e22", "#ffffff"),
-        "medium":   ("#f39c12", "#ffffff"),
-        "low":      ("#27ae60", "#ffffff"),
-    }
-
-    for field, color_map in [
-        ("severity", _severity_colors),
-        ("issue_type", {}),
-        ("stage", {}),
-    ]:
-        val = _fmt(row.get(field))
-        if val == "—":
-            continue
-        bg, fg = color_map.get(val.lower(), ("#e0e0e0", "#333333"))
-        chips_html.append(_chip_html(val, bg, fg))
-
-    label_list = _normalize_issue_labels(row.get("labels"))
-    for lb in label_list:
-        style = label_styles.get(lb, {})
-        bg = style.get("color", "#e0e0e0")
-        fg = style.get("text_color", "#333333")
-        chips_html.append(_chip_html(lb, bg, fg))
-
-    if chips_html:
-        st.markdown(
-            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">'
-            + "".join(chips_html)
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-
-
-def _render_dialog_meta(row: pd.Series) -> None:
-    """Render metadata fields in the right column of the dialog body."""
-    divider_color = with_alpha(get_plotly_font_color(), 0.14)
-    label_color = with_alpha(get_plotly_font_color(), 0.72)
-    value_color = get_plotly_font_color()
-
-    text_fields: list[tuple[str, str]] = [
-        ("Stage", _fmt(row.get("stage"))),
-        ("State", _fmt(row.get("state"))),
-        ("Assignee", _fmt(row.get("assignee"))),
-        ("Milestone", _fmt(row.get("milestone"))),
-        ("Context", _fmt(row.get("context"))),
-        ("Days in Stage", _fmt(row.get("days_in_stage")) if pd.notna(row.get("days_in_stage")) else "—"),
-        ("Age", _fmt(row.get("age_days")) if pd.notna(row.get("age_days")) else "—"),
-    ]
-    quality_hints = _issue_quality_hints(row)
-    if quality_hints:
-        text_fields.append(("Quality Hints", " • ".join(quality_hints)))
-    for label, value in text_fields:
-        if value != "—":
-            st.markdown(
-                _dialog_meta_item_html(
-                    label=label,
-                    value=value,
-                    divider_color=divider_color,
-                    label_color=label_color,
-                    value_color=value_color,
-                ),
-                unsafe_allow_html=True,
-            )
-
-
-def _dialog_meta_item_html(
-    label: str,
-    value: str,
-    divider_color: str,
-    label_color: str,
-    value_color: str,
-) -> str:
-    """Build HTML for a single dialog metadata section with a separator."""
-    safe_label = html.escape(label)
-    safe_value = html.escape(value)
-    return (
-        f'<div style="padding:0.1rem 0 0.7rem 0;'
-        f'margin-bottom:0.7rem;border-bottom:1px solid {divider_color};">'
-        f'<div style="font-size:0.72rem;letter-spacing:0.08em;'
-        f'text-transform:uppercase;font-weight:700;color:{label_color};">'
-        f"{safe_label}</div>"
-        f'<div style="margin-top:0.28rem;font-size:0.98rem;line-height:1.35;'
-        f'font-weight:600;color:{value_color};">{safe_value}</div>'
-        "</div>"
-    )
-
-
-# --- Side list ----------------------------------------------------------------
-
-def _scroll_side_list_to(selected_url: str) -> None:
-    """Scroll the side list so the open issue's card is visible."""
-    components.html(
-        f"""
-        <script>
-        // issue {html.escape(selected_url)}
-        window.setTimeout(() => {{
-            const card = window.parent.document.querySelector(
-                '[class*="issue_side_list-ibcard-"][class*="-ibsel"]'
-            );
-            let box = card && card.parentElement;
-            while (box && !(box.scrollHeight > box.clientHeight + 4
-                    && /auto|scroll/.test(getComputedStyle(box).overflowY))) {{
-                box = box.parentElement;
-            }}
-            if (card && box) {{
-                box.scrollTop += card.getBoundingClientRect().top
-                    - box.getBoundingClientRect().top - 8;
-            }}
-        }}, 200);
-        </script>
-        """,
-        height=0,
-        width=0,
     )
 
 
@@ -949,9 +618,6 @@ def render_issue_panel(
     lanes = board_lanes(chart_stages, header_issues)
     lane_counts = lane_priority_counts(header_issues)
 
-    selected_row = _selected_row(df)
-    selected_url = "" if selected_row is None else str(selected_row["web_url"])
-
     noun = "issue" if len(issues) == 1 else "issues"
     count_caption = f"{len(issues)} {noun}"
 
@@ -960,54 +626,7 @@ def render_issue_panel(
         with st.container(key="issue_panel_head"):
             view = _render_panel_header(facets, count_caption, toolbar, show_filters)
 
-        if selected_row is not None:
-            list_caption = ""
-            if view == "Board":
-                # The side list is the lane the issue was opened from.
-                columns = build_board_columns(issues, lanes)
-                lane = next(
-                    (
-                        (stage, cards)
-                        for stage, cards in columns
-                        if selected_url in set(cards["web_url"].astype(str))
-                    ),
-                    None,
-                )
-                if lane is None:
-                    ordered = pd.concat([cards for _, cards in columns]) if columns else issues
-                else:
-                    ordered = lane[1]
-                    noun = "issue" if len(ordered) == 1 else "issues"
-                    list_caption = f"{lane[0]} · {len(ordered)} {noun}"
-            else:
-                rows = _prepare_issue_rows(issues) if not issues.empty else None
-                ordered = (
-                    issues.set_index("id").loc[rows["id"]].reset_index()
-                    if rows is not None
-                    else issues
-                )
-            list_col, detail_col = st.columns([0.3, 0.7], gap="medium")
-            with list_col:
-                if list_caption:
-                    st.caption(list_caption)
-                clicked_url = tables.issue_card_list(
-                    ordered,
-                    {
-                        "key": "issue_side_list",
-                        "height": _LANE_HEIGHT + 60,
-                        "selected_url": selected_url,
-                    },
-                )
-                if clicked_url and clicked_url != selected_url:
-                    _select_issue(clicked_url)
-                    st.rerun()
-                _scroll_side_list_to(selected_url)
-            with detail_col:
-                back_label = "Back to board" if view == "Board" else "Back to table"
-                _render_issue_detail(
-                    selected_row, ordered["web_url"].astype(str).tolist(), back_label
-                )
-        elif view == "Board":
+        if view == "Board":
             if issues.empty and not lane_counts:
                 st.info("No issues match the current filters.")
             else:
@@ -1015,9 +634,9 @@ def render_issue_panel(
                     (len(cards) for _, cards in build_board_columns(issues, lanes)),
                     default=0,
                 )
-                cards_page = render_page_bar("board", longest_lane, on_change=lambda: None)
+                cards_page = render_page_bar("board", longest_lane)
                 with st.container(key="issue_board_wrap"):
-                    clicked_url = tables.issue_board(
+                    tables.issue_board(
                         issues,
                         {
                             "key": "issue_board",
@@ -1034,9 +653,6 @@ def render_issue_panel(
                             ),
                         },
                     )
-                if clicked_url:
-                    _select_issue(clicked_url)
-                    st.rerun()
         elif issues.empty:
             st.info("No issues match the current filters.")
         else:

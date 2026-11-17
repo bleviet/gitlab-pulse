@@ -1,11 +1,15 @@
 """Tests for the issue board column builder."""
 
+from collections.abc import Hashable
+from typing import Any
+
 import pandas as pd
 
 from app.dashboard.theme import priority_slug
 from app.dashboard.widgets.tables.issue_board import (
     _footer_html,
     _header_html,
+    _title_html,
     build_board_columns,
 )
 
@@ -73,13 +77,33 @@ def test_stale_class_only_when_is_stale_true() -> None:
     assert "ib-stale" not in fresh and "Days in stage" in fresh
 
 
-def test_link_only_for_non_empty_url() -> None:
-    """The GitLab link is rendered, escaped, only when web_url is non-empty."""
-    with_url = _footer_html({"web_url": "https://x/y?a=1&b=2"})
+def test_footer_has_no_link() -> None:
+    """The title is the link; the footer carries none."""
+    assert "href" not in _footer_html({"web_url": "https://x/y", "days_in_stage": 3})
 
-    assert 'href="https://x/y?a=1&amp;b=2"' in with_url
-    assert "ib-link" not in _footer_html({"web_url": ""})
-    assert "ib-link" not in _footer_html({"web_url": None})
+
+def test_title_links_to_escaped_url_in_new_tab() -> None:
+    """The title is an escaped link that opens in a new tab."""
+    title = _title_html({"title": "Fix <b>x</b>", "web_url": "https://x/y?a=1&b=2"})
+
+    assert 'href="https://x/y?a=1&amp;b=2"' in title
+    assert 'target="_blank"' in title
+    assert 'rel="noopener"' in title
+    assert "Fix &lt;b&gt;x&lt;/b&gt;" in title
+    assert "<b>" not in title
+
+
+def test_title_is_plain_without_url() -> None:
+    """A card without a web_url shows its title without a link."""
+    cards: list[dict[Hashable, Any]] = [
+        {"title": "T", "web_url": ""},
+        {"title": "T", "web_url": None},
+        {"title": "T"},
+    ]
+    for card in cards:
+        title = _title_html(card)
+        assert "<a" not in title
+        assert "ib-title" in title and ">T<" in title
 
 
 def test_header_escapes_and_labels_priority() -> None:

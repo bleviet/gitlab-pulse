@@ -13,7 +13,7 @@ GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extr
 ## Visual Insights
 
 ### Two layouts
-Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews. Switch between them at the top right of the page. The filter, the layout and an open issue are kept in the URL.
+Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews. Switch between them at the top right of the page. The filter and the layout are kept in the URL.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">

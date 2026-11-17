@@ -1,43 +1,20 @@
 """Issue data helpers for the Overview page.
 
 Pure helpers shared by the Overview charts and the issue panel: quality hints,
-chart-selection masks, issue-list facets, search, and issue detail loading.
+chart-selection masks, issue-list facets, and search.
 """
 
 import ast
-import os
 import re
 from collections.abc import Mapping
 from difflib import SequenceMatcher
 from typing import TypedDict
 from urllib.parse import parse_qs, urlparse
 
-import gitlab
 import pandas as pd
-import streamlit as st
 
 from app.dashboard.theme import get_palette, with_alpha
 from app.dashboard.utils import normalize_assignee_labels
-
-
-class _IssueNoteData(TypedDict):
-    """Serialized GitLab issue note for Streamlit caching and rendering."""
-
-    author_name: str
-    author_username: str
-    body: str
-    created_at: str
-    system: bool
-
-
-class _IssueDetailsData(TypedDict):
-    """Serialized GitLab issue details for the native modal view."""
-
-    description: str
-    notes: list[_IssueNoteData]
-    title: str
-    web_url: str
-
 
 _ISSUE_GRID_SEARCH_COLUMNS = (
     "iid",
@@ -253,87 +230,6 @@ def _is_local_issue_url(url: object) -> bool:
     return query.get("issue_source", [""])[0] == "local"
 
 
-def _build_local_issue_details(row: pd.Series) -> _IssueDetailsData:
-    """Build issue details directly from a local seeded row."""
-    return {
-        "title": str(row.get("title") or ""),
-        "description": str(row.get("description") or "").strip(),
-        "web_url": str(row.get("web_url") or ""),
-        "notes": _normalize_local_issue_notes(row.get("notes")),
-    }
-
-
-def _normalize_local_issue_notes(raw_notes: object) -> list[_IssueNoteData]:
-    """Normalize seeded local-issue notes from parquet into dialog note records."""
-    if raw_notes is None:
-        return []
-
-    values = raw_notes.tolist() if hasattr(raw_notes, "tolist") else raw_notes
-    if isinstance(values, dict):
-        values = [values]
-    if not isinstance(values, list | tuple):
-        return []
-
-    notes: list[_IssueNoteData] = []
-    for value in values:
-        if not isinstance(value, dict):
-            continue
-        notes.append(
-            {
-                "author_name": str(value.get("author_name") or ""),
-                "author_username": str(value.get("author_username") or ""),
-                "body": str(value.get("body") or ""),
-                "created_at": str(value.get("created_at") or ""),
-                "system": bool(value.get("system", False)),
-            }
-        )
-
-    return notes
-
-
-@st.cache_resource
-def _get_gitlab_client() -> gitlab.Gitlab:
-    """Create and cache the GitLab API client used by the overview dialog."""
-    gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com").strip() or "https://gitlab.com"
-    private_token = os.environ.get("GITLAB_TOKEN", "").strip()
-
-    if not private_token:
-        raise ValueError("GITLAB_TOKEN environment variable is required to load issue details.")
-
-    return gitlab.Gitlab(gitlab_url, private_token=private_token, timeout=15)
-
-
-@st.cache_data(ttl=60)
-def _load_issue_details(project_id: int, issue_iid: int) -> _IssueDetailsData:
-    """Fetch the latest issue description and notes from the GitLab REST API."""
-    client = _get_gitlab_client()
-    project = client.projects.get(project_id)
-    issue = project.issues.get(issue_iid)
-
-    issue_attrs = issue.attributes
-    notes: list[_IssueNoteData] = []
-
-    for note in issue.notes.list(iterator=True, order_by="created_at", sort="asc"):
-        note_attrs = note.attributes
-        author = note_attrs.get("author") or {}
-        notes.append(
-            {
-                "author_name": str(author.get("name") or ""),
-                "author_username": str(author.get("username") or ""),
-                "body": str(note_attrs.get("body") or ""),
-                "created_at": str(note_attrs.get("created_at") or ""),
-                "system": bool(note_attrs.get("system", False)),
-            }
-        )
-
-    return {
-        "title": str(issue_attrs.get("title") or ""),
-        "description": str(issue_attrs.get("description") or ""),
-        "web_url": str(issue_attrs.get("web_url") or ""),
-        "notes": notes,
-    }
-
-
 def _normalize_issue_labels(raw_labels: object) -> list[str]:
     """Normalize labels from parquet/array/string forms into individual values."""
     if raw_labels is None:
@@ -369,29 +265,6 @@ def _normalize_issue_labels(raw_labels: object) -> list[str]:
         return _clean_labels(list(parsed))
 
     return [raw]
-
-
-def _fmt(val: object) -> str:
-    """Return a clean string value or '—' for missing/empty."""
-    if val is None:
-        return "—"
-    s = str(val).strip()
-    return "—" if s.lower() in ("nan", "none", "nat", "<na>", "") else s
-
-
-def _format_timestamp(value: str, system_note: bool = False) -> str:
-    """Format a GitLab timestamp for dialog metadata."""
-    parsed = pd.to_datetime(value, utc=True, errors="coerce")
-    if pd.isna(parsed):
-        suffix = " · system note" if system_note else ""
-        return f"{value}{suffix}" if value else "Unknown time"
-    formatted = parsed.strftime("%Y-%m-%d %H:%M UTC")
-    return f"{formatted} · system note" if system_note else formatted
-
-
-def _cell(val: str) -> str:
-    """Escape a string for safe use inside a markdown table cell."""
-    return val.replace("|", "\\|").replace("\n", " ").replace("\r", "")
 
 
 def _build_issue_search_mask(

@@ -84,7 +84,7 @@ def _header_html(card: Mapping[Hashable, Any]) -> str:
 
 
 def _footer_html(card: Mapping[Hashable, Any]) -> str:
-    """Build the card footer: assignee left; days and GitLab link right."""
+    """Build the card footer: assignee left, days in stage right."""
     assignee = str(
         normalize_assignee_labels(pd.Series([card.get("assignee")])).iloc[0]
     )
@@ -98,67 +98,34 @@ def _footer_html(card: Mapping[Hashable, Any]) -> str:
             )
         else:
             right += f'<span class="ib-days" title="Days in stage">{days:.0f}d</span>'
-    url = card.get("web_url")
-    if isinstance(url, str) and url:
-        right += (
-            f'<a class="ib-link" href="{html.escape(url, quote=True)}" '
-            'target="_blank" rel="noopener" aria-label="Open in GitLab">↗</a>'
-        )
     return (
         f'<div class="ib-foot"><span class="ib-assignee">{html.escape(assignee)}'
         f'</span><span class="ib-right">{right}</span></div>'
     )
 
 
-def _render_card(
-    card: Mapping[Hashable, Any], key: str, selected: bool = False
-) -> str | None:
-    """Render one issue card; return its ``web_url`` when it was clicked."""
+def _title_html(card: Mapping[Hashable, Any]) -> str:
+    """Build the card title, a link to the issue when it has a ``web_url``."""
+    title = html.escape(_truncate(str(card.get("title", ""))))
+    url = card.get("web_url")
+    if isinstance(url, str) and url:
+        return (
+            f'<a class="ib-title" href="{html.escape(url, quote=True)}" '
+            f'target="_blank" rel="noopener">{title}</a>'
+        )
+    return f'<span class="ib-title">{title}</span>'
+
+
+def _render_card(card: Mapping[Hashable, Any], key: str) -> None:
+    """Render one issue card; its title opens the issue in a new tab."""
     slug = priority_slug(_priority_text(card))
-    marker = "-ibsel" if selected else ""
-    clicked: str | None = None
-    with st.container(key=f"{key}-ibcard-{slug}-{card.get('id')}{marker}"):
+    with st.container(key=f"{key}-ibcard-{slug}-{card.get('id')}"):
         st.markdown(_header_html(card), unsafe_allow_html=True)
-        title = _truncate(str(card.get("title", "")))
-        if st.button(title, key=f"{key}_{card.get('id')}", type="tertiary"):
-            url = card.get("web_url")
-            clicked = url if isinstance(url, str) and url else None
+        st.markdown(_title_html(card), unsafe_allow_html=True)
         st.markdown(_footer_html(card), unsafe_allow_html=True)
-    return clicked
 
 
-def issue_card_list(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str | None:
-    """Render issues as one scrollable column of cards, in the given order.
-
-    Args:
-        df: Issues to list, one row per issue, already sorted.
-        config: Optional settings: ``key`` (widget key prefix, default
-            ``"issue_card_list"``), ``height`` (px, default 620), ``max_cards``
-            (default 100) and ``selected_url`` (card to mark as current).
-
-    Returns:
-        The ``web_url`` of the card clicked in this run, or None.
-    """
-    config = config or {}
-    key = str(config.get("key", "issue_card_list"))
-    max_cards = int(config.get("max_cards", 100))
-    selected_url = config.get("selected_url")
-
-    clicked: str | None = None
-    with st.container(
-        height=int(config.get("height", 620)), border=False, key=f"{key}-iblane-0"
-    ):
-        for card in df.head(max_cards).to_dict("records"):
-            card_clicked = _render_card(
-                card, key, selected=card.get("web_url") == selected_url
-            )
-            clicked = card_clicked or clicked
-    if len(df) > max_cards:
-        st.caption(f"+{len(df) - max_cards} more; narrow the filter or search")
-    return clicked
-
-
-def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str | None:
+def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> None:
     """Render a read-only Kanban board of issues grouped by stage.
 
     Args:
@@ -176,9 +143,6 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
             instead of the default title and count) and ``lane_headers``
             (False: no column headers, for a page that shows the stages
             above the board; default True).
-
-    Returns:
-        The ``web_url`` of the card clicked in this run, or None.
     """
     config = config or {}
     key = str(config.get("key", "issue_board"))
@@ -190,9 +154,8 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
     columns = build_board_columns(df, config.get("stages"))
     if not columns:
         st.info("No issues to display")
-        return None
+        return
 
-    clicked: str | None = None
     column_count = max(len(columns), int(config.get("min_columns", 0)))
     # The headers are a row of their own, not the top of each lane, so they can
     # stay pinned while the page scrolls: the lanes' row scrolls sideways on a
@@ -230,8 +193,7 @@ def issue_board(df: pd.DataFrame, config: dict[str, Any] | None = None) -> str |
                 if shown.empty:
                     st.caption("No issues" if cards.empty else "No more issues")
                 for card in shown.to_dict("records"):
-                    clicked = _render_card(card, key) or clicked
+                    _render_card(card, key)
             remaining = len(cards) - card_start - len(shown)
             if remaining > 0:
                 st.caption(f"+{remaining} more on the next pages")
-    return clicked

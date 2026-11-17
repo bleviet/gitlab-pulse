@@ -2,13 +2,11 @@
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from app.dashboard.utils import normalize_assignee_labels
 from app.dashboard.views.issue_data import (
     _build_issue_search_mask,
-    _build_local_issue_details,
     _build_overview_quality_signal_df,
     _has_multiple_classification_labels,
     _is_local_issue_url,
@@ -21,7 +19,6 @@ from app.dashboard.views.issue_data import (
     _selection_mask_for_quality_signal,
     _selection_mask_for_value,
 )
-from app.dashboard.views.issue_panel import _dialog_meta_item_html
 from tools.local_data_manager import delete_local_projects, discover_local_projects
 from tools.seeder import build_local_issue_url, generate_issues, seed_data
 
@@ -118,37 +115,6 @@ def test_build_local_issue_url_uses_dashboard_query_params() -> None:
     )
 
 
-def test_build_local_issue_details_uses_seeded_row_data() -> None:
-    """Local issue detail rendering should come from the parquet row."""
-    row = pd.Series(
-        {
-            "title": "Seeded issue",
-            "description": "Local description",
-            "web_url": build_local_issue_url(101, 3),
-            "notes": np.array(
-                [
-                    {
-                        "author_name": "Alex Rivera",
-                        "author_username": "arivera",
-                        "body": "Checked the latest repro.",
-                        "created_at": "2024-01-02T10:00:00Z",
-                        "system": False,
-                    }
-                ],
-                dtype=object,
-            ),
-        }
-    )
-
-    details = _build_local_issue_details(row)
-
-    assert details["title"] == "Seeded issue"
-    assert details["description"] == "Local description"
-    assert details["web_url"].endswith("issue_iid=3")
-    assert len(details["notes"]) == 1
-    assert details["notes"][0]["author_username"] == "arivera"
-
-
 def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:
     """Issue label chips should split numpy-style string arrays into values."""
     raw = (
@@ -189,21 +155,6 @@ def test_priority_cell_style_uses_palette_defaults_for_known_values() -> None:
     assert style is not None
     assert "background-color:" in style
     assert "font-weight: 700;" in style
-
-
-def test_dialog_meta_item_html_adds_separator_and_escapes_content() -> None:
-    """Dialog metadata sections should render dividers with escaped text."""
-    html_markup = _dialog_meta_item_html(
-        label="Stage <Current>",
-        value="Review & QA",
-        divider_color="rgba(255,255,255,0.14)",
-        label_color="rgba(255,255,255,0.72)",
-        value_color="#d4deee",
-    )
-
-    assert "border-bottom:1px solid rgba(255,255,255,0.14)" in html_markup
-    assert "Stage &lt;Current&gt;" in html_markup
-    assert "Review &amp; QA" in html_markup
 
 
 def test_has_multiple_classification_labels_detects_duplicate_type_family() -> None:

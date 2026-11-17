@@ -68,6 +68,7 @@ def issue_detail_grid(
             - minimize_columns: bool (default True) to filter columns
             - column_config: dict of column configurations to merge/override
             - column_order: list of column names for ordering
+            - on_select: "rerun" (default) or "ignore" for no row selection
             - selection_mode: "single-row", "multi-row" (default "multi-row")
             - zebra_stripes: bool (default True)
             - zebra_color: CSS color for zebra rows
@@ -81,6 +82,7 @@ def issue_detail_grid(
     config = config or {}
     title = config.get("title")
     widget_key = config.get("key", "issue_detail_grid")
+    on_select = config.get("on_select", "rerun")
     selection_mode = config.get("selection_mode", "multi-row")
     zebra_stripes = config.get("zebra_stripes", True)
     height_option = config.get("height", 400)
@@ -309,7 +311,7 @@ def issue_detail_grid(
         hide_index=True,
         column_config=final_col_config,
         column_order=final_column_order,
-        on_select="rerun",
+        on_select=on_select,
         selection_mode=selection_mode,
         key=widget_key,
     )

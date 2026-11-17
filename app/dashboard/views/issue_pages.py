@@ -13,7 +13,6 @@ Each view keeps its own size and page in session state
 (``issue_<view>_rows``, ``issue_<view>_page``).
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -48,19 +47,17 @@ def page_bounds(total: int, size_option: str, page: int) -> tuple[int, int, int]
     return page * size, min(total, (page + 1) * size), page
 
 
-def _turn_page(view: View, step: int, on_change: Callable[[], None]) -> None:
+def _turn_page(view: View, step: int) -> None:
     key = f"issue_{view}_page"
     st.session_state[key] = st.session_state.get(key, 0) + step
-    on_change()
 
 
-def _change_size(view: View, on_change: Callable[[], None]) -> None:
+def _change_size(view: View) -> None:
     # Clicking the active option deselects it; keep the current one then.
     choice = st.session_state.get(f"issue_{view}_rows_choice")
     if choice:
         st.session_state[f"issue_{view}_rows"] = choice
     st.session_state[f"issue_{view}_page"] = 0
-    on_change()
 
 
 def _pager_label(view: View, start: int, stop: int, total: int, size: int) -> str:
@@ -69,14 +66,12 @@ def _pager_label(view: View, start: int, stop: int, total: int, size: int) -> st
     return f"{start + 1}–{stop} of {total}"
 
 
-def render_page_bar(view: View, total: int, on_change: Callable[[], None]) -> PageWindow:
+def render_page_bar(view: View, total: int) -> PageWindow:
     """Render the size control (and page buttons) above the table or board.
 
     Args:
         view: "table" or "board".
         total: Number of rows (table) or cards in the longest lane (board).
-        on_change: Called when the page or the size changes, so the caller
-            can drop a row selection that pointed into the old page.
 
     Returns:
         The slice to show.
@@ -102,7 +97,7 @@ def render_page_bar(view: View, total: int, on_change: Callable[[], None]) -> Pa
                 key=f"issue_{view}_prev",
                 disabled=start == 0,
                 on_click=_turn_page,
-                args=(view, -1, on_change),
+                args=(view, -1),
                 help="Previous page",
             )
             st.caption(_pager_label(view, start, stop, total, int(size_option)))
@@ -112,7 +107,7 @@ def render_page_bar(view: View, total: int, on_change: Callable[[], None]) -> Pa
                 key=f"issue_{view}_next",
                 disabled=stop >= total,
                 on_click=_turn_page,
-                args=(view, 1, on_change),
+                args=(view, 1),
                 help="Next page",
             )
         st.caption(_SIZE_LABEL[view])
@@ -122,6 +117,6 @@ def render_page_bar(view: View, total: int, on_change: Callable[[], None]) -> Pa
             key=f"issue_{view}_rows_choice",
             label_visibility="collapsed",
             on_change=_change_size,
-            args=(view, on_change),
+            args=(view,),
         )
     return PageWindow(start, stop)

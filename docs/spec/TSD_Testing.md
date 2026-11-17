@@ -53,7 +53,6 @@ Tests verify:
 
 - seeder assignment-rate and team-size behavior
 - local issue URL generation
-- local issue detail resolution
 - local project discovery and deletion utilities
 - overview quality-signal helpers
 

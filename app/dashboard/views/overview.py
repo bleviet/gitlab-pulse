@@ -120,7 +120,7 @@ def render_overview(
         st.warning("No data available.")
         return
 
-    sync_issue_state_from_query(df)
+    sync_issue_state_from_query()
     layout = _current_layout()
     _render_layout_switch()
     inject_pinned_header_script()
@@ -154,4 +154,4 @@ def render_overview(
             toolbar=lambda: render_summary_bar(unique_df),
         )
     _write_layout_query(layout)
-    finish_issue_state(df)
+    finish_issue_state()

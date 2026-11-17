@@ -113,7 +113,7 @@ While the board is filtered, a row under the toolbar shows one removable chip pe
 
 ### 4.1.1 URL state
 
-The facets, the picked summary pill and the selected issue are mirrored into query parameters (`summary`, `f_stage`, `f_state`, `f_priority`, `f_signal`, `f_recent`, `f_day`, `f_day_kind`, `f_query`, `issue_project_id`, `issue_iid`; the layout uses `view`), so a refresh or a shared link restores the same view. The URL is only read when it differs from what the session last wrote, which is the case on page load. Malformed values are ignored. Sidebar filters are not part of the URL.
+The facets and the picked summary pill are mirrored into query parameters (`summary`, `f_stage`, `f_state`, `f_priority`, `f_signal`, `f_recent`, `f_day`, `f_day_kind`, `f_query`; the layout uses `view`), so a refresh or a shared link restores the same view. The URL is only read when it differs from what the session last wrote, which is the case on page load. Malformed values are ignored. Sidebar filters are not part of the URL.
 
 ### 4.2 Milestone synchronization
 
@@ -136,13 +136,13 @@ Each view keeps its own size and page in session state (`issue_table_rows`, `iss
 
 **Table.** The table applies all facets. It shows one row per issue (several contexts appear as chips in the Context column), sorted by priority rank and then by days in stage. The Stage column is hidden while a stage facet is active, and the Quality hints column is shown only when a listed issue has hints.
 
-**Issue detail.** Selecting a card or a row opens the issue in place of the board or table, next to a column of cards. From the board, that column is the lane the issue was opened from; from the table, it is the table order. The open card is outlined and scrolled into view. Previous/next follow that column. "Back to board" or "Back to table" returns to the list.
+**Opening an issue.** A card's title and the table's Title column open the issue's `web_url` in a new browser tab. The dashboard has no in-app issue detail.
 
 Issue state changes are not possible from the list; they are made in GitLab.
 
-### 4.4 Local seeded issue details
+### 4.4 Local seeded issues
 
-For locally seeded issues, the detail flow resolves from local parquet-backed data rather than assuming a live GitLab API lookup. This keeps local demo workflows usable end-to-end.
+Seeded issues have a `web_url` that points back to the dashboard (`issue_source=local`), so their link opens the dashboard in a new tab. There is no GitLab page for them.
 
 ### 4.5 Search field (Ctrl/Cmd+K)
 
