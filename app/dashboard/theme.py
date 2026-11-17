@@ -695,7 +695,10 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_panel_toolbar_left [data-testid="stMarkdown"], .st-key-issue_panel_toolbar_left [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
 .st-key-issue_panel_actions {{ gap: 0.5rem; }}
 .st-key-issue_panel_actions [data-testid="stButtonGroup"] button {{ min-height: 1.9rem; padding: 0.1rem 0.7rem; font-size: 0.82rem; }}
-.ov-divider {{ display: inline-block; width: 1px; height: 1.2rem; background: {border}; vertical-align: middle; }}
+.ov-divider {{ display: block; width: 1px; height: 1.2rem; background: {border}; }}
+/* The divider's paragraph would add a line height and a margin, making the
+   toolbar row taller than the pills and pushing them below the search field. */
+[data-testid="stMarkdownContainer"] p:has(> .ov-divider) {{ margin: 0; line-height: 0; }}
 /* Pills: compact, and the picked one in the accent colour (orange is kept for primary actions). */
 .st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] {{ gap: 0.3rem; }}
 .st-key-issue_panel_toolbar_left [data-testid="stButtonGroup"] button,
