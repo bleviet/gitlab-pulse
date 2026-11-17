@@ -158,6 +158,8 @@ def render_analytics_layout(
             config={
                 "key": f"analytics_timeline_{key_suffix}",
                 "height": 150,
+                # The Compact layout's rail; the panel heading is its label.
+                "style": "rail",
                 "highlight_milestone": active_milestone,
             },
         )

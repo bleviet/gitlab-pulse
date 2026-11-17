@@ -61,6 +61,8 @@ _SIDEBAR_SELECTS = (
     ("milestone", "Milestone", "sidebar_milestone_selector"),
 )
 _VIEW_ICONS = {"Board": ":material/view_kanban:", "Table": ":material/table_rows:"}
+# The issue list opens as a table; the board is one click away.
+_DEFAULT_VIEW = "Table"
 
 
 # --- Session state -----------------------------------------------------------
@@ -839,7 +841,7 @@ def _render_panel_header(
     Returns:
         The active view, ``"Board"`` or ``"Table"``.
     """
-    persisted_view = st.session_state.get("filtered_issues_view", "Board")
+    persisted_view = st.session_state.get("filtered_issues_view", _DEFAULT_VIEW)
     with st.container(
         key="issue_panel_toolbar",
         horizontal=True,
@@ -955,7 +957,7 @@ def render_issue_panel(
 
     # The switch's own state is current even on the rerun it triggered.
     current_view = st.session_state.get("filtered_issues_view_choice") or st.session_state.get(
-        "filtered_issues_view", "Board"
+        "filtered_issues_view", _DEFAULT_VIEW
     )
     if current_view == "Board":
         noun = "issue" if len(board_issues) == 1 else "issues"

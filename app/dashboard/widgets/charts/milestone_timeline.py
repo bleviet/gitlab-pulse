@@ -242,13 +242,13 @@ def milestone_timeline(
                 showlegend=not is_dim,  # only one legend entry per status
                 opacity=float(opacity_val),
                 marker=dict(
-                    # Rail style: round dots with a ring in the page
-                    # background colour, so they read as pins on the rail.
-                    size=group_df["size"] - 3 if rail else group_df["size"],
+                    # Round dots with a ring in the page background colour,
+                    # so they read as pins on the timeline (both styles).
+                    size=group_df["size"] - 3,
                     color=color,
-                    symbol="circle" if rail else "diamond",
+                    symbol="circle",
                     line=dict(
-                        width=group_df["line_width"] + 2 if rail else group_df["line_width"],
+                        width=group_df["line_width"] + 2,
                         color=group_df["line_color"],
                     ),
                 ),

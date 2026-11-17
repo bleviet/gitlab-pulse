@@ -80,7 +80,7 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 
 | Row | Panels |
 |---|---|
-| 1 | Release Timeline (three quarters of the width), Closed Issues by Priority (donut) |
+| 1 | Release Timeline (three quarters of the width; the rail style of the Compact layout, 3.1), Closed Issues by Priority (donut) |
 | 2 | Open Issues by Priority (donut), Issue Quality Signals, Daily New vs. Closed Issues (7 days) |
 | 3 | Issues by Workflow State (priority bars per stage); stays pinned below the header while the board scrolls |
 
@@ -121,7 +121,7 @@ The release timeline and sidebar milestone selector are synchronized bidirection
 
 ### 4.3 Issue board
 
-The board (`app/dashboard/views/issue_panel.py`) shows Board by default; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search field (4.5) applies to both views.
+The issue list (`app/dashboard/views/issue_panel.py`) opens as the Table; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search field (4.5) applies to both views.
 
 **Paging** (`app/dashboard/views/issue_pages.py`). A bar above the table or the board, pinned below the toolbar while the page scrolls (on the board, the lane headers are pinned below it), sets how much is shown: 10 (default), 20 or 30 per page, with previous/next buttons when there is more than one page. The table and the lanes are exactly as tall as one page, with no scrolling inside; the page scrolls instead.
 
