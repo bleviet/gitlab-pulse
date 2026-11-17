@@ -15,6 +15,7 @@ from __future__ import annotations
 import collections.abc
 import re
 import types
+from collections.abc import Iterable
 from typing import Any
 
 # --- Font Constants ---
@@ -221,15 +222,28 @@ def get_severity_colors() -> dict[str, str]:
         "Unset": p["unset"],
     }
 
+_PRIORITY_PALETTE_KEYS: dict[str, str] = {"P1": "p1", "P2": "p2", "P3": "p3"}
+
+
+def register_priority_order(names: Iterable[str]) -> None:
+    """Register priority names, most urgent first, for colouring.
+
+    The first name uses the ``p1`` palette colour, the second ``p2``, and
+    every later name ``p3``.
+
+    Args:
+        names: Priority names ordered from most to least urgent.
+    """
+    for position, name in enumerate(names):
+        _PRIORITY_PALETTE_KEYS[name] = f"p{min(position, 2) + 1}"
+
+
 def get_priority_colors() -> dict[str, str]:
     """Return colors mapping for priorities."""
     p = get_palette()
-    return {
-        "P1": p["p1"],
-        "P2": p["p2"],
-        "P3": p["p3"],
-        "Unset": p["unset"],
-    }
+    colors = {name: p[key] for name, key in _PRIORITY_PALETTE_KEYS.items()}
+    colors["Unset"] = p["unset"]
+    return colors
 
 def priority_slug(name: object) -> str:
     """Return a lowercase ``[a-z0-9]`` slug of a priority name (CSS/key safe)."""

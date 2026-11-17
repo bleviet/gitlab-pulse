@@ -23,7 +23,11 @@ from app.dashboard.data_loader import (
 from app.dashboard.views.overview import render_overview
 from app.processor.rule_loader import RuleLoader
 from app.dashboard.sidebar import render_sidebar
-from app.dashboard.theme import apply_rule_color_overrides, get_global_css
+from app.dashboard.theme import (
+    apply_rule_color_overrides,
+    get_global_css,
+    register_priority_order,
+)
 
 _FAVICON = Image.open(Path(__file__).parent / "static" / "favicon.png")
 
@@ -34,6 +38,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+_RULE_LOADER = RuleLoader()
+for _rule in _RULE_LOADER.rules.values():
+    register_priority_order(_rule.classification.get("priority", {}))
 
 # Global CSS: only residual styling not covered by config.toml theming
 st.markdown(get_global_css(), unsafe_allow_html=True)
@@ -87,7 +95,7 @@ def main() -> None:
     quality_df = load_quality_issues()
 
     # Load rules to get color overrides
-    rule_loader = RuleLoader()
+    rule_loader = _RULE_LOADER
     # Try to find default team rule, otherwise use first available or empty default
     default_rule = None
     for rule in rule_loader.rules.values():
