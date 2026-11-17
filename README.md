@@ -26,7 +26,7 @@ Two layouts share one issue board. **Compact** (default) puts the board first fo
 </picture>
 
 ### Board and table
-Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. The toolbar, the page bar and the lane headers stay pinned while you scroll. The issue list opens as a table; both show 10, 20 or 30 issues per page.
+Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. The toolbar, the page bar and the lane headers stay pinned while you scroll. The issue list opens as a table; both show 10, 20 or 30 issues per page. A card's title or a row's title opens the issue in GitLab in a new tab.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_board_dark.png">

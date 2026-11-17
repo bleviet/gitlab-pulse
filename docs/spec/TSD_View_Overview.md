@@ -130,7 +130,7 @@ The issue list (`app/dashboard/views/issue_panel.py`) opens as the Table; the ch
 
 The Overview has only a small margin below the panel, so the page stops scrolling once the last row or card is in view, instead of moving the table or lanes up under the pinned rows.
 
-Each view keeps its own size and page in session state (`issue_table_rows`, `issue_board_rows`, and `_page`). A page is clamped when a filter leaves fewer rows; changing the table's page clears a row selection, so a click always opens the row shown.
+Each view keeps its own size and page in session state (`issue_table_rows`, `issue_board_rows`, and `_page`). A page is clamped when a filter leaves fewer rows.
 
 **Board.** Lanes are the stages that have open issues, in workflow order (`overview_stages`). Lanes without matching issues stay visible and empty. Other stages (for example "Done" for closed issues) are appended; when none of the issues is in one of those stages, only the stages with issues are shown, in the same column width. The board applies all facets, like the table, so both show the same issues. The lane of the `stage` facet is marked and the other lanes stay visible (empty), also when no issue matches, so the lane pills can undo the selection; the caption shows the issue count. Each lane shows at most 50 cards and scrolls on its own.
 
