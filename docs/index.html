@@ -1,1135 +1,1657 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="dark">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitLab Pulse | by bahonavi</title>
-
-    <link rel="icon" type="image/svg+xml" href="images/logo.svg">
-
-    <style>
-        @font-face {
-            font-family: "Manrope";
-            font-style: normal;
-            font-weight: 200 800;
-            font-display: swap;
-            src: url("fonts/manrope-latin-wght-normal.woff2") format("woff2");
-        }
-
-        @font-face {
-            font-family: "Space Grotesk";
-            font-style: normal;
-            font-weight: 300 700;
-            font-display: swap;
-            src: url("fonts/space-grotesk-latin-wght-normal.woff2") format("woff2");
-        }
-
-        /* =========================================
-           BAHONAVI BRAND TOKENS
-           ========================================= */
-        :root {
-            /* Dark Theme (Default) */
-            --bg: #050811;
-            --bg-card: #0c1123;
-            --surface: rgba(255, 255, 255, 0.05);
-            --line: rgba(255, 255, 255, 0.08);
-            --text: #d4deee;
-            --muted: #7a8fa8;
-            --accent: #00f2fe;
-            --nav-bg: rgba(5, 8, 17, 0.84);
-            --shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
-
-            /* Brand Colors (Universal) */
-            --brand: #ff512f;
-            --brand-2: #dd2476;
-            --grad: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);
-
-            /* Nodes */
-            --node-cyan: #4facfe;
-            --node-pink: #f5576c;
-            --node-purple: #da22ff;
-
-            /* Charts - Dark Theme */
-            --chart-1: #4facfe;
-            --chart-2: #ff7354;
-            --chart-3: #c76bff;
-            --chart-4: #f5576c;
-            --chart-5: #74c7f0;
-            --chart-6: #f4a44a;
-            --chart-7: #56d4b0;
-            --chart-8: #9f7bea;
-            --chart-bg: var(--bg-card);
-            --chart-grid: rgba(255, 255, 255, 0.06);
-            --chart-axis: rgba(255, 255, 255, 0.12);
-            --chart-label: var(--muted);
-            --chart-tooltip-bg: rgba(12, 17, 35, 0.95);
-
-            /* Layout Tokens */
-            --r: 20px;
-            --max: 1140px;
-
-            /* Animation timings */
-            --stagger: 0.15s;
-        }
-
-        [data-theme="light"] {
-            --bg: #e8ecf5;
-            --bg-card: #f1f4fb;
-            --surface: rgba(0, 0, 0, 0.07);
-            --line: rgba(0, 0, 0, 0.14);
-            --text: #0d1120;
-            --muted: #3d5370;
-            --accent: #006ea3;
-            --nav-bg: rgba(232, 236, 245, 0.93);
-            --shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
-
-            --node-cyan: #005e9e;
-            --node-pink: #b51c3c;
-            --node-purple: #8a0ea8;
-
-            /* Charts - Light Theme */
-            --chart-1: #005e9e;
-            --chart-2: #d63e1a;
-            --chart-3: #8a0ea8;
-            --chart-4: #b51c3c;
-            --chart-5: #0079b3;
-            --chart-6: #b06000;
-            --chart-7: #1a7a62;
-            --chart-8: #5c2e9a;
-            --chart-grid: rgba(0, 0, 0, 0.05);
-            --chart-axis: rgba(0, 0, 0, 0.12);
-            --chart-tooltip-bg: rgba(241, 244, 251, 0.97);
-        }
-
-        /* =========================================
-           BASE RESET & TYPOGRAPHY
-           ========================================= */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: "Manrope", system-ui, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            overflow-x: hidden;
-            transition: background-color 0.4s ease, color 0.4s ease;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        .display-font {
-            font-family: "Space Grotesk", system-ui, sans-serif;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            line-height: 1.05;
-        }
-
-        a {
-            color: var(--accent);
-            text-decoration: none;
-            transition: opacity 0.2s ease;
-        }
-
-        a:hover {
-            opacity: 0.8;
-        }
-
-        .container {
-            width: min(var(--max), calc(100% - 2.5rem));
-            margin: 0 auto;
-        }
-
-        .section-label {
-            font-family: "Space Grotesk", sans-serif;
-            font-size: 0.76rem;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: var(--accent);
-            display: inline-block;
-            margin-bottom: 1rem;
-        }
-
-        /* =========================================
-           UTILITIES & COMPONENTS
-           ========================================= */
-        .grad-text {
-            background: var(--grad);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            display: inline-block;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.8rem 1.8rem;
-            border-radius: var(--r);
-            font-family: "Space Grotesk", sans-serif;
-            font-weight: 700;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            border: none;
-            outline: none;
-        }
-
-        .btn-primary {
-            background: var(--grad);
-            color: #fff;
-            box-shadow: 0 8px 20px rgba(255, 81, 47, 0.25);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 25px rgba(255, 81, 47, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--surface);
-            color: var(--text);
-            border: 1px solid var(--line);
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-card);
-            border-color: var(--muted);
-        }
-
-        .card {
-            background: var(--bg-card);
-            border-radius: var(--r);
-            padding: 2.5rem;
-            border: 1px solid var(--line);
-            box-shadow: var(--shadow);
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.3s ease, border-color 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        /* =========================================
-           LAYOUT & SECTIONS
-           ========================================= */
-        /* Navbar */
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 100;
-            background: var(--nav-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--line);
-        }
-
-        .nav-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 80px;
-        }
-
-        .logo {
-            font-family: "Space Grotesk", sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-        }
-
-        .nav-links a {
-            color: var(--text);
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .nav-links a:hover {
-            color: var(--accent);
-        }
-
-        .theme-toggle {
-            background: transparent;
-            border: 1px solid var(--line);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s ease;
-        }
-
-        .theme-toggle:hover {
-            background: var(--surface);
-        }
-
-        /* Hero Section */
-        .hero {
-            padding: 180px 0 100px;
-            position: relative;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-        }
-
-        /* Ambient Glows */
-        .hero-glow {
-            position: absolute;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            filter: blur(120px);
-            z-index: -1;
-            opacity: 0.15;
-            animation: float-glow 10s infinite alternate ease-in-out;
-        }
-
-        .hero-glow-1 {
-            top: -10%;
-            left: -10%;
-            background: var(--node-purple);
-        }
-
-        .hero-glow-2 {
-            bottom: 10%;
-            right: 0%;
-            background: var(--node-cyan);
-            animation-delay: -5s;
-        }
-
-        .hero-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-        }
-
-        .hero-content h1 {
-            font-size: clamp(3rem, 5vw, 4.5rem);
-            margin-bottom: 1.5rem;
-        }
-
-        .hero-content p {
-            font-size: 1.25rem;
-            color: var(--muted);
-            margin-bottom: 2.5rem;
-            max-width: 90%;
-        }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        /* Animated Dashboard Abstraction */
-        .dash-mockup {
-            background: var(--bg-card);
-            border: 1px solid var(--line);
-            border-radius: var(--r);
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            position: relative;
-            transform: perspective(1000px) rotateY(-5deg) rotateX(5deg);
-            transform-style: preserve-3d;
-            animation: float 6s infinite ease-in-out;
-        }
-
-        .dash-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid var(--line);
-            padding-bottom: 1rem;
-        }
-
-        .dash-skeleton-title {
-            width: 120px;
-            height: 16px;
-            background: var(--surface);
-            border-radius: 4px;
-        }
-
-        .dash-skeleton-nav {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .dash-skeleton-nav div {
-            width: 40px;
-            height: 16px;
-            background: var(--surface);
-            border-radius: 4px;
-        }
-
-        .dash-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        /* Abstract Donut Chart */
-        .mock-donut-card {
-            background: var(--surface);
-            border-radius: calc(var(--r) / 2);
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border: 1px solid var(--line);
-        }
-
-        .donut-ring {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: conic-gradient(var(--chart-1) 0% 60%,
-                    var(--chart-6) 60% 85%,
-                    var(--chart-4) 85% 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            animation: spin-in 2s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
-        }
-
-        .donut-hole {
-            width: 65%;
-            height: 65%;
-            background: var(--bg-card);
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2;
-        }
-
-        .donut-val {
-            font-family: "Space Grotesk";
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--text);
-        }
-
-        .donut-sub {
-            font-size: 0.6rem;
-            color: var(--muted);
-        }
-
-        /* Abstract Bar Chart */
-        .mock-bar-card {
-            background: var(--surface);
-            border-radius: calc(var(--r) / 2);
-            padding: 1.5rem;
-            grid-column: span 2;
-            border: 1px solid var(--line);
-        }
-
-        .bar-chart-container {
-            display: flex;
-            align-items: flex-end;
-            gap: 1rem;
-            height: 120px;
-            margin-top: 1rem;
-            border-bottom: 1px solid var(--chart-grid);
-        }
-
-        .bar {
-            flex: 1;
-            background: var(--chart-1);
-            border-radius: 4px 4px 0 0;
-            transform-origin: bottom;
-            animation: grow-up 1.5s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
-            opacity: 0;
-        }
-
-        .bar:nth-child(1) {
-            height: 40%;
-            background: var(--chart-7);
-            animation-delay: 0.2s;
-        }
-
-        .bar:nth-child(2) {
-            height: 65%;
-            background: var(--chart-2);
-            animation-delay: 0.3s;
-        }
-
-        .bar:nth-child(3) {
-            height: 30%;
-            background: var(--chart-6);
-            animation-delay: 0.4s;
-        }
-
-        .bar:nth-child(4) {
-            height: 90%;
-            background: var(--chart-1);
-            animation-delay: 0.5s;
-        }
-
-        /* Highlight */
-        .bar:nth-child(5) {
-            height: 50%;
-            background: var(--chart-5);
-            animation-delay: 0.6s;
-        }
-
-        /* Features Section */
-        .features {
-            padding: 6rem 0;
-            position: relative;
-            z-index: 10;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-
-        @media (max-width: 992px) {
-            .features-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 640px) {
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(0, 242, 254, 0.1);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            color: var(--accent);
-        }
-
-        .feature-icon svg {
-            width: 24px;
-            height: 24px;
-        }
-
-        .card h3 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .card p {
-            color: var(--muted);
-            font-size: 0.95rem;
-        }
-
-        .card-accent-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: var(--grad);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .card:hover .card-accent-line {
-            opacity: 1;
-        }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--line);
-            padding: 3rem 0;
-            text-align: center;
-            color: var(--muted);
-            font-size: 0.9rem;
-            margin-top: 4rem;
-        }
-
-        /* Browser-like frame for screenshots */
-        .browser-frame {
-            background: var(--bg-card);
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            position: relative;
-            transition: transform 0.3s ease;
-        }
-
-        .browser-header {
-            background: var(--surface);
-            height: 32px;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            gap: 6px;
-            border-bottom: 1px solid var(--line);
-        }
-
-        .browser-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--line);
-        }
-
-        .browser-content {
-            padding: 2.5rem;
-            background: var(--bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            aspect-ratio: 16 / 10;
-        }
-
-        .browser-content img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
-        }
-
-        /* Gallery Grid */
-        .insights-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 2.5rem;
-            margin-top: 4rem;
-        }
-
-        .insight-item {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            height: 100%;
-        }
-
-        .insight-item h4 {
-            font-size: 1.25rem;
-            color: var(--text);
-        }
-
-        .insight-item p {
-            color: var(--muted);
-            font-size: 0.95rem;
-        }
-
-        @media (max-width: 768px) {
-            .insights-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* =========================================
-           ANIMATIONS
-           ========================================= */
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            animation: fade-in-up 0.8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
-        }
-
-        .delay-1 {
-            animation-delay: calc(var(--stagger) * 1);
-        }
-
-        .delay-2 {
-            animation-delay: calc(var(--stagger) * 2);
-        }
-
-        .delay-3 {
-            animation-delay: calc(var(--stagger) * 3);
-        }
-
-        @keyframes fade-in-up {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: perspective(1000px) rotateY(-5deg) rotateX(5deg) translateY(0);
-            }
-
-            50% {
-                transform: perspective(1000px) rotateY(-5deg) rotateX(5deg) translateY(-15px);
-            }
-        }
-
-        @keyframes float-glow {
-            0% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            100% {
-                transform: translate(30px, -30px) scale(1.1);
-            }
-        }
-
-        @keyframes spin-in {
-            from {
-                transform: rotate(-90deg) scale(0.8);
-                opacity: 0;
-            }
-
-            to {
-                transform: rotate(0deg) scale(1);
-                opacity: 1;
-            }
-        }
-
-        @keyframes grow-up {
-            from {
-                transform: scaleY(0);
-                opacity: 0;
-            }
-
-            to {
-                transform: scaleY(1);
-                opacity: 1;
-            }
-        }
-
-        /* Responsive */
-        @media (max-width: 992px) {
-            .hero-grid {
-                grid-template-columns: 1fr;
-                text-align: center;
-            }
-
-            .hero-actions {
-                justify-content: center;
-            }
-
-            .hero-content p {
-                margin: 0 auto 2.5rem;
-            }
-
-            .dash-mockup {
-                transform: none !important;
-                animation: none;
-                max-width: 600px;
-                margin: 0 auto;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-
-            .hero-content h1 {
-                font-size: 2.5rem;
-            }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description"
+    content="GitLab Pulse is a local-first dashboard for GitLab issues: a board per workflow stage, a table, search, and charts that filter the board." />
+  <meta name="theme-color" content="#050811" />
+  <title>GitLab Pulse | Every open issue. One board.</title>
+  <link rel="icon" type="image/svg+xml" href="images/logo.svg" />
+  <script>
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem('gitlab-pulse-theme'); } catch (e) { /* storage blocked */ }
+      document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'dark';
+    })();
+  </script>
+  <style>
+
+    @font-face {
+      font-family: 'Manrope';
+      font-style: normal;
+      font-weight: 200 800;
+      font-display: swap;
+      src: url('fonts/manrope-latin-wght-normal.woff2') format('woff2');
+    }
+
+    @font-face {
+      font-family: 'Space Grotesk';
+      font-style: normal;
+      font-weight: 300 700;
+      font-display: swap;
+      src: url('fonts/space-grotesk-latin-wght-normal.woff2') format('woff2');
+    }
+
+    @font-face {
+      font-family: 'Space Mono';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('fonts/space-mono-regular.ttf') format('truetype');
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #050811;
+      --bg-card: #0c1123;
+      --bg-code: #070b18;
+      --surface: rgba(255, 255, 255, 0.05);
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --text: #d4deee;
+      --text-strong: #ffffff;
+      --text-soft: #a9b8cd;
+      --muted: #7a8fa8;
+      --accent: #00f2fe;
+      --nav-bg: rgba(5, 8, 17, 0.84);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+      --shadow-deep: 0 40px 120px rgba(0, 0, 0, 0.6);
+      --brand: #ff512f;
+      --brand-2: #dd2476;
+      --grad: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);
+      --node-cyan: #4facfe;
+      --node-pink: #f5576c;
+      --node-purple: #da22ff;
+      --chart-2: #ff7354;
+      --chart-3: #c76bff;
+      --chart-5: #74c7f0;
+      --chart-6: #f4a44a;
+      --chart-7: #56d4b0;
+      --button-text: #ffffff;
+      --grid-dot: rgba(255, 255, 255, 0.1);
+      --hero-glow-1: rgba(221, 36, 118, 0.2);
+      --hero-glow-2: rgba(0, 242, 254, 0.1);
+      --shot-glow: 0.34;
+      --wire-alpha: 0.5;
+      --r: 20px;
+      --max: 1140px;
+      --wide: 1240px;
+      --nav-height: 72px;
+    }
+
+    [data-theme='light'] {
+      color-scheme: light;
+      --bg: #e8ecf5;
+      --bg-card: #f1f4fb;
+      --bg-code: #0c1123;
+      --surface: rgba(0, 0, 0, 0.07);
+      --line: rgba(0, 0, 0, 0.14);
+      --line-strong: rgba(0, 0, 0, 0.24);
+      --text: #0d1120;
+      --text-strong: #0d1120;
+      --text-soft: #3d5370;
+      --muted: #3d5370;
+      --accent: #006ea3;
+      --nav-bg: rgba(232, 236, 245, 0.93);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+      --shadow-deep: 0 40px 100px rgba(13, 17, 32, 0.22);
+      --node-cyan: #005e9e;
+      --node-pink: #b51c3c;
+      --node-purple: #8a0ea8;
+      --chart-2: #d63e1a;
+      --chart-3: #8a0ea8;
+      --chart-5: #0079b3;
+      --chart-6: #b06000;
+      --chart-7: #1a7a62;
+      --grid-dot: rgba(13, 17, 32, 0.13);
+      --hero-glow-1: rgba(221, 36, 118, 0.13);
+      --hero-glow-2: rgba(0, 110, 163, 0.1);
+      --shot-glow: 0.2;
+      --wire-alpha: 0.42;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: calc(var(--nav-height) + 16px);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Manrope', system-ui, sans-serif;
+      font-size: 1.0625rem;
+      line-height: 1.6;
+      overflow-x: hidden;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--text-strong);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      color: var(--text-strong);
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .mono {
+      font-family: 'Space Mono', ui-monospace, monospace;
+    }
+
+    .wrap {
+      width: min(var(--wide), calc(100% - 2.5rem));
+      margin: 0 auto;
+    }
+
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      z-index: 100;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border-radius: 10px;
+    }
+
+    .skip:focus {
+      left: 12px;
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 1.7rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 1.0625rem;
+      color: var(--button-text);
+      background: var(--grad);
+      background-size: 160% 160%;
+      box-shadow: 0 14px 40px rgba(221, 36, 118, 0.35);
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background-position 0.5s ease;
+    }
+
+    .btn:hover {
+      color: var(--button-text);
+      transform: translateY(-2px);
+      background-position: 100% 100%;
+      box-shadow: 0 20px 50px rgba(221, 36, 118, 0.48);
+    }
+
+    .btn-ghost {
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      box-shadow: none;
+    }
+
+    .btn-ghost:hover {
+      color: var(--text-strong);
+      border-color: var(--accent);
+      box-shadow: none;
+    }
+
+    .btn-small {
+      min-height: 44px;
+      padding: 0 1.25rem;
+      font-size: 0.94rem;
+    }
+
+    /* ---------- Nav ---------- */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--nav-bg);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav-inner {
+      min-height: var(--nav-height);
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      min-height: 44px;
+      color: var(--text-strong);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      flex: 1;
+      display: flex;
+      gap: 0.25rem;
+      font-size: 0.94rem;
+      font-weight: 500;
+    }
+
+    .nav-links a {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-height: 44px;
+      padding: 0 0.75rem;
+      color: var(--text);
+      border-radius: 10px;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-strong);
+      background: var(--surface);
+    }
+
+    .pill-new {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--bg);
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-left: auto;
+    }
+
+    .theme-toggle {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.4s ease, border-color 0.2s ease;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      transform: rotate(40deg);
+    }
+
+    .theme-toggle .sun,
+    [data-theme='light'] .theme-toggle .moon {
+      display: none;
+    }
+
+    [data-theme='light'] .theme-toggle .sun {
+      display: block;
+    }
+
+    /* ---------- Hero ---------- */
+    .hero {
+      position: relative;
+      background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 55% at 78% 8%, var(--hero-glow-1), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 8% 30%, var(--hero-glow-2), transparent 70%),
+        linear-gradient(180deg, transparent 55%, var(--bg) 100%);
+      pointer-events: none;
+    }
+
+    .wires {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: var(--wire-alpha);
+    }
+
+    .wires path {
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+    }
+
+    .wires .trace {
+      opacity: 0.35;
+      stroke-dasharray: 2400;
+      stroke-dashoffset: 2400;
+      animation: draw 2.6s 0.3s ease-out forwards;
+    }
+
+    .wires .pulse {
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 46 2400;
+      stroke-dashoffset: 46;
+      animation: signal 7s linear infinite;
+    }
+
+    .wires .w1 { stroke: var(--node-cyan); }
+    .wires .w2 { stroke: var(--chart-7); }
+    .wires .w3 { stroke: var(--chart-6); }
+    .wires .w4 { stroke: var(--chart-3); }
+    .wires .pulse.w2 { animation-delay: -2.2s; animation-duration: 9s; }
+    .wires .pulse.w3 { animation-delay: -4.1s; animation-duration: 8s; }
+    .wires .pulse.w4 { animation-delay: -1.2s; animation-duration: 10s; }
+
+    .hero-inner {
+      position: relative;
+      padding-top: clamp(3.5rem, 8vw, 7rem);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.75rem;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+
+    .pin {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pin-pulse 2.2s ease-out infinite;
+    }
+
+    h1 {
+      max-width: 1040px;
+      font-size: clamp(2.75rem, 7.4vw, 6.5rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .grad-text {
+      background: var(--grad);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: grad-shift 8s ease-in-out infinite alternate;
+    }
+
+    .hero-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 2rem 4rem;
+      margin-top: 2.25rem;
+    }
+
+    .lede {
+      flex: 1 1 460px;
+      max-width: 620px;
+      font-size: clamp(1.0625rem, 1.5vw, 1.25rem);
+      color: var(--text-soft);
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.875rem;
+    }
+
+    .hero-shot {
+      position: relative;
+      margin-top: clamp(3rem, 6vw, 5.25rem);
+    }
+
+    .hero-shot::before {
+      content: '';
+      position: absolute;
+      inset: 10% 8% -6%;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2) 55%, var(--node-cyan));
+      filter: blur(80px);
+      opacity: var(--shot-glow);
+      animation: breathe 7s ease-in-out infinite alternate;
+    }
+
+    .window {
+      position: relative;
+      margin: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--bg-card);
+      box-shadow: var(--shadow-deep);
+    }
+
+    .window figcaption {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--line);
+      font-family: 'Space Mono', ui-monospace, monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .window figcaption b {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .window figcaption .state {
+      margin-left: auto;
+      color: var(--chart-7);
+    }
+
+    .badge-float {
+      position: absolute;
+      top: -36px;
+      right: 4%;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--accent);
+      font-size: 0.78rem;
+      color: var(--accent);
+      box-shadow: var(--shadow);
+      animation: float 5s ease-in-out infinite alternate;
+    }
+
+    .badge-float i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .marquee {
+      margin-top: 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 0.94rem;
+    }
+
+    .marquee-label {
+      flex: none;
+      font-size: 0.76rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .marquee-track {
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    }
+
+    .marquee-track ul {
+      display: flex;
+      gap: 2.75rem;
+      width: max-content;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      white-space: nowrap;
+      animation: marquee 32s linear infinite;
+    }
+
+    .marquee-track:hover ul {
+      animation-play-state: paused;
+    }
+
+    /* ---------- Sections ---------- */
+    section.block {
+      padding-top: clamp(5.5rem, 11vw, 10rem);
+    }
+
+    .marker {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1.6rem;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--c);
+    }
+
+    .marker::before {
+      content: '';
+      width: 56px;
+      height: 2px;
+      background: var(--c);
+      transform-origin: left;
+    }
+
+    .marker span::before {
+      content: '';
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 14px;
+      background: var(--c);
+    }
+
+    h2 {
+      max-width: 880px;
+      font-size: clamp(2.1rem, 4.6vw, 4rem);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+    }
+
+    .split {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1.75rem 4.5rem;
+    }
+
+    .split h2 {
+      flex: 1 1 520px;
+    }
+
+    .split-side {
+      flex: 1 1 380px;
+      max-width: 480px;
+      color: var(--text-soft);
+    }
+
+    .keys {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 1.1rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    kbd {
+      font-family: 'Space Mono', ui-monospace, monospace;
+      font-size: 0.8rem;
+      color: var(--text-strong);
+      padding: 4px 9px;
+      border-radius: 7px;
+      border: 1px solid var(--line-strong);
+      border-bottom-width: 3px;
+      background: var(--bg-card);
+    }
+
+    /* ---------- Cards ---------- */
+    .card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--bg-card);
+      overflow: hidden;
+      transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--line-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      font-size: 1.3rem;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .card.big h3 {
+      font-size: 1.625rem;
+      letter-spacing: -0.03em;
+    }
+
+    .card p {
+      margin-top: 0.5rem;
+      color: var(--text-soft);
+      font-size: 0.97rem;
+    }
+
+    .card .pad {
+      padding: 1.75rem;
+    }
+
+    .card.big .pad {
+      padding: 2rem;
+    }
+
+    .card svg.icon {
+      margin-bottom: 0.875rem;
+    }
+
+    .card img {
+      width: 100%;
+    }
+
+    .files {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 3.5rem;
+    }
+
+    .files > div {
+      flex: 1 1 280px;
+      padding: 1.5rem 1.75rem;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      margin: 0 -1px -1px 0;
+    }
+
+    .files .ext {
+      font-size: 1.375rem;
+    }
+
+    .files b {
+      display: block;
+      margin-top: 0.375rem;
+      color: var(--text-strong);
+    }
+
+    .files small {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .bento {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+
+    .bento > .big {
+      flex: 999 1 560px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bento > .stack {
+      flex: 1 1 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .stack > .card {
+      flex: 1 1 auto;
+    }
+
+    .head-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.875rem 2.5rem;
+    }
+
+    .head-row > div:first-child {
+      flex: 1 1 320px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.875rem;
+      font-family: 'Space Mono', ui-monospace, monospace;
+      font-size: 0.78rem;
+    }
+
+    .head-row .chips {
+      margin-top: 0;
+    }
+
+    .chip {
+      padding: 5px 11px;
+      border-radius: 999px;
+      color: var(--c);
+      border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
+    }
+
+    .chip.dashed {
+      border-style: dashed;
+    }
+
+    .chips .link {
+      width: 16px;
+      height: 1px;
+      background: var(--c);
+    }
+
+    .shot-top {
+      border-top: 1px solid var(--line);
+    }
+
+    .shot-bottom {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .headless {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 3.5rem;
+    }
+
+    .headless > .pad {
+      flex: 1 1 340px;
+    }
+
+    .headless > .terminal {
+      flex: 1.4 1 460px;
+      min-width: 0;
+      padding: 1.75rem 2rem;
+      background: var(--bg-code);
+      font-size: 0.85rem;
+    }
+
+    .terminal {
+      color: #d4deee;
+      font-family: 'Space Mono', ui-monospace, monospace;
+      line-height: 1.9;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .terminal .c { color: #7a8fa8; }
+    .terminal .p { color: #f5576c; }
+    .terminal .k { color: #ffffff; }
+    .terminal .f { color: #74c7f0; }
+    .terminal .o { color: #56d4b0; }
+
+    .terminal .caret {
+      display: inline-block;
+      width: 8px;
+      height: 1em;
+      vertical-align: -2px;
+      background: #00f2fe;
+      animation: blink 1.1s steps(1) infinite;
+    }
+
+    .more {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      margin-top: 0.75rem;
+      font-weight: 700;
+    }
+
+    .more span {
+      margin-left: 0.4rem;
+      transition: transform 0.25s ease;
+    }
+
+    .more:hover span {
+      transform: translateX(5px);
+    }
+
+    /* ---------- Editors ---------- */
+    .editor-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2rem 4rem;
+      margin-top: 6rem;
+    }
+
+    .editor-row:first-of-type {
+      margin-top: 4.5rem;
+    }
+
+    .editor-row.flip {
+      flex-wrap: wrap-reverse;
+    }
+
+    .editor-copy {
+      flex: 1 1 320px;
+      max-width: 420px;
+    }
+
+    .editor-copy .tag {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .editor-copy h3 {
+      margin: 0.6rem 0 0.75rem;
+      font-size: clamp(1.625rem, 2.6vw, 2.125rem);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .editor-copy p {
+      color: var(--text-soft);
+    }
+
+    .editor-shot {
+      flex: 999 1 520px;
+      min-width: 0;
+      border-radius: 16px;
+      border: 1px solid var(--line-strong);
+      overflow: hidden;
+      box-shadow: var(--shadow-deep);
+      transition: transform 0.5s ease;
+    }
+
+    .editor-shot:hover {
+      transform: scale(1.012);
+    }
+
+    /* ---------- Capabilities ---------- */
+    .sheet {
+      margin-top: 3.5rem;
+      border-top: 1px solid var(--line-strong);
+    }
+
+    .sheet-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 3rem;
+      padding: 1.75rem 0;
+      border-bottom: 1px solid var(--line);
+      transition: padding-left 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sheet-row:hover {
+      padding-left: 0.875rem;
+      background: var(--surface);
+    }
+
+    .sheet-row .addr {
+      flex: 0 0 56px;
+      padding-top: 0.4rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .sheet-row h3 {
+      flex: 1 1 280px;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .sheet-row p {
+      flex: 2 1 420px;
+      color: var(--text-soft);
+    }
+
+    .sheet-row code {
+      font-family: 'Space Mono', ui-monospace, monospace;
+      font-size: 0.92em;
+      color: var(--text);
+    }
+
+    /* ---------- CTA + footer ---------- */
+    .cta {
+      position: relative;
+      padding: 1px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2) 45%, var(--node-cyan));
+      background-size: 220% 220%;
+      animation: grad-shift 9s ease-in-out infinite alternate;
+    }
+
+    .cta-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 2.25rem 4rem;
+      padding: clamp(3rem, 7vw, 6rem) clamp(1.5rem, 6vw, 5.5rem);
+      border-radius: 27px;
+      background-color: var(--bg-card);
+      background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    .cta-inner > div:first-child {
+      flex: 1 1 460px;
+    }
+
+    .cta h2 {
+      font-size: clamp(2.1rem, 5vw, 4.5rem);
+      line-height: 1.03;
+      letter-spacing: -0.04em;
+    }
+
+    .cta p {
+      max-width: 540px;
+      margin-top: 1rem;
+      color: var(--text-soft);
+    }
+
+    footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem 2.5rem;
+      padding: 4rem 0 3rem;
+      font-size: 0.94rem;
+      color: var(--muted);
+    }
+
+    footer > div:first-child {
+      flex: 1 1 320px;
+    }
+
+    footer strong {
+      display: block;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 1.125rem;
+      color: var(--text-strong);
+    }
+
+    footer nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+    }
+
+    footer nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 0.75rem;
+      color: var(--text);
+    }
+
+    footer nav a:hover {
+      color: var(--accent);
+    }
+
+    /* ---------- Motion ---------- */
+    .rise {
+      animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      animation-delay: calc(var(--i, 0) * 90ms);
+    }
+
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+      transition-delay: calc(var(--i, 0) * 90ms);
+    }
+
+    .js .reveal.in {
+      opacity: 1;
+      transform: none;
+    }
+
+    .js .marker::before {
+      transform: scaleX(0);
+      transition: transform 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s;
+    }
+
+    .js .marker.in::before {
+      transform: scaleX(1);
+    }
+
+    @supports (animation-timeline: view()) {
+      .hero-shot .window {
+        transform-origin: 50% 100%;
+        animation: flatten linear both;
+        animation-timeline: view();
+        animation-range: entry 10% cover 45%;
+      }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes flatten {
+      from { transform: perspective(1800px) rotateX(9deg) scale(0.95); }
+      to { transform: perspective(1800px) rotateX(0deg) scale(1); }
+    }
+
+    @keyframes pin-pulse {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+      100% { box-shadow: 0 0 0 14px transparent; }
+    }
+
+    @keyframes draw {
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes signal {
+      from { stroke-dashoffset: 46; }
+      to { stroke-dashoffset: -2400; }
+    }
+
+    @keyframes grad-shift {
+      from { background-position: 0% 50%; }
+      to { background-position: 100% 50%; }
+    }
+
+    @keyframes breathe {
+      from { transform: scale(0.96); }
+      to { transform: scale(1.04); }
+    }
+
+    @keyframes float {
+      from { transform: translateY(0); }
+      to { transform: translateY(-8px); }
+    }
+
+    @keyframes marquee {
+      to { transform: translateX(-50%); }
+    }
+
+    @keyframes hub-flow {
+      from { stroke-dashoffset: 10; }
+      to { stroke-dashoffset: -100; }
+    }
+
+    @keyframes seg-fill {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    @media (max-width: 900px) {
+      .nav-links {
+        display: none;
+      }
+
+      .hub-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+      }
+
+      .hub-wires {
+        display: none;
+      }
+
+      .hub-core {
+        margin: 2.5rem 0;
+      }
+
+      .marquee {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+
+      .marquee-track {
+        width: 100%;
+      }
+
+      .badge-float {
+        right: 3%;
+        font-size: 0.72rem;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .nav-actions .btn-ghost {
+        display: none;
+      }
+
+      .tour-panels {
+        padding: 1.5rem 1.25rem;
+      }
+
+      .editor-tour .tour-controls {
+        border-radius: 20px;
+      }
+
+      .tour-controls {
+        flex-wrap: wrap;
+      }
+
+      .tour-segments {
+        order: -1;
+        flex-basis: 100%;
+        margin: 0 0 0.5rem;
+      }
+
+      .tour-count {
+        margin-left: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+
+      .wires .trace {
+        stroke-dashoffset: 0;
+      }
+
+      .wires .pulse {
+        display: none;
+      }
+
+      .js .reveal {
+        opacity: 1;
+        transform: none;
+      }
+
+      .js .marker::before {
+        transform: none;
+      }
+    }
+
+    /* ---------- GitLab Pulse additions ---------- */
+    .wide-shot {
+      margin-top: 3rem;
+    }
+
+    .window img {
+      width: 100%;
+    }
+
+    /* Wide screenshots get a whole row, so they are shown near their size. */
+    .bento > .full {
+      flex-basis: 100%;
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+
+    .panels > .span-2 {
+      grid-column: span 2;
+    }
+
+    .panel-shot {
+      padding: 0 1.25rem 1.25rem;
+    }
+
+    /* Panel crops are shown at their own size (2x images), never stretched. */
+    .card .panel-shot img {
+      max-width: 100%;
+      margin: 0 auto;
+      border-radius: 12px;
+    }
+
+    .card.big > .panel-shot {
+      padding: 0 2rem 2rem;
+    }
+
+    .logo {
+      white-space: nowrap;
+    }
+
+    /* On a phone the hero's own buttons follow right below the nav. */
+    @media (max-width: 520px) {
+      .nav-actions .btn-small {
+        display: none;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .panels {
+        grid-template-columns: 1fr;
+      }
+
+      .panels > .span-2 {
+        grid-column: auto;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
-    <!-- Navbar -->
-    <nav>
-        <div class="container nav-inner">
-            <div class="logo">
-                <img src="images/logo.svg" alt="GitLab Pulse Logo" width="32" height="32"
-                    style="border-radius: 7px; flex-shrink: 0;">
-                <a href="https://bleviet.github.io/gitlab-pulse/"><span style="color: var(--brand);">GitLab</span><span
-                        style="color: var(--text);">Pulse</span></a>
-            </div>
-            <div class="nav-links">
-                <a href="#">Home</a>
-                <a href="#insights">Insights</a>
-                <a href="#features">Features</a>
-                <button class="theme-toggle" id="themeToggle" aria-label="Toggle Theme">
-                    <!-- Sun Icon (visible in dark mode typically, but let's just use a generic toggle icon) -->
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                </button>
-            </div>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="logo" href="#top" aria-label="GitLab Pulse home">
+        <img src="images/logo.svg" alt="" width="34" height="34" />
+        GitLab Pulse
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#overview">Overview</a>
+        <a href="#board">Board</a>
+        <a href="#search">Search</a>
+        <a href="#analytics">Analytics</a>
+        <a href="#local">Local first</a>
+        <a href="#capabilities">Capabilities</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light theme" aria-pressed="false">
+          <svg class="moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 14.5A8 8 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" />
+          </svg>
+          <svg class="sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
+        </button>
+        <a class="btn btn-ghost btn-small" href="https://github.com/bleviet/gitlab-pulse">GitHub</a>
+        <a class="btn btn-small" href="https://github.com/bleviet/gitlab-pulse#quick-start-synthetic-demo">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <svg class="wires" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <path class="trace w1" d="M-10 150H260a14 14 0 0 1 14 14V420a14 14 0 0 0 14 14H520" />
+        <path class="pulse w1" d="M-10 150H260a14 14 0 0 1 14 14V420a14 14 0 0 0 14 14H520" />
+        <path class="trace w2" d="M1450 96H1180a14 14 0 0 0-14 14V250a14 14 0 0 1-14 14H930" />
+        <path class="pulse w2" d="M1450 96H1180a14 14 0 0 0-14 14V250a14 14 0 0 1-14 14H930" />
+        <path class="trace w3" d="M-10 640H120a14 14 0 0 0 14-14V540a14 14 0 0 1 14-14H1310a14 14 0 0 1 14 14V760H1450" />
+        <path class="pulse w3" d="M-10 640H120a14 14 0 0 0 14-14V540a14 14 0 0 1 14-14H1310a14 14 0 0 1 14 14V760H1450" />
+        <path class="trace w4" d="M1450 420H1260a14 14 0 0 0-14 14V480" />
+        <path class="pulse w4" d="M1450 420H1260a14 14 0 0 0-14 14V480" />
+      </svg>
+
+      <div class="wrap hero-inner">
+        <p class="eyebrow mono rise"><span class="pin"></span>Local-first issue analytics for GitLab</p>
+        <h1 class="rise" style="--i: 1">Every open issue. <span class="grad-text">One board.</span></h1>
+        <div class="hero-row rise" style="--i: 2">
+          <p class="lede">GitLab Pulse collects the issues of your GitLab projects, maps their labels to workflow
+            stages, and shows them as a board, a table, and charts in a dashboard that runs on your machine.</p>
+          <div class="cta-row">
+            <a class="btn" href="https://github.com/bleviet/gitlab-pulse#quick-start-synthetic-demo">Try the demo</a>
+            <a class="btn btn-ghost" href="#board">See the board</a>
+          </div>
         </div>
+
+        <div class="hero-shot rise" style="--i: 4">
+          <figure class="window">
+            <figcaption><b>localhost:8501</b><span>Overview &middot; Compact</span><span class="state">local &middot; your data</span></figcaption>
+            <img class="theme-image" src="images/screenshots/hp_compact_dark.png"
+          data-dark="images/screenshots/hp_compact_dark.png" data-light="images/screenshots/hp_compact.png"
+          width="2560" height="1600" alt="The Compact layout: a release rail, summary pills, and the issue board with a lane per workflow stage" />
+          </figure>
+        </div>
+
+        <div class="marquee">
+          <span class="marquee-label">Works with</span>
+          <div class="marquee-track">
+            <ul>
+              <li>GitLab.com</li><li>Self-managed GitLab</li><li>REST API</li><li>GraphQL</li><li>YAML rules</li>
+              <li>Parquet</li><li>Streamlit</li><li>Plotly</li><li>Docker</li><li>uv</li>
+              <li aria-hidden="true">GitLab.com</li><li aria-hidden="true">Self-managed GitLab</li>
+              <li aria-hidden="true">REST API</li><li aria-hidden="true">GraphQL</li><li aria-hidden="true">YAML rules</li>
+              <li aria-hidden="true">Parquet</li><li aria-hidden="true">Streamlit</li><li aria-hidden="true">Plotly</li>
+              <li aria-hidden="true">Docker</li><li aria-hidden="true">uv</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overview -->
+    <section class="block wrap" id="overview">
+      <p class="marker reveal" style="--c: var(--chart-2)"><span>Overview</span></p>
+      <div class="split reveal">
+        <h2>Two layouts. One board, one filter, one link.</h2>
+        <div class="split-side">
+          <p><b>Compact</b> puts the board first for daily triage: a thin release rail, the summary pills, and the
+            lanes. <b>Analytics</b> puts the charts above the same board for reviews. Both share the filter, and the
+            filter, the layout, and an open issue are kept in the URL, so a link shows the same view.</p>
+        </div>
+      </div>
+      <figure class="window wide-shot reveal">
+        <figcaption><b>localhost:8501</b><span>Overview &middot; Analytics</span></figcaption>
+        <img class="theme-image" loading="lazy" src="images/screenshots/hp_analytics_dark.png"
+          data-dark="images/screenshots/hp_analytics_dark.png" data-light="images/screenshots/hp_analytics.png"
+          width="2560" height="1426" alt="The Analytics layout: release timeline, priority donuts, quality signals, daily new versus closed issues, and issues by workflow state" />
+      </figure>
+    </section>
+
+    <!-- Board -->
+    <section class="block wrap" id="board">
+      <p class="marker reveal" style="--c: var(--node-cyan)"><span>Issue board</span></p>
+      <h2 class="reveal">Every open issue, in the stage where it waits.</h2>
+
+      <div class="editor-row reveal">
+        <div class="editor-copy">
+          <span class="tag mono">01 &middot; Board</span>
+          <h3>A lane per workflow stage.</h3>
+          <p>Each lane header shows the stage's priority mix. Pick a priority there to filter the board; the lane
+            stays marked. The toolbar, the page bar, and the lane headers stay pinned while you scroll, and each
+            lane shows 10, 20, or 30 cards per page.</p>
+        </div>
+        <img class="theme-image editor-shot" loading="lazy" src="images/screenshots/hp_board_dark.png"
+          data-dark="images/screenshots/hp_board_dark.png" data-light="images/screenshots/hp_board.png"
+          width="1544" height="1054" alt="Three board lanes; the Implementation lane is marked after picking its P1 priority" />
+      </div>
+
+      <div class="bento">
+        <article class="card big full reveal">
+          <div class="pad head-row">
+            <div>
+              <h3>A table when you need the columns</h3>
+              <p>The same issues as rows: title with a link to GitLab, context labels, stage, priority, days in stage,
+                milestone, assignee, and quality hints. Ten rows per page by default, each page shown in full.</p>
+            </div>
+            <div class="chips">
+              <span class="chip" style="--c: var(--chart-7)">10 &middot; 20 &middot; 30 rows</span>
+              <span class="chip" style="--c: var(--node-cyan)">pinned header</span>
+            </div>
+          </div>
+          <img class="theme-image shot-top" loading="lazy" src="images/screenshots/hp_table_dark.png"
+          data-dark="images/screenshots/hp_table_dark.png" data-light="images/screenshots/hp_table.png"
+          width="2464" height="1122" alt="The issue table with ten rows and the page bar" />
+        </article>
+        <article class="card big full reveal" style="--i: 1">
+          <img class="theme-image shot-bottom" loading="lazy" src="images/screenshots/hp_detail_dark.png"
+          data-dark="images/screenshots/hp_detail_dark.png" data-light="images/screenshots/hp_detail.png"
+          width="2464" height="1280" alt="An issue opened next to the cards of its lane, with labels, description, and details" />
+          <div class="pad">
+            <h3>Open an issue without leaving the board</h3>
+            <p>A card opens the issue in place of the board, next to the other cards of its lane: labels, description,
+              activity, stage, assignee, and milestone. Previous and next walk through the lane.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Search -->
+    <section class="block wrap" id="search">
+      <p class="marker reveal" style="--c: var(--chart-6)"><span>Search</span></p>
+      <div class="split reveal">
+        <h2>Press <span class="mono">&#8984;K</span> and type.</h2>
+        <div class="split-side">
+          <p>The search field in the toolbar widens and takes the cursor; the board filters as you type. Every word
+            has to appear in the title, assignee, context, milestone, priority, or stage, with a fallback to similar
+            words when nothing matches exactly.</p>
+          <p class="keys">Press <kbd>Ctrl</kbd><kbd>K</kbd> or <kbd>&#8984;</kbd><kbd>K</kbd> anywhere on the page</p>
+        </div>
+      </div>
+      <figure class="window wide-shot reveal">
+        <figcaption><b>localhost:8501</b><span>Overview &middot; Compact &middot; search &ldquo;crash&rdquo;</span></figcaption>
+        <img class="theme-image" loading="lazy" src="images/screenshots/hp_search_dark.png"
+          data-dark="images/screenshots/hp_search_dark.png" data-light="images/screenshots/hp_search.png"
+          width="2464" height="1240" alt="The search field holding the word crash, and the board filtered to the 37 matching issues" />
+      </figure>
+    </section>
+
+    <!-- Analytics -->
+    <section class="block wrap" id="analytics">
+      <p class="marker reveal" style="--c: var(--chart-3)"><span>Analytics</span></p>
+      <div class="split reveal">
+        <h2>Charts that filter the board.</h2>
+        <div class="split-side">
+          <p>Click a bar, a donut slice, a day, or a quality signal: the board below shows those issues, and the
+            other charts dim. Click it again to clear the filter. The workflow-state row stays pinned above the board,
+            with each stage over its lane.</p>
+        </div>
+      </div>
+      <figure class="window wide-shot reveal">
+        <figcaption><b>localhost:8501</b><span>Overview &middot; Analytics &middot; Implementation, P2</span></figcaption>
+        <img class="theme-image" loading="lazy" src="images/screenshots/hp_chart_filter_dark.png"
+          data-dark="images/screenshots/hp_chart_filter_dark.png" data-light="images/screenshots/hp_chart_filter.png"
+          width="2504" height="1308" alt="The P2 bar of the Implementation stage selected; the other bars are dimmed and the board shows P2 issues with the Implementation lane marked" />
+      </figure>
+
+      <article class="card big reveal" style="margin-top: 1.25rem">
+        <div class="pad">
+          <h3>Releases on one rail</h3>
+          <p>Milestones are coloured by health (overdue, on track, complete) around a line for today. Click one to
+            filter the dashboard by that milestone.</p>
+        </div>
+        <div class="panel-shot">
+          <img class="theme-image" loading="lazy" style="width: 928px" src="images/screenshots/hp_timeline_dark.png"
+          data-dark="images/screenshots/hp_timeline_dark.png" data-light="images/screenshots/hp_timeline.png"
+          width="1856" height="444" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line" />
+        </div>
+      </article>
+
+      <div class="panels">
+        <article class="card reveal">
+          <div class="pad">
+            <h3>Priority mix</h3>
+            <p>Open and closed issues by priority. The centre selects them all.</p>
+          </div>
+          <div class="panel-shot">
+            <img class="theme-image" loading="lazy" style="width: 309px" src="images/screenshots/hp_priority_dark.png"
+          data-dark="images/screenshots/hp_priority_dark.png" data-light="images/screenshots/hp_priority.png"
+          width="618" height="444" alt="Open issues by priority: 408 open issues as a donut" />
+          </div>
+        </article>
+        <article class="card reveal" style="--i: 1">
+          <div class="pad">
+            <h3>Quality signals</h3>
+            <p>Open issues without a milestone, an assignee, or a clear type.</p>
+          </div>
+          <div class="panel-shot">
+            <img class="theme-image" loading="lazy" style="width: 309px" src="images/screenshots/hp_quality_dark.png"
+          data-dark="images/screenshots/hp_quality_dark.png" data-light="images/screenshots/hp_quality.png"
+          width="618" height="444" alt="Issue quality signals: missing milestone, unassigned owner, mixed classification" />
+          </div>
+        </article>
+        <article class="card span-2 reveal" style="--i: 2">
+          <div class="pad">
+            <h3>New versus closed, per day</h3>
+            <p>The last seven days. Click a day to see the issues opened or closed on it.</p>
+          </div>
+          <div class="panel-shot">
+            <img class="theme-image" loading="lazy" style="width: 617px" src="images/screenshots/hp_velocity_dark.png"
+          data-dark="images/screenshots/hp_velocity_dark.png" data-light="images/screenshots/hp_velocity.png"
+          width="1234" height="444" alt="Daily new versus closed issues over seven days" />
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Local first -->
+    <section class="block wrap" id="local">
+      <p class="marker reveal" style="--c: var(--chart-7)"><span>Local first</span></p>
+      <div class="split reveal">
+        <h2>Your issues stay on your machine.</h2>
+        <div class="split-side">
+          <p>A collector pulls issues from the GitLab REST and GraphQL APIs, a processor applies your YAML rules and
+            writes Parquet files, and the dashboard reads them. Nothing leaves the machine it runs on.</p>
+        </div>
+      </div>
+      <article class="card big headless reveal">
+        <div class="pad">
+          <h3>Three commands from GitLab to dashboard</h3>
+          <p>Give the collector a GitLab URL, a token with the <code>read_api</code> scope, and the project IDs. Later
+            runs fetch only issues that changed since the last one.</p>
+          <a class="more" href="https://github.com/bleviet/gitlab-pulse#connecting-live-gitlab-data">Connect your GitLab <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="terminal" role="img"
+          aria-label="Terminal: uv run python app/collector/orchestrator.py; uv run python app/processor/main.py; uv run streamlit run app/dashboard/main.py">
+          <div class="c"># fetch issues from the GitLab API (only what changed)</div>
+          <div><span class="p">$</span> <span class="k">uv run python</span> <span class="f">app/collector/orchestrator.py</span></div>
+          <div class="c"># map labels to stages with your rules, write Parquet</div>
+          <div><span class="p">$</span> <span class="k">uv run python</span> <span class="f">app/processor/main.py</span></div>
+          <div class="c"># open the dashboard on http://localhost:8501</div>
+          <div><span class="p">$</span> <span class="k">uv run streamlit run</span> <span class="f">app/dashboard/main.py</span></div>
+          <div class="c"># or try it first with synthetic data</div>
+          <div><span class="p">$</span> <span class="k">docker compose up</span> <span class="o">--build</span></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Capabilities -->
+    <section class="block wrap" id="capabilities">
+      <p class="marker reveal" style="--c: var(--node-pink)"><span>Capabilities</span></p>
+      <h2 class="reveal">Built for the way your team labels issues.</h2>
+      <div class="sheet">
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x00</span>
+          <h3>Your labels, your stages</h3>
+          <p>YAML rule files map GitLab labels to workflow stages, issue types, and priorities. One file per team, and
+            a file can apply to selected projects only.</p>
+        </div>
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x04</span>
+          <h3>Incremental sync</h3>
+          <p>The collector remembers what it fetched and pulls only issues that changed. A project that fails is
+            logged and skipped; the others continue.</p>
+        </div>
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x08</span>
+          <h3>Quality hints</h3>
+          <p>Issues without a milestone, without an assignee, or with conflicting type labels are counted, listed,
+            and one click away as a filter.</p>
+        </div>
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x0C</span>
+          <h3>Links that keep the view</h3>
+          <p>Filters, the layout, the search, and an open issue are part of the URL, so a shared link opens the same
+            view.</p>
+        </div>
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x10</span>
+          <h3>Synthetic demo data</h3>
+          <p>Seed realistic local projects to try the dashboard without access to a GitLab instance.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="block wrap">
+      <div class="cta reveal">
+        <div class="cta-inner">
+          <div>
+            <h2>Get started with GitLab Pulse.</h2>
+            <p>Run the setup script or Docker for a demo with synthetic data, then connect your GitLab projects with a
+              read-only token.</p>
+          </div>
+          <div class="cta-row">
+            <a class="btn" href="https://github.com/bleviet/gitlab-pulse#quick-start-synthetic-demo">Try the demo</a>
+            <a class="btn btn-ghost" href="https://github.com/bleviet/gitlab-pulse">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <div>
+      <strong>GitLab Pulse</strong>
+      Local-first issue analytics for GitLab. Open source under the MIT license.
+    </div>
+    <nav aria-label="Footer">
+      <a href="https://github.com/bleviet/gitlab-pulse#readme">Documentation</a>
+      <a href="https://github.com/bleviet/gitlab-pulse/blob/main/docs/architecture/ARCH_Master.md">Architecture</a>
+      <a href="https://github.com/bleviet/gitlab-pulse/issues">Issues</a>
+      <a href="https://bahonavi.de/">by bahonavi</a>
     </nav>
+  </footer>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-glow hero-glow-1"></div>
-        <div class="hero-glow hero-glow-2"></div>
+  <script>
+    const root = document.documentElement;
+    root.classList.add('js');
 
-        <div class="container hero-grid">
-            <div class="hero-content">
-                <span class="section-label reveal">GitLab Pulse App</span>
-                <h1 class="reveal delay-1">Dashboards for your <span class="grad-text">GitLab Projects.</span>
-                </h1>
-                <p class="reveal delay-2">Track issue velocity, workflow states, and milestone health across your
-                    repositories.</p>
-                <div class="hero-actions reveal delay-3">
-                    <a href="#insights" class="btn btn-primary">Insights</a>
-                    <a href="https://github.com/bleviet/gitlab-pulse" class="btn btn-secondary">GitHub Repo</a>
-                </div>
-            </div>
+    const themeToggle = document.getElementById('themeToggle');
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
 
-            <!-- Dashboard Screenshot -->
-            <div class="browser-frame reveal delay-2"
-                style="transform: perspective(1000px) rotateY(-5deg) rotateX(5deg);">
-                <div class="browser-header">
-                    <div class="browser-dot"></div>
-                    <div class="browser-dot"></div>
-                    <div class="browser-dot"></div>
-                    <div style="margin-left: auto; font-size: 0.65rem; color: var(--muted); opacity: 0.6;">
-                        bleviet.github.io/gitlab-pulse/</div>
-                </div>
-                <div class="browser-content">
-                    <img src="images/screenshots/fullsite_dark.png" data-light="images/screenshots/fullsite.png"
-                        data-dark="images/screenshots/fullsite_dark.png" alt="GitLab Pulse Dashboard"
-                        class="theme-aware-img">
-                </div>
-            </div>
-        </div>
-    </section>
+    function applyTheme(theme, persist) {
+      root.dataset.theme = theme;
+      if (persist) {
+        try { localStorage.setItem('gitlab-pulse-theme', theme); } catch (e) { /* storage blocked */ }
+      }
+      const isLight = theme === 'light';
+      themeToggle.setAttribute('aria-pressed', String(isLight));
+      themeToggle.setAttribute('aria-label', `Switch to ${isLight ? 'dark' : 'light'} theme`);
+      themeMeta.setAttribute('content', isLight ? '#e8ecf5' : '#050811');
+      document.querySelectorAll('.theme-image').forEach((image) => {
+        image.src = image.dataset[theme];
+      });
+    }
 
-    <!-- Visual Insights Section -->
-    <section class="features" id="insights"
-        style="background: rgba(0,0,0,0.02); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
-        <div class="container">
-            <div style="text-align: center;">
-                <span class="section-label reveal">Data Breakdown</span>
-                <h2 class="display-font reveal delay-1" style="font-size: 2.5rem; margin-bottom: 1rem;">Charts generated
-                    from your metadata.</h2>
-                <p class="reveal delay-2" style="color: var(--muted); max-width: 600px; margin: 0 auto;">
-                    GitLab Pulse parses your issues and milestones to generate the following views.
-                </p>
-            </div>
+    applyTheme(root.dataset.theme, false);
+    themeToggle.addEventListener('click', () =>
+      applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark', true)
+    );
 
-            <div class="insights-grid">
-                <!-- Insight 1: Velocity -->
-                <div class="insight-item reveal delay-1">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/daily_issues_velocity_dark.png"
-                                data-light="images/screenshots/daily_issues_velocity.png"
-                                data-dark="images/screenshots/daily_issues_velocity_dark.png"
-                                alt="Daily Issues Velocity" class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Issue Velocity</h4>
-                        <p>A stacked area chart comparing daily opened vs. closed issues over a 7-day window.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Insight 2: Workflow -->
-                <div class="insight-item reveal delay-2">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/issues_by_workflow_state_dark.png"
-                                data-light="images/screenshots/issues_by_workflow_state.png"
-                                data-dark="images/screenshots/issues_by_workflow_state_dark.png"
-                                alt="Issues by Workflow State" class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Workflow Distribution</h4>
-                        <p>Issues grouped by specific labels (e.g., architecture, implementation, review) to identify
-                            where work is currently sitting in your pipeline.</p>
-                    </div>
-                </div>
-
-                <!-- Insight 3: Release Timeline -->
-                <div class="insight-item reveal delay-1">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/release_timeline_dark.png"
-                                data-light="images/screenshots/release_timeline.png"
-                                data-dark="images/screenshots/release_timeline_dark.png" alt="Release Timeline"
-                                class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Milestone Timeline</h4>
-                        <p>A horizontal Gantt-style view of milestones showing their health (overdue, on track,
-                            completed) and deadlines.</p>
-                    </div>
-                </div>
-
-                <!-- Insight 4: Quality Signals -->
-                <div class="insight-item reveal delay-2">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/issues_quality_dark.png"
-                                data-light="images/screenshots/issues_quality.png"
-                                data-dark="images/screenshots/issues_quality_dark.png" alt="Issues Quality Signals"
-                                class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Metadata Health</h4>
-                        <p>Lists issues that are missing critical labels—such as milestones, or assignees—to
-                            help keep your backlog organized.</p>
-                    </div>
-                </div>
-
-                <!-- Insight 5: Interactive Filtering -->
-                <div class="insight-item reveal delay-1">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/issues_filtered_dark.png"
-                                data-light="images/screenshots/issues_filtered.png"
-                                data-dark="images/screenshots/issues_filtered_dark.png" alt="Interactive Filtering"
-                                class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Interactive Filtering</h4>
-                        <p>Select any segment in the bar charts or donut charts to instantly filter the issue table.
-                            Fuzzy search through all columns to quickly find issues by title, assignee, label, or any
-                            other metadata.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Insight 6: Priority Pulse -->
-                <div class="insight-item reveal delay-2">
-                    <div class="browser-frame">
-                        <div class="browser-header">
-                            <div class="browser-dot" style="background: #ff5f56;"></div>
-                            <div class="browser-dot" style="background: #ffbd2e;"></div>
-                            <div class="browser-dot" style="background: #27c93f;"></div>
-                        </div>
-                        <div class="browser-content">
-                            <img src="images/screenshots/open_issues_by_priority_dark.png"
-                                data-light="images/screenshots/open_issues_by_priority.png"
-                                data-dark="images/screenshots/open_issues_by_priority_dark.png" alt="Priority Pulse"
-                                class="theme-aware-img">
-                        </div>
-                    </div>
-                    <div>
-                        <h4>Priority Pulse</h4>
-                        <p>Real-time distribution of issues by priority level. Identify bottlenecks in high-priority
-                            tasks and ensure your team is focused on what matters most.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <div class="container">
-            <div style="text-align: center;">
-                <span class="section-label reveal">What's Inside</span>
-                <h2 class="display-font reveal delay-1" style="font-size: 2.5rem; margin-bottom: 1rem;">Direct GitLab
-                    integration.</h2>
-                <p class="reveal delay-2" style="color: var(--muted); max-width: 600px; margin: 0 auto;">GitLab Pulse
-                    fetches data from the GitLab API to populate pre-configured charts.
-                </p>
-            </div>
-
-            <div class="features-grid">
-                <!-- Card 1 -->
-                <div class="card reveal delay-1">
-                    <div class="card-accent-line"></div>
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                        </svg>
-                    </div>
-                    <h3>Area Charts</h3>
-                    <p>Visual representation of issue volume over time using area and bar charts.</p>
-                </div>
-
-                <!-- Card 2 -->
-                <div class="card reveal delay-2">
-                    <div class="card-accent-line"></div>
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="3" y1="9" x2="21" y2="9"></line>
-                            <line x1="9" y1="21" x2="9" y2="9"></line>
-                        </svg>
-                    </div>
-                    <h3>Grouped States</h3>
-                    <p>Aggregated issue counts based on workflow labels and priority levels.</p>
-                </div>
-
-                <!-- Card 3 -->
-                <div class="card reveal delay-3">
-                    <div class="card-accent-line"></div>
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                    </div>
-                    <h3>Milestone View</h3>
-                    <p>Aggregated metrics for specific milestones, including burn-down status and unassigned items.</p>
-                </div>
-
-                <!-- Card 5 -->
-                <div class="card reveal delay-2">
-                    <div class="card-accent-line"></div>
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                    </div>
-                    <h3>Drill-down Filters</h3>
-                    <p>Click on any chart segment to instantly filter your data. Exploring your project is intuitive
-                        and fast.</p>
-                </div>
-
-                <!-- Card 6 -->
-                <div class="card reveal delay-3">
-                    <div class="card-accent-line"></div>
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="5"></circle>
-                            <line x1="12" y1="1" x2="12" y2="3"></line>
-                            <line x1="12" y1="21" x2="12" y2="23"></line>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        </svg>
-                    </div>
-                    <h3>Adaptive UI</h3>
-                    <p>Full support for Dark and Light modes. A cohesive experience tailored to your workspace
-                        environment.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer>
-        <div class="container">
-            <div class="logo" style="justify-content: center; margin-bottom: 1rem; opacity: 0.8;">
-                <img src="https://bahonavi.de/wp-content/uploads/2026/03/logo_animated.svg" alt="GitLab Pulse Logo"
-                    width="48" height="48" style="border-radius: 5px; flex-shrink: 0;">
-                <a href="https://bahonavi.de/"><span style="color: var(--brand);">baho</span><span
-                        style="color: var(--text);">navi</span></a>
-            </div>
-            <p>&copy; 2026 bahonavi. Designed according to bahonavi brand guidelines.</p>
-        </div>
-    </footer>
-
-    <!-- Interactive Scripts -->
-    <script>
-        // Theme Toggle Logic
-        const toggleBtn = document.getElementById('themeToggle');
-        const htmlDoc = document.documentElement;
-
-        toggleBtn.addEventListener('click', () => {
-            const currentTheme = htmlDoc.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-            htmlDoc.setAttribute('data-theme', newTheme);
-            updateImages(newTheme);
-        });
-
-        function updateImages(theme) {
-            document.querySelectorAll('.theme-aware-img').forEach(img => {
-                const newSrc = img.getAttribute(`data-${theme}`);
-                if (newSrc) img.src = newSrc;
-            });
-        }
-
-        // Intersection Observer for scroll animations (re-trigger reveals if needed, or simply let CSS handle initial load)
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: "0px 0px -50px 0px"
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    // Elements are already animated on load via CSS, 
-                    // but if they were hidden, we could add a class here.
-                    // For this landing page, the initial load handles the hero beautifully.
-                    entry.target.style.animationPlayState = 'running';
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.reveal').forEach(el => {
-            // Optional: Pause animation until scroll into view
-            // el.style.animationPlayState = 'paused';
-            observer.observe(el);
-        });
-    </script>
+    const revealTargets = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window) {
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in');
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        },
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.08 }
+      );
+      revealTargets.forEach((target) => revealObserver.observe(target));
+    } else {
+      revealTargets.forEach((target) => target.classList.add('in'));
+    }
+  </script>
 </body>
 
 </html>

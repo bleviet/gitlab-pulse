@@ -12,22 +12,47 @@ GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extr
 
 ## Visual Insights
 
-### Executive Dashboard
-Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the full charts (priority, daily velocity, workflow state, release timeline, quality signals) above the board for reviews. Switch between them at the top right of the page.
-![Compact layout](docs/images/screenshots/fullsite.png)
-![Analytics layout](docs/images/screenshots/fullsite_analytics.png)
+### Two layouts
+Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews. Switch between them at the top right of the page. The filter, the layout and an open issue are kept in the URL.
 
-### Interactive Filtering
-Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. Press Ctrl+K (⌘K on macOS) to search issues and change filters from a floating panel.
-![Interactive Filtering](docs/images/screenshots/issues_filtered.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">
+  <img alt="Compact layout" src="docs/images/screenshots/hp_compact.png">
+</picture>
 
-### Summary Pills
-Open issues, the last seven days, open issues per priority and quality hints are shown as pills in the board's toolbar row. Pick one to filter the board; pick it again to reset.
-![Summary Pills](docs/images/screenshots/summary_pills.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_analytics_dark.png">
+  <img alt="Analytics layout" src="docs/images/screenshots/hp_analytics.png">
+</picture>
 
-### Milestone Timeline
-A thin rail above the board: milestones coloured by health (overdue, on track, complete), with a line marking today. Click one to filter by that milestone.
-![Milestone Timeline](docs/images/screenshots/release_timeline.png)
+### Board and table
+Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. The toolbar, the page bar and the lane headers stay pinned while you scroll. The issue list opens as a table; both show 10, 20 or 30 issues per page.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_board_dark.png">
+  <img alt="Board lanes with a priority picked" src="docs/images/screenshots/hp_board.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_table_dark.png">
+  <img alt="Issue table" src="docs/images/screenshots/hp_table.png">
+</picture>
+
+### Search
+Press Ctrl+K (⌘K on macOS) to focus the search field in the toolbar; the board filters as you type, with fuzzy matching across title, assignee, context, milestone, priority and stage.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_search_dark.png">
+  <img alt="Search field filtering the board" src="docs/images/screenshots/hp_search.png">
+</picture>
+
+### Charts as filters
+In the Analytics layout, a click on a bar, a donut slice, a day or a quality signal filters the board below; a second click clears it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_chart_filter_dark.png">
+  <img alt="A workflow-state bar selected as a filter" src="docs/images/screenshots/hp_chart_filter.png">
+</picture>
 
 ---
 
@@ -52,7 +77,10 @@ flowchart LR
 The repository includes a template configuration (`app/config/rules/default.yaml`) that maps standard labels to a lifecycle. For instance, the label `workflow::implementation` is mapped to the "Active" phase.
 
 Visualize exactly where issues are sitting across your custom lifecycle stages on the dashboard:
-![Workflow Distribution](docs/images/screenshots/issues_by_workflow_state.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_board_dark.png">
+  <img alt="Board lanes per workflow stage" src="docs/images/screenshots/hp_board.png">
+</picture>
 
 ```mermaid
 stateDiagram-v2
