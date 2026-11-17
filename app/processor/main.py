@@ -58,7 +58,6 @@ class Processor:
 
         if not parquet_files:
             logger.warning("No processed data found in Layer 1 output")
-            return {"valid": 0, "quality": 0}
 
         for filepath in parquet_files:
             project_id = self._extract_project_id(filepath)
@@ -75,16 +74,12 @@ class Processor:
                 logger.error(f"Failed to process project {project_id}: {e}")
 
         # Combine and write output
-        valid_count = 0
-        quality_count = 0
+        # Always write both files so stale output is cleared when the latest
+        # run (e.g. after a full sync removed issues) produces no rows.
+        combined_valid = pd.concat(all_valid, ignore_index=True) if all_valid else pd.DataFrame()
+        self._write_parquet(combined_valid, self.analytics_path / "issues_valid.parquet")
+        valid_count = len(combined_valid)
 
-        if all_valid:
-            combined_valid = pd.concat(all_valid, ignore_index=True)
-            self._write_parquet(combined_valid, self.analytics_path / "issues_valid.parquet")
-            valid_count = len(combined_valid)
-
-        # Always write the quality file so stale hint output is cleared when the
-        # latest processing run produces no validation hints.
         combined_quality = pd.concat(all_quality, ignore_index=True) if all_quality else pd.DataFrame()
         self._write_parquet(combined_quality, self.analytics_path / "data_quality.parquet")
         quality_count = len(combined_quality)

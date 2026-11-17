@@ -13,7 +13,7 @@
 2. Fetch issues incrementally unless `--full-sync` is set
 3. Persist raw issue payloads to Layer 0
 4. Enrich issues with GraphQL hierarchy data when possible
-5. Upsert Layer 1 issue parquet files
+5. Upsert Layer 1 issue parquet files on incremental sync, replace them on full sync
 6. Persist milestone and label parquet side datasets
 7. Update sync state
 
@@ -29,14 +29,14 @@
 3. **Persist Raw:** save raw issue payloads to `data/raw/`
 4. **Fetch Side Data:** fetch milestones and labels independently
 5. **Enrich Hierarchy:** fetch parent/child work-item data through GraphQL when project path resolution succeeds
-6. **Persist Layer 1:** upsert `data/processed/issues_{project_id}.parquet`
+6. **Persist Layer 1:** upsert `data/processed/issues_{project_id}.parquet` on incremental sync; on full sync replace it (deleting it when no issues are returned)
 7. **Update State:** store latest seen `updated_at` and issue counts
 
 ## 3. Layer 1 Outputs
 
 | File | Behavior |
 | :---- | :---- |
-| `issues_{project_id}.parquet` | Upserted by issue `id` |
+| `issues_{project_id}.parquet` | Upserted by issue `id` on incremental sync; fully replaced on full sync (the only way to drop issues deleted in GitLab) |
 | `milestones_{project_id}.parquet` | Full replace on each sync |
 | `labels_{project_id}.parquet` | Full replace on each sync |
 

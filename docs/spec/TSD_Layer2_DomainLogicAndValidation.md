@@ -45,6 +45,8 @@ This preserves reporting completeness while still surfacing the data quality pro
 
 `data_quality.parquet` is always rewritten, even when there are zero current quality hints. This clears stale quality output from earlier runs.
 
+`issues_valid.parquet` is always rewritten as well, as an empty file when no issue is valid or when no Layer 1 issue files exist. A full sync that returns no issues deletes the project's Layer 1 file, so without this the dashboard would keep showing issues that no longer exist in GitLab.
+
 ## 4. Data Outputs
 
 | File | Content |

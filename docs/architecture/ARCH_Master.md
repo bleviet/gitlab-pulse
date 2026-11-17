@@ -33,7 +33,7 @@ The architecture follows a layered data pipeline:
 2. Fetch changed issues incrementally using `updated_after` unless `--full-sync` is used.
 3. Persist raw issue payloads into Layer 0.
 4. Fetch hierarchy data through GraphQL when a project path is available.
-5. Upsert issues into `data/processed/issues_{project_id}.parquet`.
+5. Upsert issues into `data/processed/issues_{project_id}.parquet` on incremental sync; replace the file on full sync (the only way to drop issues deleted in GitLab).
 6. Persist milestones and labels separately as full-refresh side datasets.
 7. Update `data/state/sync_state.json`.
 

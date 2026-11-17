@@ -104,7 +104,15 @@ class Orchestrator:
             logger.warning(f"Failed to fetch labels for project {project_id}: {e}")
 
         if not issues:
-            logger.info(f"No new issues found for project {project_id}")
+            if full_sync:
+                filepath = self.processed_path / f"issues_{project_id}.parquet"
+                filepath.unlink(missing_ok=True)
+                logger.info(
+                    f"Full sync returned no issues for project {project_id}; "
+                    f"removed {filepath}"
+                )
+            else:
+                logger.info(f"No new issues found for project {project_id}")
             return 0
 
         # Step 4: Enrich with GraphQL (hierarchy)
@@ -126,7 +134,7 @@ class Orchestrator:
                     issue.child_ids = h.get("child_ids", [])
 
         # Step 5 & 6: Transform and Persist L1
-        self._persist_processed(project_id, issues)
+        self._persist_processed(project_id, issues, full_sync)
 
         # Update state
         max_updated = max(issue.updated_at for issue in issues)
@@ -214,10 +222,21 @@ class Orchestrator:
         )
         return True
 
-    def _persist_processed(self, project_id: int, issues: list[RawIssue]) -> None:
+    def _persist_processed(
+        self,
+        project_id: int,
+        issues: list[RawIssue],
+        full_sync: bool = False,
+    ) -> None:
         """Persist validated issues to Parquet (Layer 1 output).
 
-        Uses upsert logic to merge with existing data.
+        Incremental syncs upsert into the existing file. A full sync replaces
+        it, which is the only way issues deleted in GitLab are dropped.
+
+        Args:
+            project_id: GitLab project ID
+            issues: Issues to persist
+            full_sync: If True, replace the existing file instead of merging
         """
         filepath = self.processed_path / f"issues_{project_id}.parquet"
 
@@ -231,8 +250,8 @@ class Orchestrator:
                 # Force to datetime, coercing errors, ensuring UTC
                 new_df[col] = pd.to_datetime(new_df[col], utc=True)
 
-        # Merge with existing data (upsert on id)
-        if filepath.exists():
+        # Merge with existing data (upsert on id) unless this is a full sync
+        if filepath.exists() and not full_sync:
             existing_df = pd.read_parquet(filepath)
             
             # Align columns: Ensure new_df has all columns from existing_df to avoid concat warnings
