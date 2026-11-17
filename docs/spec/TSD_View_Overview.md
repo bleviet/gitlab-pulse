@@ -38,7 +38,7 @@ One column, one focus: the issue board, which starts high on the screen (on a 13
 | Lanes | The board; the workflow state is shown in its lane headers (3.3) |
 
 - The page switch (Overview, Custom View, Admin) is in the sidebar, and Streamlit runs with `toolbarMode = "minimal"` (no "Deploy" button), so the page has no navigation row of its own.
-- The sidebar is collapsed by default; its filters are also available in the search panel (4.5) and shown as chips on the board.
+- The sidebar is collapsed by default; its active filters are shown as chips on the board (Compact layout).
 - On a narrow window the lanes keep a minimum width of 15rem and the board scrolls sideways, instead of squeezing the cards.
 - Lane height follows the window height (between 320 and 1000 px). A lane wider than two cards (large screens) shows its cards in several columns.
 
@@ -58,7 +58,7 @@ One column, one focus: the issue board, which starts high on the screen (on a 13
 | Open by priority | P1, P2, ... Unset | open issues per priority, ordered by `priority_rank`, "Unset" last, each with a coloured dot | open issues of that priority |
 | Hints | No milestone, Unassigned, Mixed | open issues with that quality signal | that quality signal |
 
-There is no pill for all closed issues; the search panel's Open/Closed/All switch covers it.
+There is no pill for all closed issues; in the Analytics layout, a click in the centre of the closed-issues donut selects them.
 
 Picking a pill replaces the board's filter (the search text is kept) and shows the pill as picked; picking it again resets the board to all open issues. The pills are native `st.pills`; the picked pill uses the accent colour.
 
@@ -94,7 +94,7 @@ How the pinned rows work (`app/dashboard/views/pinned_header.py`):
 
 The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
 
-A click on a chart segment filters the board below the grid (it does not open a dialog) and the segment stays highlighted by Plotly's own selection (the donuts draw theirs, see above). When the filter changes another way (a chip, a pill, "Clear all", the search panel), the charts are rebuilt with new widget keys so the highlight disappears. In this layout the board's header holds only the search button and the board/table switch, and the lanes have no headers of their own (`render_issue_panel(..., show_filters=False, lane_headers=False)`): the charts above show the counts and the active filter, and the pinned workflow-state row names each lane's stage. Without filter chips, a chart filter is removed by clicking its segment again. Charts that keep Plotly's selection (the daily new-vs-closed line, the quality signals) see that click as a deselect, which counts only once the chart has reported its selection back on a later run; charts that draw their own highlight (the donuts, the workflow-state bars) lose Plotly's selection when redrawn, so there the click arrives as a new selection equal to the current filter. The search panel (Cmd+K) also lists the active filters, each with a remove button. Each stage in the workflow-state row is a separate chart. They draw the selection themselves, like the donuts (`priority_bar` options `highlight` and `dimmed`): the clicked chart keeps its selected bar in full colour and dims the others, and the other stage charts are dimmed entirely. Plotly's own selection would not do: it dims only within the clicked chart, and Streamlit drops it when the chart is redrawn, for example when a dimmed stage is clicked.
+A click on a chart segment filters the board below the grid (it does not open a dialog) and the segment stays highlighted by Plotly's own selection (the donuts draw theirs, see above). When the filter changes another way (a chip, a pill, "Clear all"), the charts are rebuilt with new widget keys so the highlight disappears. In this layout the board's header holds only the search button and the board/table switch, and the lanes have no headers of their own (`render_issue_panel(..., show_filters=False, lane_headers=False)`): the charts above show the counts and the active filter, and the pinned workflow-state row names each lane's stage. Without filter chips, a chart filter is removed by clicking its segment again. Charts that keep Plotly's selection (the daily new-vs-closed line, the quality signals) see that click as a deselect, which counts only once the chart has reported its selection back on a later run; charts that draw their own highlight (the donuts, the workflow-state bars) lose Plotly's selection when redrawn, so there the click arrives as a new selection equal to the current filter. The search panel (Cmd+K) also lists the active filters, each with a remove button. Each stage in the workflow-state row is a separate chart. They draw the selection themselves, like the donuts (`priority_bar` options `highlight` and `dimmed`): the clicked chart keeps its selected bar in full colour and dims the others, and the other stage charts are dimmed entirely. Plotly's own selection would not do: it dims only within the clicked chart, and Streamlit drops it when the chart is redrawn, for example when a dimmed stage is clicked.
 
 ## 4. Interactions
 
@@ -105,7 +105,7 @@ The board is always visible and shows all open issues until something filters it
 - a summary pill sets the base facets (3.2),
 - a lane pill adds `stage` and `priority` (3.3),
 - a chart click in the Analytics layout sets the facets the segment stands for (`facets_from_selection`): a donut slice its state and priority, a donut centre its state, a workflow-state bar its stage, open state and priority, a velocity point the day and created/closed, an open/closed bar the state, a quality bar the signal (3.4),
-- the search panel sets `query`, `state` and the sidebar filters (4.5).
+- the search field in the board's toolbar sets `query` (4.5).
 
 Open issues are the default: a missing `state` means `opened`, and only `closed` or `all` is shown as a chip (not next to a 7-day filter, which already says which issues it covers).
 
@@ -121,7 +121,7 @@ The release timeline and sidebar milestone selector are synchronized bidirection
 
 ### 4.3 Issue board
 
-The board (`app/dashboard/views/issue_panel.py`) shows Board by default; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search panel (4.5) applies to both views.
+The board (`app/dashboard/views/issue_panel.py`) shows Board by default; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search field (4.5) applies to both views.
 
 **Board.** Lanes are the stages that have open issues, in workflow order (`overview_stages`). Lanes without matching issues stay visible and empty. Other stages (for example "Done" for closed issues) are appended; when none of the issues is in one of those stages, only the stages with issues are shown, in the same column width. The board ignores the `stage` facet and marks that stage's lane instead, so the other stages stay visible for comparison; the caption shows the total and the count in the marked stage. Each lane shows at most 50 cards and scrolls on its own.
 
@@ -129,25 +129,21 @@ The board (`app/dashboard/views/issue_panel.py`) shows Board by default; the cho
 
 **Issue detail.** Selecting a card or a row opens the issue in place of the board or table, next to a column of cards. From the board, that column is the lane the issue was opened from; from the table, it is the table order. The open card is outlined and scrolled into view. Previous/next follow that column. "Back to board" or "Back to table" returns to the list.
 
-The recently viewed issues are listed in the search panel (4.5).
-
 Issue state changes are not possible from the list; they are made in GitLab.
 
 ### 4.4 Local seeded issue details
 
 For locally seeded issues, the detail flow resolves from local parquet-backed data rather than assuming a live GitLab API lookup. This keeps local demo workflows usable end-to-end.
 
-### 4.5 Search panel (Ctrl/Cmd+K)
+### 4.5 Search field (Ctrl/Cmd+K)
 
-Ctrl+K (⌘K on macOS), or the search button in the board header, opens a floating search panel (`st.dialog`). The shortcut is a small keyboard listener added to the page that clicks the search button.
+The search is a field in the board's toolbar, left of the board/table switch (`app/dashboard/views/issue_search.py`), not a separate panel, so searching does not cover the board.
 
-- The search box has focus when the panel opens. While it is empty, the panel lists the last five issues opened in the session ("Recently viewed"). Results update as you type: the top eight matching issues, by priority and then time in stage. Selecting one closes the panel and opens the issue on the board.
-- Quick filter: Open, Closed or All issues.
-- The active board facets (except search and state, which have their own controls) are shown as removable chips.
-- The sidebar filters (domain/team, context, milestone, time range) are repeated here and stay in sync with the sidebar.
-- Esc, the close button or a click outside closes the panel. The search text stays applied to the board as a "Search" chip.
+- The field is compact until it has focus. Ctrl+K (⌘K on macOS) anywhere on the page, or a click, focuses it and widens it in place.
+- The board filters as you type (after a 250 ms pause). The matching is fuzzy: every word must appear in the title, assignee, context, milestone, priority or stage, with a fallback to similar words when nothing matches exactly (`_build_issue_search_mask`).
+- Esc leaves the field. It stays wide while it holds a search; in the Compact layout the search is also shown as a "Search" chip, and removing the chip clears the field.
 
-The search box is the `st_keyup` component, which renders in an iframe. Keys typed there do not reach the page, so the listener forwards Esc from the iframe to close the panel.
+The field is the `st_keyup` component (Streamlit's own text input reports only on Enter or blur), which renders its input in a same-origin iframe. A small script focuses that input on Ctrl/Cmd+K, styles it like the toolbar's buttons, and marks the field's container while it has focus or text so the CSS can widen it (`:focus-within` does not see focus inside an iframe). The field reports an edit only when it is rendered, after the board was filtered in that run, so the toolbar reruns the page when the text changed. When the search changes elsewhere (a chip, the URL), the field gets a new widget key so it shows the new text.
 
 ## 5. Notes on Scope
 

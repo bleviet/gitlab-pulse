@@ -17,7 +17,6 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from gitlab.exceptions import GitlabError
-from st_keyup import st_keyup
 
 from app.dashboard.data_loader import load_labels
 from app.dashboard.theme import get_plotly_font_color, get_priority_colors, with_alpha
@@ -46,17 +45,15 @@ from app.dashboard.views.issue_data import (
     priority_color_names,
     without_facet,
 )
+from app.dashboard.views.issue_search import inject_search_shortcut, render_search_box
 from app.dashboard.widgets import tables
 from app.dashboard.widgets.tables.issue_board import build_board_columns
 
 _ISSUE_QUERY_KEYS = ("issue_source", "issue_project_id", "issue_iid")
 _SUMMARY_QUERY_KEY = "summary"
 _DEFAULT_FACETS: IssueFacets = {"state": "opened"}
-_RECENT_ISSUES_LIMIT = 5
-_SEARCH_RESULTS_LIMIT = 8
 _LANE_HEIGHT = 440
 _TABLE_HEIGHT = 480
-_QUICK_STATES = {"Open": "opened", "Closed": "closed", "All": "all"}
 _TIME_PRESETS = {"30 Days": 30, "90 Days": 90, "1 Year": 365, "All Time": None}
 _SIDEBAR_SELECTS = (
     ("team", "Domain / Team", "sidebar_team_selector"),
@@ -64,7 +61,6 @@ _SIDEBAR_SELECTS = (
     ("milestone", "Milestone", "sidebar_milestone_selector"),
 )
 _VIEW_ICONS = {"Board": ":material/view_kanban:", "Table": ":material/table_rows:"}
-_SEARCH_PLACEHOLDER = "Search title, assignee, context, milestone, priority, stage..."
 
 
 # --- Session state -----------------------------------------------------------
@@ -194,8 +190,31 @@ def chart_priority_highlight(chart_id: str) -> str | None:
     return _get_facets().get("priority")
 
 
+def _sync_search_box(facets: IssueFacets) -> None:
+    """Make the search field show a search changed elsewhere (a chip, the URL).
+
+    The field keeps what was typed into it, so it gets a new key instead.
+    """
+    if facets.get("query") != _get_facets().get("query"):
+        st.session_state["issue_search_version"] = (
+            st.session_state.get("issue_search_version", 0) + 1
+        )
+
+
+def _set_search_query(query: str) -> None:
+    """Apply the search field's text (typed, so the field already shows it)."""
+    facets = dict(_get_facets())
+    if query:
+        facets["query"] = query
+    else:
+        facets.pop("query", None)
+    st.session_state["issue_facets"] = cast(IssueFacets, facets)
+    st.session_state["selected_issue_url"] = ""
+
+
 def _set_facets(facets: IssueFacets) -> None:
-    """Replace the board's facets (chip removal, clear all, search panel)."""
+    """Replace the board's facets (chip removal, clear all)."""
+    _sync_search_box(facets)
     st.session_state["issue_facets"] = facets
     if not facets:
         st.session_state["issue_summary"] = None
@@ -302,7 +321,9 @@ def sync_issue_state_from_query(df: pd.DataFrame) -> None:
     st.session_state["issue_query_snapshot"] = current
 
     st.session_state["issue_summary"] = current.get(_SUMMARY_QUERY_KEY) or None
-    st.session_state["issue_facets"] = facets_from_query(current)
+    from_url = facets_from_query(current)
+    _sync_search_box(from_url)
+    st.session_state["issue_facets"] = from_url
     st.session_state["selected_issue_url"] = _issue_url_from_query(df, current)
 
 
@@ -329,73 +350,7 @@ def _write_query_state(selected_row: pd.Series | None) -> None:
     st.session_state["issue_query_snapshot"] = desired
 
 
-# --- Search panel (Ctrl/Cmd+K) -------------------------------------------------
-
-_SEARCH_KEYS_SCRIPT = """
-<script>
-(() => {
-  if (window.__pulseSearchKeys) return;
-  window.__pulseSearchKeys = true;
-  document.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-      const open = document.querySelector(".st-key-issue_search_open button");
-      if (open && !document.querySelector(".st-key-search_palette")) {
-        event.preventDefault();
-        open.click();
-      }
-    }
-  }, true);
-  // Focus the search box when the panel opens. st_keyup renders its input in
-  // a same-origin iframe, which loads after the dialog appears.
-  let focused = false;
-  new MutationObserver(() => {
-    const frame = document.querySelector(".st-key-search_palette iframe");
-    if (!frame) { focused = false; return; }
-    if (focused) return;
-    const input = frame.contentDocument && frame.contentDocument.querySelector("input");
-    if (input) {
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-      focused = true;
-      // Keys typed in the iframe do not reach this document, so forward Esc
-      // to let the dialog close as it does elsewhere.
-      if (!frame.__pulseEscape) {
-        frame.__pulseEscape = true;
-        frame.contentDocument.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") {
-            for (const type of ["keydown", "keyup"]) {
-              document.dispatchEvent(new KeyboardEvent(type, {
-                key: "Escape", code: "Escape", keyCode: 27, bubbles: true,
-              }));
-            }
-          }
-        });
-      }
-    }
-  }).observe(document.body, { childList: true, subtree: true, attributes: true });
-})();
-</script>
-"""
-
-
-def _shortcut_label() -> str:
-    """Return the platform's search shortcut, from the browser's user agent."""
-    user_agent = str(st.context.headers.get("User-Agent", ""))
-    return "⌘K" if "Macintosh" in user_agent or "Mac OS" in user_agent else "Ctrl K"
-
-
-def _open_search() -> None:
-    st.session_state["search_open"] = True
-
-
-def _close_search() -> None:
-    st.session_state["search_open"] = False
-
-
-def _copy_to_sidebar(source_key: str, sidebar_key: str) -> None:
-    st.session_state[sidebar_key] = st.session_state[source_key]
-    st.session_state["search_app_rerun"] = True
-
+# --- Sidebar filters ---------------------------------------------------------
 
 def _sidebar_filter_chips() -> list[tuple[str, str, str]]:
     """Return ``(name, label, sidebar key)`` for each active sidebar filter.
@@ -438,156 +393,13 @@ def _set_time_range(label: str) -> None:
     st.session_state["active_range"] = label
 
 
-def _apply_time_preset() -> None:
-    _set_time_range(str(st.session_state.get("search_time")))
-    st.session_state["search_app_rerun"] = True
-
-
-def _render_search_filters() -> None:
-    """Render the sidebar filters, kept in sync with the sidebar widgets."""
-    options: dict[str, list[str]] = st.session_state.get("sidebar_filter_options", {})
-    columns = st.columns([1, 1, 1, 1.5], vertical_alignment="bottom")
-    for column, (name, label, sidebar_key) in zip(columns, _SIDEBAR_SELECTS, strict=False):
-        choices = options.get(name) or ["All"]
-        current = st.session_state.get(sidebar_key, "All")
-        with column:
-            st.selectbox(
-                label,
-                choices,
-                index=choices.index(current) if current in choices else 0,
-                key=f"search_{name}",
-                on_change=_copy_to_sidebar,
-                args=(f"search_{name}", sidebar_key),
-            )
-    with columns[-1]:
-        st.segmented_control(
-            "Time range",
-            list(_TIME_PRESETS),
-            default=st.session_state.get("active_range", "All Time"),
-            key="search_time",
-            on_change=_apply_time_preset,
-        )
-
-
-def _render_search_results(df: pd.DataFrame, facets: IssueFacets) -> None:
-    matches = collapse_issue_contexts(filter_issues(df, _with_default_state(facets)))
-    if matches.empty:
-        st.caption("No issues match. Change the search or the filters.")
-        return
-    matches = matches.sort_values(
-        ["priority_rank", "days_in_stage"], ascending=[True, False], na_position="last"
-    )
-    noun = "issue matches" if len(matches) == 1 else "issues match"
-    st.caption(f"{len(matches)} {noun} · open one, or close this panel to see them on the board")
-    with st.container(key="search_results"):
-        for record in matches.head(_SEARCH_RESULTS_LIMIT).to_dict("records"):
-            priority = _fmt(record.get("priority"))
-            details = " · ".join(
-                value
-                for value in (
-                    "Unset" if priority == "—" else priority,
-                    _fmt(record.get("stage")),
-                    _fmt(record.get("assignee")),
-                )
-                if value != "—"
-            )
-            label = f"#{record.get('iid')}  {_fmt(record.get('title'))}  ·  {details}"
-            if st.button(label, key=f"search_result_{record.get('id')}", type="tertiary"):
-                _select_issue(str(record.get("web_url") or ""))
-                _close_search()
-                st.rerun()
-
-
-def _render_recent_in_search() -> None:
-    """List the recently viewed issues while the search box is empty."""
-    recent: list[dict[str, str]] = st.session_state.get("recent_issues", [])
-    if not recent:
-        return
-    st.caption("Recently viewed")
-    with st.container(key="search_recent"):
-        for position, entry in enumerate(recent):
-            if st.button(
-                entry["label"],
-                icon=":material/history:",
-                key=f"search_recent_{position}",
-                type="tertiary",
-            ):
-                _select_issue(entry["url"])
-                _close_search()
-                st.rerun()
-
-
-@st.dialog("Search issues", width="large", on_dismiss=_close_search)
-def _search_dialog(df: pd.DataFrame) -> None:
-    """Floating search panel: search box, quick state filter, applied filters."""
-    if st.session_state.pop("search_app_rerun", False):
-        st.rerun()
-
-    with st.container(key="search_palette"):
-        facets = dict(_get_facets())
-        query = (
-            st_keyup(
-                "Search issues",
-                value=facets.get("query", ""),
-                placeholder=_SEARCH_PLACEHOLDER,
-                key="search_palette_query",
-                debounce=150,
-                label_visibility="collapsed",
-            )
-            or ""
-        ).strip()
-        if query != facets.get("query", ""):
-            if query:
-                facets["query"] = query
-            else:
-                facets.pop("query", None)
-            st.session_state["issue_facets"] = facets
-            st.session_state["selected_issue_url"] = ""
-
-        state_labels = {value: label for label, value in _QUICK_STATES.items()}
-        current_state = state_labels.get(str(facets.get("state", "opened")), "Open")
-        with st.container(
-            key="search_palette_bar", horizontal=True, vertical_alignment="center"
-        ):
-            choice = st.segmented_control(
-                "Issues",
-                list(_QUICK_STATES),
-                default=current_state,
-                key="search_palette_state",
-                label_visibility="collapsed",
-            )
-            for facet_key, label in facet_chips(cast(IssueFacets, facets)):
-                if facet_key in ("query", "state"):
-                    continue
-                if st.button(
-                    label,
-                    icon=":material/close:",
-                    key=f"search_chip_{facet_key}",
-                    help="Remove this filter",
-                ):
-                    _set_facets(without_facet(cast(IssueFacets, facets), facet_key))
-                    st.rerun()
-        if choice and choice != current_state:
-            facets["state"] = _QUICK_STATES[choice]
-            _set_facets(cast(IssueFacets, facets))
-            st.rerun()
-
-        _render_search_filters()
-        st.divider()
-        if not query:
-            _render_recent_in_search()
-        _render_search_results(df, cast(IssueFacets, facets))
-
-
 def finish_issue_state(df: pd.DataFrame) -> None:
-    """Write the URL state, install the search shortcut, open the search panel.
+    """Write the URL state and install the search shortcut.
 
     Call once per run, after the Overview is rendered.
     """
     _write_query_state(_selected_row(df))
-    st.html(_SEARCH_KEYS_SCRIPT, unsafe_allow_javascript=True)
-    if st.session_state.get("search_open"):
-        _search_dialog(df)
+    inject_search_shortcut()
 
 
 # --- Issue list --------------------------------------------------------------
@@ -696,14 +508,6 @@ def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
 
 
 # --- Issue detail ------------------------------------------------------------
-
-def _remember_issue(url: str, label: str) -> None:
-    recent: list[dict[str, str]] = st.session_state.get("recent_issues", [])
-    recent = [entry for entry in recent if entry["url"] != url]
-    st.session_state["recent_issues"] = [
-        {"url": url, "label": label}, *recent
-    ][:_RECENT_ISSUES_LIMIT]
-
 
 def _render_issue_detail(row: pd.Series, ordered_urls: list[str], back_label: str) -> None:
     """Render the selected issue next to the list."""
@@ -1053,13 +857,13 @@ def _render_panel_header(
             vertical_alignment="center",
             width="content",
         ):
-            st.button(
-                _shortcut_label(),
-                icon=":material/search:",
-                key="issue_search_open",
-                on_click=_open_search,
-                help="Search issues, recently viewed issues and filters",
+            query = str(facets.get("query", ""))
+            typed = render_search_box(
+                query, int(st.session_state.get("issue_search_version", 0))
             )
+            if typed != query:
+                _set_search_query(typed)
+                st.rerun()
             view = st.segmented_control(
                 "View",
                 ["Board", "Table"],
@@ -1145,11 +949,6 @@ def render_issue_panel(
 
     selected_row = _selected_row(df)
     selected_url = "" if selected_row is None else str(selected_row["web_url"])
-    if selected_row is not None:
-        _remember_issue(
-            selected_url,
-            f"#{_fmt(selected_row.get('iid'))} {_fmt(selected_row.get('title'))}",
-        )
 
     # The switch's own state is current even on the rerun it triggered.
     current_view = st.session_state.get("filtered_issues_view_choice") or st.session_state.get(

@@ -104,7 +104,7 @@ The Overview page is the main curated workflow view. It currently includes:
 - issue quality signals
 - one column: a release rail, a line of summary pills, and the issue board (or a table) whose lane headers show each stage's priority mix; summary and lane pills filter the board
 - issue detail shown in place of the board, next to the lane or table it was opened from
-- Ctrl/Cmd+K search panel with quick Open/Closed/All filter and the sidebar filters
+- inline search field in the board's toolbar: Ctrl/Cmd+K focuses and widens it, and the board filters (fuzzy) as you type
 
 ### 4.4 Caching
 

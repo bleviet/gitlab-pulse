@@ -694,7 +694,6 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_panel_toolbar > :has(> .st-key-issue_panel_actions) {{ margin-left: auto; }}
 .st-key-issue_panel_toolbar_left [data-testid="stMarkdown"], .st-key-issue_panel_toolbar_left [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
 .st-key-issue_panel_actions {{ gap: 0.5rem; }}
-.st-key-issue_panel_actions [data-testid="stButton"] button,
 .st-key-issue_panel_actions [data-testid="stButtonGroup"] button {{ min-height: 1.9rem; padding: 0.1rem 0.7rem; font-size: 0.82rem; }}
 .ov-divider {{ display: inline-block; width: 1px; height: 1.2rem; background: {border}; vertical-align: middle; }}
 /* Pills: compact, and the picked one in the accent colour (orange is kept for primary actions). */
@@ -739,13 +738,11 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 [class*="issue_board-iblane"] {{ height: 100% !important; }}
 /* A wide lane (large screen) shows its cards in several columns. */
 [class*="issue_board-iblane"] {{ display: grid !important; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-content: start; }}
-.st-key-search_palette {{ gap: 0.75rem; }}
-.st-key-search_palette iframe[title="st_keyup.st_keyup"] {{ height: 46px !important; }}
-.st-key-search_results, .st-key-search_recent {{ gap: 0; }}
-.st-key-search_recent [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; padding: 0.35rem 0.5rem; border-radius: 8px; }}
-.st-key-search_results [data-testid="stButton"] button {{ width: 100%; justify-content: flex-start; padding: 0.35rem 0.5rem; border-radius: 8px; }}
-.st-key-search_results [data-testid="stButton"] button:hover {{ background: {_with_alpha(text_color, 0.06, secondary_bg)}; }}
-.st-key-search_results [data-testid="stButton"] button p {{ text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+/* Search field: compact until it has focus or holds a search, then wider
+   (see ``views.issue_search``; the input itself is styled inside its iframe). */
+.st-key-issue_search_box {{ width: 10.5rem !important; transition: width 0.18s ease; }}
+.st-key-issue_search_box[data-active], .st-key-issue_search_box[data-filled] {{ width: min(26rem, 45vw) !important; }}
+.st-key-issue_search_box iframe {{ height: 32px !important; display: block; }}
 .st-key-issue_panel_chips, .st-key-issue_panel_actions {{ gap: 0.5rem; }}
 /* Filter chips: the same size as the summary pills in the toolbar above. */
 .st-key-issue_panel_chips {{ gap: 0.3rem; }}
