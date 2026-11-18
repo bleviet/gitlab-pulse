@@ -115,13 +115,16 @@ def _on_pick(pills_key: str, items: dict[str, SummaryItem]) -> None:
     select_summary(item.item_id if item else None, item.facets if item else {})
 
 
-def render_summary_bar(df: pd.DataFrame) -> None:
+def render_summary_bar(groups: list[tuple[str, list[SummaryItem]]]) -> None:
     """Render the summary pills, one group after another, divided by a rule.
 
     Meant for a horizontal container (the board's toolbar row). Each group is
     a single-select ``st.pills``; the group name is its accessible label.
+
+    Args:
+        groups: The pills from ``build_summary``, computed once per full run.
     """
-    for position, (heading, items) in enumerate(build_summary(df)):
+    for position, (heading, items) in enumerate(groups):
         if position:
             st.markdown('<span class="ov-divider"></span>', unsafe_allow_html=True, width="content")
         pills_key = "summary_" + heading.lower().replace(" ", "_")

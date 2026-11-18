@@ -9,6 +9,7 @@ import streamlit as st
 
 from app.dashboard.views import issue_panel
 from app.dashboard.views.issue_data import facets_from_selection
+from app.dashboard.views.issue_pages import PageWindow
 
 STAGES = ["Backlog", "Implementation", "Testing"]
 
@@ -50,9 +51,11 @@ def captured(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     )
     monkeypatch.setattr(st, "container", lambda *a, **k: nullcontext())
 
-    def header(_facets: Any, caption: str, *_a: Any) -> str:
-        seen["caption"] = caption
+    def toolbar(_toolbar: Any) -> str:
         return str(seen["view"])
+
+    def chips(_facets: Any, caption: str) -> None:
+        seen["caption"] = caption
 
     def board(issues: pd.DataFrame, config: dict[str, Any]) -> None:
         seen["board_ids"] = issues["id"].tolist()
@@ -64,7 +67,8 @@ def captured(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     def lane_header(_facets: Any, lane_counts: Any, _colors: Any) -> None:
         seen["lane_counts"] = lane_counts
 
-    monkeypatch.setattr(issue_panel, "_render_panel_header", header)
+    monkeypatch.setattr(issue_panel, "_render_toolbar", toolbar)
+    monkeypatch.setattr(issue_panel, "_render_filter_chips", chips)
     monkeypatch.setattr(issue_panel, "render_page_bar", lambda *a, **k: range(50))
     monkeypatch.setattr(issue_panel.tables, "issue_board", board)
     monkeypatch.setattr(issue_panel, "_render_issue_table", table)
@@ -121,3 +125,88 @@ def test_board_keeps_lanes_when_the_full_facets_match_nothing(
 
     assert captured["board_ids"] == []
     assert captured["board_config"]["stages"] == STAGES
+
+
+def test_prepare_issue_rows_leaves_the_hints_to_the_page() -> None:
+    rows = issue_panel._prepare_issue_rows(_issues())
+
+    assert "quality_hints" not in rows.columns
+
+
+def test_table_computes_hints_only_for_the_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[int] = []
+    original = issue_panel._issue_quality_hints_text
+
+    def counting(row: pd.Series) -> str:
+        calls.append(1)
+        return original(row)
+
+    shown: dict[str, pd.DataFrame] = {}
+
+    def grid(styler: Any, *_a: Any, **_k: Any) -> None:
+        shown["frame"] = styler.data
+
+    monkeypatch.setattr(issue_panel, "render_page_bar", lambda *a, **k: PageWindow(0, 2))
+    monkeypatch.setattr(issue_panel, "load_labels", lambda: {})
+    monkeypatch.setattr(issue_panel.tables, "issue_detail_grid", grid)
+    monkeypatch.setattr(issue_panel, "_issue_quality_hints_text", counting)
+
+    rows = issue_panel._prepare_issue_rows(_issues().assign(context=[[]] * 4))
+    issue_panel._render_issue_table(rows, {})
+
+    frame = shown["frame"]
+    assert len(calls) == 2
+    assert len(frame) == 2
+    assert frame["quality_hints"].tolist() == [
+        "Unassigned owner | Missing milestone"
+    ] * 2
+    assert frame["quality_hints"].tolist() == [
+        original(row) for _, row in rows.iloc[0:2].iterrows()
+    ]
+
+
+def test_table_view_does_not_compute_lane_counts(
+    captured: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured["view"] = "Table"
+
+    def fail(*_a: Any, **_k: Any) -> None:
+        raise AssertionError("lane counts computed in Table view")
+
+    monkeypatch.setattr(issue_panel, "lane_priority_counts", fail)
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["table_ids"] == [2]
+
+
+def test_resetting_a_sidebar_filter_requests_a_full_rerun(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state: dict[str, Any] = {"sidebar_team_selector": "Team A"}
+    monkeypatch.setattr(st, "session_state", state)
+
+    issue_panel._reset_sidebar_filter("sidebar_team_selector")
+
+    assert state["sidebar_team_selector"] == "All"
+    assert state[issue_panel.FULL_RERUN_KEY] is True
+
+
+def test_typed_search_is_applied_in_the_same_run(
+    captured: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    st.session_state["issue_facets"] = {"state": "opened"}
+    captured["view"] = "Table"
+
+    def toolbar(_toolbar: Any) -> str:
+        issue_panel._set_search_query("2")
+        return "Table"
+
+    monkeypatch.setattr(issue_panel, "_render_toolbar", toolbar)
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["table_ids"] == [2]
+    assert captured["caption"] == "1 issue"

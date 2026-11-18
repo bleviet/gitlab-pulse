@@ -4,7 +4,8 @@ The chart grid for stepping back: the release timeline, the priority donuts,
 the quality signals, the daily new-vs-closed line and the workflow-state bars,
 which stay pinned above the issue board while it scrolls. A click on a chart segment filters the issue board below
 the grid and keeps the segment highlighted (see
-``issue_panel.apply_chart_selection``). A click in a donut's centre selects all
+``issue_panel.apply_chart_selection``); the click is applied before the
+charts are drawn. A click in a donut's centre selects all
 open (or closed) issues, so there is no separate open-vs-closed chart.
 """
 
@@ -84,12 +85,23 @@ def render_analytics_layout(
 
         return StreamlitGridCell(key=key, span=span, render=render_panel)
 
-    def select(
-        selection: dict[str, Any] | None,
-        chart_id: str,
-        stage_filter: str | None = None,
-        state_filter: str | None = None,
-    ) -> None:
+    # chart id -> (widget key base, stage scope, state scope)
+    chart_scopes: dict[str, tuple[str, str | None, str | None]] = {
+        "open_donut": ("analytics_priority_open", None, "opened"),
+        "closed_donut": ("analytics_priority_closed", None, "closed"),
+        "velocity_chart": ("analytics_velocity", None, None),
+        "quality_signal_chart": ("analytics_quality_signals", None, None),
+        **{
+            f"stage_bar_{index}": (f"analytics_stage_bar_{index}", stage, "opened")
+            for index, stage in enumerate(stages)
+        },
+    }
+
+    def widget_key(chart_id: str) -> str:
+        return chart_key(chart_scopes[chart_id][0], chart_id)
+
+    def select(selection: dict[str, Any] | None, chart_id: str) -> None:
+        _, stage_filter, state_filter = chart_scopes[chart_id]
         apply_chart_selection(selection, chart_id, stage_filter, state_filter)
 
     def open_priority() -> None:
@@ -97,31 +109,31 @@ def render_analytics_layout(
             unique_df,
             config={
                 "height": 150,
-                "key": chart_key("analytics_priority_open", "open_donut"),
+                "key": widget_key("open_donut"),
                 "show_legend": False,
                 "highlight": chart_priority_highlight("open_donut"),
             },
         )
-        select(selection, "open_donut", state_filter="opened")
+        select(selection, "open_donut")
 
     def closed_priority() -> None:
         selection = charts.priority_donut(
             unique_df,
             config={
                 "height": 150,
-                "key": chart_key("analytics_priority_closed", "closed_donut"),
+                "key": widget_key("closed_donut"),
                 "show_legend": False,
                 "state_filter": "closed",
                 "center_text": "CLOSED<br>ISSUES",
                 "highlight": chart_priority_highlight("closed_donut"),
             },
         )
-        select(selection, "closed_donut", state_filter="closed")
+        select(selection, "closed_donut")
 
     def velocity() -> None:
         selection = charts.daily_velocity_line(
             unique_df,
-            config={"height": 150, "key": chart_key("analytics_velocity", "velocity_chart")},
+            config={"height": 150, "key": widget_key("velocity_chart")},
         )
         select(selection, "velocity_chart")
 
@@ -144,12 +156,12 @@ def render_analytics_layout(
                     unique_df[unique_df["stage"] == stage],
                     config={
                         "height": 115,
-                        "key": chart_key(f"analytics_stage_bar_{index}", f"stage_bar_{index}"),
+                        "key": widget_key(f"stage_bar_{index}"),
                         "highlight": chart_priority_highlight(f"stage_bar_{index}"),
                         "dimmed": stage_bar_active and active != f"stage_bar_{index}",
                     },
                 )
-                select(selection, f"stage_bar_{index}", stage_filter=stage, state_filter="opened")
+                select(selection, f"stage_bar_{index}")
 
     def timeline() -> None:
         key_suffix = st.session_state.get("timeline_reset_counter", 0)
@@ -178,10 +190,22 @@ def render_analytics_layout(
             _build_overview_quality_signal_df(unique_df),
             config={
                 "height": 150,
-                "key": chart_key("analytics_quality_signals", "quality_signal_chart"),
+                "key": widget_key("quality_signal_chart"),
             },
         )
         select(selection, "quality_signal_chart")
+
+    # A chart click is reported by the run it triggers. Apply it before any
+    # chart is drawn, so that run stops here instead of after building most
+    # of the charts.
+    for chart_id, (key_base, stage_filter, state_filter) in chart_scopes.items():
+        apply_chart_selection(
+            st.session_state.get(chart_key(key_base, chart_id)),
+            chart_id,
+            stage_filter,
+            state_filter,
+            confirm=False,
+        )
 
     with st.container(key="overview_analytics"):
         render_streamlit_grid(

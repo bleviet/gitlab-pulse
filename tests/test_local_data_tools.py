@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from app.dashboard.utils import normalize_assignee_labels
@@ -138,6 +139,27 @@ def test_normalize_issue_labels_preserves_real_label_lists() -> None:
         "type::bug",
         "severity::critical",
     ]
+
+
+def test_normalize_issue_labels_treats_numpy_arrays_like_lists() -> None:
+    """Parquet list columns arrive as numpy arrays and must match plain lists."""
+    cases = [
+        ["type::bug", "severity::critical", ""],
+        ["type::bug"],
+        [],
+    ]
+    for labels in cases:
+        array = np.array(labels, dtype=object)
+        assert _normalize_issue_labels(array) == _normalize_issue_labels(labels)
+    assert _normalize_issue_labels(np.array(["type::bug"], dtype=object)) == ["type::bug"]
+    assert _normalize_issue_labels(np.array([], dtype=object)) == []
+
+
+def test_has_multiple_classification_labels_accepts_numpy_arrays() -> None:
+    """Mixed classification must be detected for array-valued label cells."""
+    labels = np.array(["type::bug", "type::feature"], dtype=object)
+
+    assert _has_multiple_classification_labels(labels)
 
 
 def test_priority_color_key_normalizes_severity_and_priority_labels() -> None:

@@ -11,6 +11,7 @@ from app.dashboard.widgets.tables.issue_board import (
     _header_html,
     _title_html,
     build_board_columns,
+    priority_bar_html,
 )
 
 
@@ -136,3 +137,13 @@ def test_explicit_stages_on_empty_issues_still_return_columns() -> None:
     columns = build_board_columns(_issues().iloc[0:0], stages=["Backlog", "Review"])
 
     assert [stage for stage, cards in columns if cards.empty] == ["Backlog", "Review"]
+
+
+def test_priority_bar_html_has_one_segment_per_priority() -> None:
+    assert "ib-pbar-empty" in priority_bar_html([])
+
+    bar = priority_bar_html([("High", 3), ("Low", 1)])
+
+    assert bar.count("<span") == 2
+    assert "flex:3" in bar
+    assert "flex:1" in bar

@@ -12,17 +12,21 @@ A switch at the top right of the page, in Streamlit's header bar, changes the
 layout; the choice is kept in the session and in the URL (``?view=analytics``).
 """
 
+from collections.abc import Callable
+
 import pandas as pd
 import streamlit as st
 
 from app.dashboard.views.issue_data import overview_stages
 from app.dashboard.views.issue_panel import (
-    finish_issue_state,
+    FULL_RERUN_KEY,
     render_issue_panel,
     sync_issue_state_from_query,
+    write_query_state,
 )
+from app.dashboard.views.issue_search import inject_search_shortcut
 from app.dashboard.views.overview_analytics import render_analytics_layout
-from app.dashboard.views.overview_summary import render_summary_bar
+from app.dashboard.views.overview_summary import build_summary, render_summary_bar
 from app.dashboard.views.pinned_header import inject_pinned_header_script
 from app.dashboard.widgets import charts
 
@@ -100,6 +104,29 @@ def _render_release_rail(timeline_source: pd.DataFrame, active_milestone: str | 
             st.rerun()
 
 
+@st.fragment
+def _issue_panel_fragment(
+    df: pd.DataFrame,
+    stages: list[str],
+    toolbar: Callable[[], None] | None = None,
+    show_filters: bool = True,
+    lane_headers: bool = True,
+) -> None:
+    """Render the issue panel as a fragment.
+
+    A click inside the panel (pager, pills, view switch) reruns only the
+    panel, not the sidebar, the charts or the data load. The panel's filters
+    are in the URL, so the URL state is written here too.
+    """
+    if st.session_state.pop(FULL_RERUN_KEY, False):
+        # A sidebar filter was reset from a chip: the panel's data is stale.
+        st.rerun()
+    render_issue_panel(
+        df, stages, toolbar=toolbar, show_filters=show_filters, lane_headers=lane_headers
+    )
+    write_query_state()
+
+
 def render_overview(
     df: pd.DataFrame,
     quality_df: pd.DataFrame | None = None,
@@ -121,6 +148,8 @@ def render_overview(
         return
 
     sync_issue_state_from_query()
+    # A full run already satisfies a pending full-rerun request.
+    st.session_state.pop(FULL_RERUN_KEY, None)
     layout = _current_layout()
     _render_layout_switch()
     inject_pinned_header_script()
@@ -142,16 +171,17 @@ def render_overview(
             active_milestone,
             # The charts above show the stages and the filters, so the board
             # keeps only the search and the view switch.
-            board=lambda: render_issue_panel(
+            board=lambda: _issue_panel_fragment(
                 df, stages, show_filters=False, lane_headers=False
             ),
         )
     else:
         _render_release_rail(timeline_source, active_milestone)
-        render_issue_panel(
+        summary = build_summary(unique_df)
+        _issue_panel_fragment(
             df,
             stages,
-            toolbar=lambda: render_summary_bar(unique_df),
+            toolbar=lambda: render_summary_bar(summary),
         )
     _write_layout_query(layout)
-    finish_issue_state()
+    inject_search_shortcut()

@@ -16,7 +16,6 @@ import pandas as pd
 import streamlit as st
 
 from app.dashboard.data_loader import load_labels
-from app.dashboard.theme import get_priority_colors
 from app.dashboard.utils import sort_hierarchy
 from app.dashboard.views.issue_data import (
     FACET_QUERY_PREFIX,
@@ -35,11 +34,16 @@ from app.dashboard.views.issue_data import (
     without_facet,
 )
 from app.dashboard.views.issue_pages import render_page_bar
-from app.dashboard.views.issue_search import inject_search_shortcut, render_search_box
+from app.dashboard.views.issue_search import render_search_box
 from app.dashboard.widgets import tables
-from app.dashboard.widgets.tables.issue_board import build_board_columns
+from app.dashboard.widgets.tables.issue_board import (
+    build_board_columns,
+    priority_bar_html,
+)
 
 _SUMMARY_QUERY_KEY = "summary"
+# Set when a sidebar filter is reset from a chip: the panel needs a full rerun.
+FULL_RERUN_KEY = "issue_panel_full_rerun"
 _DEFAULT_FACETS: IssueFacets = {"state": "opened"}
 _TIME_PRESETS = {"30 Days": 30, "90 Days": 90, "1 Year": 365, "All Time": None}
 _SIDEBAR_SELECTS = (
@@ -97,6 +101,7 @@ def apply_chart_selection(
     chart_id: str,
     stage_filter: str | None = None,
     state_filter: str | None = None,
+    confirm: bool = True,
 ) -> None:
     """Filter the board by a new selection in an Analytics chart.
 
@@ -105,6 +110,11 @@ def apply_chart_selection(
     facets replace the board's filter (the search text is kept); the other
     charts drop their highlight. Clicking the segment that set the filter again
     removes it.
+
+    With ``confirm=False`` the call comes from before the chart is drawn (the
+    selection is read from session state): an unchanged selection is then not
+    "reported again", since a chart that redraws its highlight only drops the
+    selection when it is drawn.
     """
     points = (selection or {}).get("selection", {}).get("points") or []
     signatures: dict[str, str] = st.session_state.setdefault("issue_chart_signatures", {})
@@ -120,7 +130,8 @@ def apply_chart_selection(
         return
     signature = json.dumps(points, sort_keys=True, default=str)
     if signatures.get(chart_id) == signature:
-        confirmed[chart_id] = True
+        if confirm:
+            confirmed[chart_id] = True
         return
     signatures[chart_id] = signature
     confirmed[chart_id] = False
@@ -268,7 +279,7 @@ def sync_issue_state_from_query() -> None:
     st.session_state["issue_facets"] = from_url
 
 
-def _write_query_state() -> None:
+def write_query_state() -> None:
     """Mirror the facets and the picked summary pill into the URL."""
     desired: dict[str, str] = facets_to_query(_get_facets())
     summary_id = st.session_state.get("issue_summary")
@@ -309,6 +320,7 @@ def _reset_sidebar_filter(sidebar_key: str) -> None:
         _set_time_range("All Time")
     else:
         st.session_state[sidebar_key] = "All"
+    st.session_state[FULL_RERUN_KEY] = True
 
 
 def _clear_all_filters() -> None:
@@ -327,15 +339,6 @@ def _set_time_range(label: str) -> None:
     start = min_date if days is None else max(min_date, max_date - pd.Timedelta(days=days))
     st.session_state["date_range"] = (start, max_date)
     st.session_state["active_range"] = label
-
-
-def finish_issue_state() -> None:
-    """Write the URL state and install the search shortcut.
-
-    Call once per run, after the Overview is rendered.
-    """
-    _write_query_state()
-    inject_search_shortcut()
 
 
 # --- Issue list --------------------------------------------------------------
@@ -357,7 +360,6 @@ def _prepare_issue_rows(issues: pd.DataFrame) -> pd.DataFrame:
     for column in ("stage", "milestone", "assignee"):
         if column in rows.columns:
             rows[column] = rows[column].astype(object).fillna("")
-    rows["quality_hints"] = rows.apply(_issue_quality_hints_text, axis=1)
     rows = rows.reset_index(drop=True)
     rows["title"] = (
         rows["web_url"].astype(str)
@@ -373,6 +375,7 @@ def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
     """Render the issue table; the title links to the issue in GitLab."""
     page = render_page_bar("table", len(rows))
     rows = rows.iloc[page.start:page.stop]
+    rows = rows.assign(quality_hints=rows.apply(_issue_quality_hints_text, axis=1))
 
     label_styles = load_labels()
     context_options = sorted(
@@ -432,20 +435,6 @@ def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
 
 # --- Lane headers ---------------------------------------------------------------
 
-def _priority_bar_html(counts: list[tuple[str, int]]) -> str:
-    """Thin stacked bar of a lane's issues by priority."""
-    total = sum(count for _, count in counts)
-    if not total:
-        return '<div class="ib-pbar ib-pbar-empty"></div>'
-    colors = get_priority_colors()
-    segments = "".join(
-        f'<span style="flex:{count};background:{colors.get(label, colors["Unset"])}" '
-        f'title="{html.escape(label)}: {count}"></span>'
-        for label, count in counts
-    )
-    return f'<div class="ib-pbar">{segments}</div>'
-
-
 def _lane_header_renderer(
     facets: IssueFacets,
     lane_counts: dict[str, list[tuple[str, int]]],
@@ -468,7 +457,7 @@ def _lane_header_renderer(
             st.markdown(
                 f'<div class="ib-lane-head{" ib-lane-hl" if highlighted else ""}">'
                 f"<b>{html.escape(stage)}</b> <small>{len(cards)}</small></div>"
-                + _priority_bar_html(counts),
+                + priority_bar_html(counts),
                 unsafe_allow_html=True,
             )
             pills_key = f"lane_pills_{index}"
@@ -494,18 +483,12 @@ def _lane_header_renderer(
 
 # --- Panel -------------------------------------------------------------------
 
-def _render_panel_header(
-    facets: IssueFacets,
-    count_caption: str,
-    toolbar: Callable[[], None] | None,
-    show_filters: bool,
-) -> str:
-    """Render the board's header: one toolbar row, then chips if filtered.
+def _render_toolbar(toolbar: Callable[[], None] | None) -> str:
+    """Render the toolbar row: the caller's ``toolbar`` (the summary pills) on
+    the left, the search box and the view switch on the right.
 
-    The toolbar row holds the caller's ``toolbar`` (the summary pills) on the
-    left and the search button and the view switch on the right. The active
-    filters and the issue count get a second row only while there are filters;
-    without filters the count is on the "Open" summary pill.
+    A typed search is stored here, without a rerun, so the caller filters by it
+    in the same run.
 
     Returns:
         The active view, ``"Board"`` or ``"Table"``.
@@ -531,13 +514,12 @@ def _render_panel_header(
             vertical_alignment="center",
             width="content",
         ):
-            query = str(facets.get("query", ""))
+            query = str(_get_facets().get("query", ""))
             typed = render_search_box(
                 query, int(st.session_state.get("issue_search_version", 0))
             )
             if typed != query:
                 _set_search_query(typed)
-                st.rerun()
             view = st.segmented_control(
                 "View",
                 ["Board", "Table"],
@@ -548,22 +530,29 @@ def _render_panel_header(
                 help="Board or table view",
             ) or persisted_view
     st.session_state["filtered_issues_view"] = view
+    return str(view)
 
+
+def _render_filter_chips(facets: IssueFacets, count_caption: str) -> None:
+    """Render the active filters and the issue count as a second row, only
+    while there are filters; without filters the count is on the "Open"
+    summary pill.
+    """
     chips = facet_chips(facets)
     sidebar_chips = _sidebar_filter_chips()
-    if show_filters and (chips or sidebar_chips):
+    if chips or sidebar_chips:
         with st.container(
             key="issue_panel_chips", horizontal=True, vertical_alignment="center"
         ):
             for facet_key, label in chips:
-                if st.button(
+                st.button(
                     label,
                     icon=":material/close:",
                     key=f"issue_chip_{facet_key}",
                     help="Remove this filter",
-                ):
-                    _set_facets(without_facet(facets, facet_key))
-                    st.rerun()
+                    on_click=_set_facets,
+                    args=(without_facet(facets, facet_key),),
+                )
             for name, label, sidebar_key in sidebar_chips:
                 st.button(
                     label,
@@ -580,7 +569,6 @@ def _render_panel_header(
                 on_click=_clear_all_filters,
             )
             st.caption(count_caption)
-    return str(view)
 
 
 def render_issue_panel(
@@ -605,28 +593,30 @@ def render_issue_panel(
         lane_headers: Show a header above each lane. Off where the stages are
             shown above the board (Analytics).
     """
-    facets = _get_facets()
-    effective = _with_default_state(facets)
-    highlight_stage = facets.get("stage")
-
-    issues = collapse_issue_contexts(filter_issues(df, effective))
-    # Lane headers count what the board shows without the stage and priority
-    # refinement, so every lane keeps its full priority mix, and the lanes stay
-    # even when the refinement matches nothing.
-    header_facets = without_facet(without_facet(effective, "stage"), "priority")
-    header_issues = collapse_issue_contexts(filter_issues(df, header_facets))
-    lanes = board_lanes(chart_stages, header_issues)
-    lane_counts = lane_priority_counts(header_issues)
-
-    noun = "issue" if len(issues) == 1 else "issues"
-    count_caption = f"{len(issues)} {noun}"
-
     with st.container(border=True, key="issue_panel"):
         # Keyed so the toolbar and the chips stay pinned while the board scrolls.
         with st.container(key="issue_panel_head"):
-            view = _render_panel_header(facets, count_caption, toolbar, show_filters)
+            # The toolbar comes first so a typed search filters in the same run.
+            view = _render_toolbar(toolbar)
+            facets = _get_facets()
+            effective = _with_default_state(facets)
+            highlight_stage = facets.get("stage")
+
+            issues = collapse_issue_contexts(filter_issues(df, effective))
+
+            noun = "issue" if len(issues) == 1 else "issues"
+            count_caption = f"{len(issues)} {noun}"
+            if show_filters:
+                _render_filter_chips(facets, count_caption)
 
         if view == "Board":
+            # Lane headers count what the board shows without the stage and priority
+            # refinement, so every lane keeps its full priority mix, and the lanes stay
+            # even when the refinement matches nothing.
+            header_facets = without_facet(without_facet(effective, "stage"), "priority")
+            header_issues = collapse_issue_contexts(filter_issues(df, header_facets))
+            lanes = board_lanes(chart_stages, header_issues)
+            lane_counts = lane_priority_counts(header_issues)
             if issues.empty and not lane_counts:
                 st.info("No issues match the current filters.")
             else:

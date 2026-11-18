@@ -81,3 +81,49 @@ def test_a_chart_reset_by_another_filter_does_not_clear_it(state: dict[str, Any]
     _run([], "stage_bar_1", stage_filter="Architecture", state_filter="opened")
 
     assert state["issue_facets"] == {"state": "closed"}
+
+
+def test_unchanged_selection_before_drawing_does_not_confirm(state: dict[str, Any]) -> None:
+    """Seen before the chart is drawn, an unchanged selection is not a repeat."""
+    bar = [{"x": "P1", "y": 21}]
+    scope = {"stage_filter": "Architecture", "state_filter": "opened"}
+    _run(bar, "stage_bar_1", **scope)
+    facets = dict(state["issue_facets"])
+
+    panel.apply_chart_selection(
+        {"selection": {"points": bar}}, "stage_bar_1", confirm=False, **scope
+    )
+    _run([], "stage_bar_1", **scope)
+
+    assert state["issue_facets"] == facets
+
+
+def test_new_selection_before_drawing_sets_the_filter_and_reruns(
+    state: dict[str, Any],
+) -> None:
+    bar = [{"x": "P1", "y": 21}]
+
+    with pytest.raises(_Rerun):
+        panel.apply_chart_selection(
+            {"selection": {"points": bar}},
+            "stage_bar_1",
+            "Architecture",
+            "opened",
+            confirm=False,
+        )
+
+    assert state["issue_facets"] == {"stage": "Architecture", "state": "opened", "priority": "P1"}
+
+
+def test_donut_click_survives_the_early_pass(state: dict[str, Any]) -> None:
+    """The next run's early pass still sees the old selection; the redrawn donut
+    then reports nothing, which must not clear the filter."""
+    slice_ = [{"x": 0.3, "y": 0.6, "customdata": ["P1", 83]}]
+    _run(slice_, "open_donut", state_filter="opened")
+    panel.apply_chart_selection(
+        {"selection": {"points": slice_}}, "open_donut", state_filter="opened", confirm=False
+    )
+
+    _run([], "open_donut", state_filter="opened")
+
+    assert state["issue_facets"] == {"state": "opened", "priority": "P1"}

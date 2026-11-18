@@ -11,6 +11,7 @@ from difflib import SequenceMatcher
 from typing import TypedDict
 from urllib.parse import parse_qs, urlparse
 
+import numpy as np
 import pandas as pd
 
 from app.dashboard.theme import get_palette, with_alpha
@@ -242,8 +243,8 @@ def _normalize_issue_labels(raw_labels: object) -> list[str]:
             if str(value).strip().lower() not in ("", "nan", "none", "<na>")
         ]
 
-    if isinstance(raw_labels, list):
-        return _clean_labels(raw_labels)
+    if isinstance(raw_labels, (list, tuple, np.ndarray)):
+        return _clean_labels(list(raw_labels))
 
     raw = str(raw_labels).strip()
     if raw.lower() in ("", "nan", "none", "[]", "<na>"):

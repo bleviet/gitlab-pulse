@@ -96,9 +96,8 @@ def shortcut_label() -> str:
 def render_search_box(query: str, version: int) -> str:
     """Render the search field and return its trimmed text.
 
-    The field reports an edit only when it is rendered, which is after the
-    board was filtered in that run; the caller reruns when the text differs
-    from ``query``.
+    The caller renders the field before it filters the issues, so it can
+    apply the returned text in the same run when it differs from ``query``.
 
     Args:
         query: The current search text.

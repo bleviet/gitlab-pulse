@@ -152,7 +152,22 @@ The search is a field in the board's toolbar, left of the board/table switch (`a
 - The board filters as you type (after a 250 ms pause). The matching is fuzzy: every word must appear in the title, assignee, context, milestone, priority or stage, with a fallback to similar words when nothing matches exactly (`_build_issue_search_mask`).
 - Esc leaves the field. It stays wide while it holds a search; in the Compact layout the search is also shown as a "Search" chip, and removing the chip clears the field.
 
-The field is the `st_keyup` component (Streamlit's own text input reports only on Enter or blur), which renders its input in a same-origin iframe. A small script focuses that input on Ctrl/Cmd+K, styles it like the toolbar's buttons, and marks the field's container while it has focus or text so the CSS can widen it (`:focus-within` does not see focus inside an iframe). The field reports an edit only when it is rendered, after the board was filtered in that run, so the toolbar reruns the page when the text changed. When the search changes elsewhere (a chip, the URL), the field gets a new widget key so it shows the new text.
+The field is the `st_keyup` component (Streamlit's own text input reports only on Enter or blur), which renders its input in a same-origin iframe. A small script focuses that input on Ctrl/Cmd+K, styles it like the toolbar's buttons, and marks the field's container while it has focus or text so the CSS can widen it (`:focus-within` does not see focus inside an iframe). The toolbar (and with it the field) is rendered before the issues are filtered, so a typed search filters in the same run. When the search changes elsewhere (a chip, the URL), the field gets a new widget key so it shows the new text.
+
+### 4.6 Rerun model
+
+The issue panel (toolbar with the summary pills and the search, the chips, the pager and the board or table) is rendered as a Streamlit fragment (`_issue_panel_fragment` in `views/overview.py`). A click inside it reruns only the panel. We chose this because a full script run also reloads the cached data, re-renders the sidebar and rebuilds the release rail (and, in Analytics, every chart), which was the larger part of the click latency.
+
+Consequences:
+
+- The panel works on the data of the last full run. Any interaction outside the panel, or a page reload, is a full run.
+- Resetting a sidebar filter from a chip changes the data the panel was called with, so the callback sets `FULL_RERUN_KEY` and the fragment requests a full rerun. A full run clears the flag.
+- Typing in the search field reruns only the panel, once (see 4.5).
+- In the Analytics layout a chart click is applied at the top of the layout, from the chart's selection in session state, before any chart is drawn (`chart_scopes` in `views/overview_analytics.py`). We chose this because the run that reports a click otherwise builds most charts and is then discarded by the rerun that applies the filter.
+- The panel writes the URL state itself. The search shortcut script stays at the end of the page, outside the fragment.
+- The summary pills are computed once per full run (`build_summary`), not on each click.
+- Quality hints in the table are computed only for the rows of the visible page, and lane data only in the Board view.
+- `runner.postScriptGC` is disabled in `.streamlit/config.toml`. Streamlit otherwise forces a full garbage collection after every script run while holding the interpreter, which delayed sending the results by about 25 ms per click. Python's regular collector still runs.
 
 ## 5. Notes on Scope
 

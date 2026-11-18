@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.dashboard.theme import priority_slug
+from app.dashboard.theme import get_priority_colors, priority_slug
 from app.dashboard.utils import normalize_assignee_labels
 
 _TITLE_MAX_CHARS = 70
@@ -60,6 +60,20 @@ def build_board_columns(
 
     cards = issues.drop(columns=["_rank", "_days"])
     return [(stage, cards[cards["stage"] == stage]) for stage in stages]
+
+
+def priority_bar_html(counts: list[tuple[str, int]]) -> str:
+    """Thin stacked bar of a lane's issues by priority."""
+    total = sum(count for _, count in counts)
+    if not total:
+        return '<div class="ib-pbar ib-pbar-empty"></div>'
+    colors = get_priority_colors()
+    segments = "".join(
+        f'<span style="flex:{count};background:{colors.get(label, colors["Unset"])}" '
+        f'title="{html.escape(label)}: {count}"></span>'
+        for label, count in counts
+    )
+    return f'<div class="ib-pbar">{segments}</div>'
 
 
 def _truncate(text: str, limit: int = _TITLE_MAX_CHARS) -> str:

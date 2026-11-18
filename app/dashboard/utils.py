@@ -51,10 +51,12 @@ def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str 
 
     # DFS Traversal to build new order
     ordered_indices = []
+    ids = dict(zip(df.index, df[id_col], strict=True))
+    titles = dict(zip(df.index, df[title_col], strict=True))
 
     def dfs(idx, level):
         ordered_indices.append((idx, level))
-        row_id = df.loc[idx, id_col]
+        row_id = ids[idx]
 
         children = children_map.get(row_id, [])
         # Sort children safely? Maybe by ID or Title?
@@ -84,7 +86,7 @@ def sort_hierarchy(df: pd.DataFrame, parent_col: str = "parent_id", id_col: str 
         return str(title)
 
     new_titles = [
-        _format_title(df.at[idx, title_col], level)
+        _format_title(titles[idx], level)
         for idx, level in ordered_indices
     ]
 

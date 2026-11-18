@@ -11,6 +11,12 @@ enableStaticServing = true
 # Hide the "Deploy" button and developer options; keeps the header thin.
 toolbarMode = "minimal"
 
+[runner]
+# Streamlit forces a full garbage collection after every script run, which
+# holds the interpreter and delays sending the results by ~25 ms per click.
+# Python's regular collector still runs.
+postScriptGC = false
+
 [theme]
 base = "dark"
 font = "Manrope"
