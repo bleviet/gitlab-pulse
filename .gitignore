@@ -5,8 +5,10 @@ data/raw/*.json
 data/processed/*.parquet
 data/analytics/*.parquet
 data/state/*.json
-data/config/layouts/*.json
-!data/config/layouts/default.json
+
+# Frontend build & dependencies
+frontend/node_modules/
+frontend/dist/
 
 # Keep directory structure
 !data/*/.gitkeep

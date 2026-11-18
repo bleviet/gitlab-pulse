@@ -1,0 +1,101 @@
+:root {
+  color-scheme: dark;
+
+  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-body: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --bg: #050811;
+  --bg-card: #0c1123;
+  --bg-raise: #111833;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #d4deee;
+  --heading: #f3f6fc;
+  --muted: #7a8fa8;
+  --accent: #00f2fe;
+  --accent-soft: rgba(0, 242, 254, 0.14);
+  --accent-border: rgba(0, 242, 254, 0.55);
+
+  --brand: #ff512f;
+  --brand-2: #dd2476;
+  --grad: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);
+  --button-text: #ffffff;
+
+  --node-cyan: #4facfe;
+  --node-pink: #f5576c;
+  --node-purple: #da22ff;
+  --gold: #ffa751;
+
+  --nav-bg: rgba(5, 8, 17, 0.82);
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+  --shadow-card: 0 4px 18px rgba(0, 0, 0, 0.3);
+  --grid-opacity: 0.28;
+
+  --r: 16px;
+  --r-sm: 10px;
+  --nav-height: 52px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --chart-1: #4facfe;
+  --chart-2: #ff7354;
+  --chart-3: #c76bff;
+  --chart-4: #f5576c;
+  --chart-5: #74c7f0;
+  --chart-6: #f4a44a;
+  --chart-7: #56d4b0;
+  --chart-8: #9f7bea;
+
+  --chart-bg: var(--bg-card);
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis: rgba(255, 255, 255, 0.12);
+  --chart-label: var(--muted);
+  --chart-tooltip-bg: rgba(12, 17, 35, 0.96);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #e8ecf5;
+  --bg-card: #f1f4fb;
+  --bg-raise: #f8faff;
+  --surface: rgba(0, 0, 0, 0.05);
+  --surface-hover: rgba(0, 0, 0, 0.08);
+  --line: rgba(0, 0, 0, 0.12);
+  --line-strong: rgba(0, 0, 0, 0.22);
+
+  --text: #0d1120;
+  --heading: #070a16;
+  --muted: #3d5370;
+  --accent: #006ea3;
+  --accent-soft: rgba(0, 110, 163, 0.12);
+  --accent-border: rgba(0, 110, 163, 0.65);
+
+  --node-cyan: #005e9e;
+  --node-pink: #b51c3c;
+  --node-purple: #8a0ea8;
+  --gold: #b06000;
+
+  --nav-bg: rgba(232, 236, 245, 0.88);
+  --shadow: 0 20px 60px rgba(13, 17, 32, 0.12);
+  --shadow-card: 0 2px 10px rgba(13, 17, 32, 0.07);
+  --grid-opacity: 0.5;
+
+  --chart-1: #005e9e;
+  --chart-2: #d63e1a;
+  --chart-3: #8a0ea8;
+  --chart-4: #b51c3c;
+  --chart-5: #0079b3;
+  --chart-6: #b06000;
+  --chart-7: #1a7a62;
+  --chart-8: #5c2e9a;
+
+  --chart-bg: var(--bg-card);
+  --chart-grid: rgba(0, 0, 0, 0.05);
+  --chart-axis: rgba(0, 0, 0, 0.12);
+  --chart-label: var(--muted);
+  --chart-tooltip-bg: rgba(241, 244, 251, 0.98);
+}

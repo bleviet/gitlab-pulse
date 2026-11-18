@@ -6,7 +6,7 @@ Scope: End-to-end data flow from GitLab ingestion through local analytics and da
 
 ## 1. Executive Summary
 
-**GitLab Pulse** is a local-first analytics platform for GitLab issue data. It ingests issues from GitLab or synthetic local seed data, normalizes them into Parquet, enriches them with rules-based workflow and quality metadata, and renders them in a Streamlit dashboard.
+**GitLab Pulse** is a local-first analytics platform for GitLab issue data. It ingests issues from GitLab or synthetic local seed data, normalizes them into Parquet, enriches them with rules-based workflow and quality metadata, and serves them through a FastAPI API to a React/TypeScript single-page dashboard.
 
 The architecture follows a layered data pipeline:
 
@@ -72,43 +72,23 @@ Issues without matching contexts are handled in two ways:
 
 ## 4. Layer 3: Presentation
 
-**Role:** Render analytics through Streamlit using a curated overview and a customizable layout builder.
+**Role:** Serve Layer 2 analytics data via FastAPI (`app/dashboard/`) and render interactive views in a React/TypeScript SPA (`frontend/`).
 
-### 4.1 Current pages
+### 4.1 Architecture rationale
 
-The active page set in `app/dashboard/main.py` is:
+We replaced Streamlit with a thin FastAPI backend and a React/TypeScript SPA so that filtering, fuzzy search, cross-chart selection, table/board paging, and sticky headers execute synchronously in browser memory without full-script reruns, iframe bridges, or polling intervals.
 
-- **Overview**
-- **Custom**
-- **Admin** (only when authenticated as admin)
+### 4.2 Active views
 
-### 4.2 Dashboard builder status
+- **Analytics** (default): release timeline, priority donuts, quality signals, 7-day velocity line, workflow-state priority bars, and the synchronized issue panel.
+- **Compact** (`?view=compact`): release timeline rail, summary filter pills, inline `Ctrl/Cmd+K` search, and the issue table/board.
+- **Admin Operations modal**: password-gated cookie session for triggering the Layer 1 collector, Layer 2 processor, and server cache invalidation.
 
-The dashboard builder is implemented as a **hybrid layout engine**:
+The legacy experimental Custom View layout builder has been removed.
 
-- **Edit mode:** uses `streamlit-elements` for drag-and-drop and resize interactions
-- **View mode:** renders with native Streamlit columns based on persisted grid coordinates
+### 4.3 Caching
 
-Layouts are stored as JSON files under `data/config/layouts/`.
-
-### 4.3 Overview status
-
-The Overview page is the main curated workflow view. It currently includes:
-
-- open issues by priority
-- closed issues by priority
-- daily new vs. closed issues
-- issues by workflow state
-- milestone release timeline
-- open vs. closed issues
-- issue quality signals
-- one column: a release rail, a line of summary pills, and the issue board (or a table) whose lane headers show each stage's priority mix; summary and lane pills filter the board
-- board cards and table titles open the issue in GitLab in a new tab
-- inline search field in the board's toolbar: Ctrl/Cmd+K focuses and widens it, and the board filters (fuzzy) as you type
-
-### 4.4 Caching
-
-The dashboard uses `@st.cache_data` with short TTLs for analytics loading, including a 2-minute TTL on the main data loaders.
+`DashboardService` caches the prepared `DashboardPayload` in memory keyed on the modification timestamps (`st_mtime_ns`) of `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`, and supports explicit invalidation after admin runs.
 
 ## 5. Local Data Tooling
 
@@ -122,5 +102,5 @@ This allows dashboard and processor testing without a live GitLab connection.
 ## 6. Operational Notes
 
 - The app is designed for internal or local use, not direct public internet exposure.
-- Admin actions are password-gated in the Streamlit UI, but broader production auth should still be handled externally.
+- Admin actions are password-gated via `HttpOnly` session cookies (`ADMIN_PASSWORD`), but broader production auth should still be handled externally.
 - The architecture is intentionally local-first: persistent files in `data/` are part of normal operation, not just temporary artifacts.

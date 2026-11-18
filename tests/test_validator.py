@@ -3,10 +3,10 @@
 import pandas as pd
 import pytest
 
+from app.dashboard.utils import compute_quality_summary
 from app.processor.enricher import apply_classification, enrich_metrics
 from app.processor.rule_loader import DomainRule, LabelMappings, ValidationConfig
 from app.processor.validator import ErrorCodes, validate_issues
-from app.dashboard.widgets.quality_metrics import compute_quality_summary
 
 
 @pytest.fixture

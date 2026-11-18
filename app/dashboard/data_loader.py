@@ -1,290 +1,122 @@
-"""Data loader with caching for Layer 3 Dashboard.
+"""Data loader for Layer 2 analytics Parquet files and sync metadata."""
 
-Uses Streamlit's @st.cache_data for efficient data loading.
-"""
-
+import json
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
-import streamlit as st
 
 logger = logging.getLogger(__name__)
 
-# Default data paths
 DEFAULT_ANALYTICS_PATH = Path("data/analytics")
+DEFAULT_PROCESSED_PATH = Path("data/processed")
+DEFAULT_STATE_PATH = Path("data/state/sync_state.json")
+
+_ISSUE_DATE_COLUMNS = (
+    "created_at",
+    "updated_at",
+    "closed_at",
+    "milestone_due_date",
+    "milestone_start_date",
+)
 
 
-@st.cache_data(ttl=120)  # 2-minute cache
-def load_valid_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
-    """Load valid issues from analytics Parquet.
-
-    Args:
-        analytics_path: Path to analytics directory
-
-    Returns:
-        DataFrame with valid issues
-    """
-    path = Path(analytics_path) if analytics_path else DEFAULT_ANALYTICS_PATH
-    filepath = path / "issues_valid.parquet"
+def load_valid_issues(analytics_path: Path | None = None) -> pd.DataFrame:
+    """Load valid issues from the Layer 2 analytics Parquet dataset."""
+    base_path = analytics_path if analytics_path is not None else DEFAULT_ANALYTICS_PATH
+    filepath = base_path / "issues_valid.parquet"
 
     if not filepath.exists():
-        logger.warning(f"Valid issues file not found: {filepath}")
+        logger.warning("Valid issues file not found: %s", filepath)
         return pd.DataFrame()
 
     df = pd.read_parquet(filepath)
 
-    # Priority is optional in rules; keep the column so consumers can rely on it
     if not df.empty and "priority" not in df.columns:
         df["priority"] = pd.NA
 
-    # Ensure datetime columns are proper types
-    for col in ["created_at", "updated_at", "closed_at"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], utc=True)
+    for column in _ISSUE_DATE_COLUMNS:
+        if column in df.columns:
+            df[column] = pd.to_datetime(df[column], utc=True, errors="coerce")
 
-    # Convert category columns for memory efficiency
-    for col in ["state", "work_item_type", "issue_type", "severity", "priority", "team"]:
-        if col in df.columns:
-            df[col] = df[col].astype("category")
-
-    logger.info(f"Loaded {len(df)} valid issues")
     return df
 
 
-@st.cache_data(ttl=120)
-def load_quality_issues(analytics_path: Optional[str] = None) -> pd.DataFrame:
-    """Load quality (failed) issues from analytics Parquet.
-
-    Args:
-        analytics_path: Path to analytics directory
-
-    Returns:
-        DataFrame with quality issues
-    """
-    path = Path(analytics_path) if analytics_path else DEFAULT_ANALYTICS_PATH
-    filepath = path / "data_quality.parquet"
-
-    if not filepath.exists():
-        logger.warning(f"Quality issues file not found: {filepath}")
-        return pd.DataFrame()
-
-    df = pd.read_parquet(filepath)
-    logger.info(f"Loaded {len(df)} quality issues")
-    return df
-
-
-# Default processed path for milestones (Layer 1 output)
-DEFAULT_PROCESSED_PATH = Path("data/processed")
-
-
-@st.cache_data(ttl=120)
-def load_milestones(processed_path: Optional[str] = None) -> pd.DataFrame:
-    """Load milestones from processed Parquet files.
-
-    Combines milestones from all project files.
-
-    Args:
-        processed_path: Path to processed directory
-
-    Returns:
-        DataFrame with all milestones
-    """
-    path = Path(processed_path) if processed_path else DEFAULT_PROCESSED_PATH
-
-    # Find all milestone files
-    milestone_files = list(path.glob("milestones_*.parquet"))
-
-    if not milestone_files:
-        logger.warning("No milestone files found")
-        return pd.DataFrame()
-
-    # Load and combine all milestone files
-    dfs = []
-    for filepath in milestone_files:
-        try:
-            df = pd.read_parquet(filepath)
-            dfs.append(df)
-        except Exception as e:
-            logger.warning(f"Failed to load {filepath}: {e}")
-
-    if not dfs:
-        return pd.DataFrame()
-
-    combined = pd.concat(dfs, ignore_index=True)
-
-    # Ensure datetime columns are proper types
-    for col in ["due_date", "start_date", "created_at", "updated_at"]:
-        if col in combined.columns:
-            combined[col] = pd.to_datetime(combined[col], utc=True)
-
-    # Convert state to category
-    if "state" in combined.columns:
-        combined["state"] = combined["state"].astype("category")
-
-    logger.info(f"Loaded {len(combined)} milestones from {len(milestone_files)} files")
-    return combined
-
-
-def get_sync_status(state_path: Optional[str] = None) -> dict[str, str]:
-    """Get the last sync status from state file.
-
-    Args:
-        state_path: Path to sync state file
-
-    Returns:
-        Dict with sync status info
-    """
-    import json
-    from datetime import datetime
-
-    path = Path(state_path) if state_path else Path("data/state/sync_state.json")
-
-    if not path.exists():
-        return {"status": "No sync data", "last_sync": "Never"}
-
-    try:
-        with path.open("r") as f:
-            data = json.load(f)
-
-        # Find the most recent sync
-        projects = data.get("projects", {})
-        if not projects:
-            return {"status": "No projects synced", "last_sync": "Never"}
-
-        last_sync = max(
-            (p.get("last_sync_at") for p in projects.values() if p.get("last_sync_at")),
-            default=None,
-        )
-
-        if last_sync:
-            sync_dt = datetime.fromisoformat(last_sync.replace("Z", "+00:00"))
-            return {
-                "status": f"{len(projects)} projects",
-                "last_sync": sync_dt.strftime("%Y-%m-%d %H:%M"),
-            }
-
-    except Exception as e:
-        logger.error(f"Failed to read sync state: {e}")
-
-    return {"status": "Unknown", "last_sync": "Unknown"}
-
-
-def filter_by_date_range(
-    df: pd.DataFrame,
-    start_date: pd.Timestamp,
-    end_date: pd.Timestamp,
-) -> pd.DataFrame:
-    """Filter DataFrame by created_at date range.
-
-    Args:
-        df: DataFrame to filter
-        start_date: Start of range
-        end_date: End of range
-
-    Returns:
-        Filtered DataFrame
-    """
-    if df.empty:
-        return df
-
-    mask = (df["created_at"] >= start_date) & (df["created_at"] <= end_date)
-    return df[mask]
-
-
-def filter_by_team(df: pd.DataFrame, team: str) -> pd.DataFrame:
-    """Filter DataFrame by team.
-
-    Args:
-        df: DataFrame to filter
-        team: Team name (or "All" for no filter)
-
-    Returns:
-        Filtered DataFrame
-    """
-    if df.empty or team == "All":
-        return df
-
-    return df[df["team"] == team]
-
-
-def filter_by_context(df: pd.DataFrame, context: str) -> pd.DataFrame:
-    """Filter DataFrame by context (sub-project).
-
-    Args:
-        df: DataFrame to filter
-        context: Context name (or "All" for no filter)
-
-    Returns:
-        Filtered DataFrame
-    """
-    if df.empty or context == "All":
-        return df
-
-    if "context" not in df.columns:
-        return df
-
-    return df[df["context"] == context]
-
-
-def filter_by_milestone(df: pd.DataFrame, milestone: str) -> pd.DataFrame:
-    """Filter DataFrame by milestone.
-
-    Args:
-        df: DataFrame to filter
-        milestone: Milestone title (or "All" for no filter)
-
-    Returns:
-        Filtered DataFrame
-    """
-    if df.empty or milestone == "All":
-        return df
-
-    if "milestone" not in df.columns:
-        return df
-
-    # Handle cases where milestone might be NaN but we want specific matches
-    # This filter assumes strictly matching the milestone title
-    return df[df["milestone"] == milestone]
-
-
-@st.cache_data(ttl=3600)  # 1-hour cache for labels (they change rarely)
-def load_labels(processed_path: Optional[str] = None) -> dict[str, dict[str, str]]:
-    """Load label colors from processed Parquet files.
-
-    Args:
-        processed_path: Path to processed directory
-
-    Returns:
-        Dict mapping label name to style dict {'color': hex, 'text_color': hex}
-    """
-    path = Path(processed_path) if processed_path else DEFAULT_PROCESSED_PATH
-
-    label_files = list(path.glob("labels_*.parquet"))
-    
-    label_styles = {}
-    if not label_files:
-        return label_styles
+def load_labels(processed_path: Path | None = None) -> dict[str, dict[str, str]]:
+    """Load label color styles from Layer 1 processed Parquet files."""
+    base_path = processed_path if processed_path is not None else DEFAULT_PROCESSED_PATH
+    label_files = sorted(base_path.glob("labels_*.parquet"))
+    label_styles: dict[str, dict[str, str]] = {}
 
     for filepath in label_files:
         try:
             df = pd.read_parquet(filepath)
-            if not df.empty and "name" in df.columns:
-                # Ensure columns exist
-                if "color" not in df.columns:
-                    df["color"] = "#FFFFFF"
-                if "text_color" not in df.columns:
-                    df["text_color"] = "#000000" # Default black text if missing
+        except Exception as exc:
+            logger.warning("Failed to load labels from %s: %s", filepath, exc)
+            continue
 
-                # Deduplicate by name (last wins)
-                df = df.drop_duplicates(subset=["name"], keep="last")
-                
-                # Convert to dict: name -> {color: ..., text_color: ...}
-                batch = df.set_index("name")[["color", "text_color"]].to_dict(orient="index")
-                label_styles.update(batch)
-        except Exception as e:
-            logger.warning(f"Failed to load labels from {filepath}: {e}")
+        if df.empty or "name" not in df.columns:
+            continue
 
-    logger.info(f"Loaded styles for {len(label_styles)} labels")
+        colors = df["color"] if "color" in df.columns else pd.Series("#FFFFFF", index=df.index)
+        text_colors = (
+            df["text_color"]
+            if "text_color" in df.columns
+            else pd.Series("#000000", index=df.index)
+        )
+        deduped = pd.DataFrame(
+            {
+                "name": df["name"].astype(str),
+                "color": colors.fillna("#FFFFFF").astype(str),
+                "text_color": text_colors.fillna("#000000").astype(str),
+            }
+        ).drop_duplicates(subset=["name"], keep="last")
+
+        for name, color, text_color in zip(
+            deduped["name"].tolist(),
+            deduped["color"].tolist(),
+            deduped["text_color"].tolist(),
+            strict=True,
+        ):
+            label_styles[name] = {"color": color, "text_color": text_color}
+
     return label_styles
+
+
+def get_sync_status(state_path: Path | None = None) -> dict[str, str]:
+    """Read the latest collector sync status from state JSON."""
+    path = state_path if state_path is not None else DEFAULT_STATE_PATH
+    if not path.exists():
+        return {"status": "No sync data", "last_sync": "Never"}
+
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data: object = json.load(handle)
+    except Exception as exc:
+        logger.error("Failed to read sync state: %s", exc)
+        return {"status": "Unknown", "last_sync": "Unknown"}
+
+    if not isinstance(data, dict):
+        return {"status": "Unknown", "last_sync": "Unknown"}
+
+    projects = data.get("projects")
+    if not isinstance(projects, dict) or not projects:
+        return {"status": "No projects synced", "last_sync": "Never"}
+
+    timestamps = [
+        meta["last_sync_at"]
+        for meta in projects.values()
+        if isinstance(meta, dict) and isinstance(meta.get("last_sync_at"), str)
+    ]
+    if not timestamps:
+        return {"status": f"{len(projects)} projects", "last_sync": "Never"}
+
+    latest = max(timestamps)
+    try:
+        sync_dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+        formatted = sync_dt.strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        formatted = latest
+
+    return {"status": f"{len(projects)} projects", "last_sync": formatted}

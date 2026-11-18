@@ -1,1 +1,1 @@
-"""Layer 3: Presentation - Streamlit Dashboard."""
+"""FastAPI backend for GitLab Pulse Layer 3 presentation layer."""

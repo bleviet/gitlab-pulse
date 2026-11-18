@@ -5,20 +5,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.dashboard.utils import normalize_assignee_labels
-from app.dashboard.views.issue_data import (
-    _build_issue_search_mask,
-    _build_overview_quality_signal_df,
-    _has_multiple_classification_labels,
-    _is_local_issue_url,
-    _issue_quality_hints,
-    _mixed_classification_hints,
-    _normalize_issue_labels,
-    _normalize_issue_search_text,
-    _priority_cell_style,
-    _priority_color_key,
-    _selection_mask_for_quality_signal,
-    _selection_mask_for_value,
+from app.dashboard.utils import (
+    SIGNAL_MISSING_MILESTONE,
+    SIGNAL_MIXED_CLASSIFICATION,
+    SIGNAL_UNASSIGNED_OWNER,
+    compute_issue_signals_and_hints,
+    is_local_issue_url,
+    mixed_classification_hints,
+    normalize_assignee_labels,
+    normalize_issue_labels,
 )
 from tools.local_data_manager import delete_local_projects, discover_local_projects
 from tools.seeder import build_local_issue_url, generate_issues, seed_data
@@ -37,7 +32,7 @@ def test_generate_issues_respects_max_team_members() -> None:
     unique_assignees = set(df["assignee"].dropna().tolist())
 
     assert len(unique_assignees) == 5
-    assert _is_local_issue_url(df["web_url"].iloc[0])
+    assert is_local_issue_url(df["web_url"].iloc[0])
 
 
 def test_generate_issues_allows_unassigned_issues() -> None:
@@ -87,21 +82,6 @@ def test_normalize_assignee_labels_maps_missing_values_to_unassigned() -> None:
     ]
 
 
-def test_selection_mask_matches_unassigned_assignee_rows() -> None:
-    """Clicking the Unassigned assignee bar should match null and blank assignees."""
-    df = pd.DataFrame(
-        [
-            {"id": 1, "assignee": None, "stage": "Todo", "priority": None, "state": "opened"},
-            {"id": 2, "assignee": "", "stage": "Doing", "priority": "medium", "state": "opened"},
-            {"id": 3, "assignee": "alice", "stage": "Done", "priority": "high", "state": "closed"},
-        ]
-    )
-
-    mask = _selection_mask_for_value(df, "Unassigned")
-
-    assert mask.tolist() == [True, True, False]
-
-
 def test_build_local_issue_url_uses_dashboard_query_params() -> None:
     """Synthetic issue URLs should deep-link back into the local dashboard."""
     url = build_local_issue_url(
@@ -123,7 +103,7 @@ def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:
         "'cve' 'project::B' 'workflow::architecture']"
     )
 
-    assert _normalize_issue_labels(raw) == [
+    assert normalize_issue_labels(raw) == [
         "type::bug",
         "severity::critical",
         "priority::1",
@@ -135,7 +115,7 @@ def test_normalize_issue_labels_splits_numpy_style_label_string() -> None:
 
 def test_normalize_issue_labels_preserves_real_label_lists() -> None:
     """Issue label chips should keep already-materialized label lists intact."""
-    assert _normalize_issue_labels(["type::bug", "severity::critical", ""]) == [
+    assert normalize_issue_labels(["type::bug", "severity::critical", ""]) == [
         "type::bug",
         "severity::critical",
     ]
@@ -150,221 +130,45 @@ def test_normalize_issue_labels_treats_numpy_arrays_like_lists() -> None:
     ]
     for labels in cases:
         array = np.array(labels, dtype=object)
-        assert _normalize_issue_labels(array) == _normalize_issue_labels(labels)
-    assert _normalize_issue_labels(np.array(["type::bug"], dtype=object)) == ["type::bug"]
-    assert _normalize_issue_labels(np.array([], dtype=object)) == []
+        assert normalize_issue_labels(array) == normalize_issue_labels(labels)
+    assert normalize_issue_labels(np.array(["type::bug"], dtype=object)) == ["type::bug"]
+    assert normalize_issue_labels(np.array([], dtype=object)) == []
 
 
-def test_has_multiple_classification_labels_accepts_numpy_arrays() -> None:
-    """Mixed classification must be detected for array-valued label cells."""
-    labels = np.array(["type::bug", "type::feature"], dtype=object)
-
-    assert _has_multiple_classification_labels(labels)
-
-
-def test_priority_color_key_normalizes_severity_and_priority_labels() -> None:
-    """Priority cell styling should accept both severity and priority values."""
-    assert _priority_color_key("High") == "high"
-    assert _priority_color_key("P2") == "p2"
-    assert _priority_color_key("priority::3") == "p3"
-    assert _priority_color_key(None) == "unset"
+def test_mixed_classification_hints_detects_numpy_arrays_and_conflicts() -> None:
+    """Mixed classification hints should explain conflicting labels."""
+    labels = normalize_issue_labels(np.array(["type::bug", "type::feature", "severity::high"], dtype=object))
+    assert mixed_classification_hints(labels) == ["Mixed type labels: type::bug + type::feature"]
+    assert mixed_classification_hints(["type::bug", "severity::high"]) == []
 
 
-def test_priority_cell_style_uses_palette_defaults_for_known_values() -> None:
-    """Priority cell styling should resolve to semantic palette colors."""
-    style = _priority_cell_style("High")
-
-    assert style is not None
-    assert "background-color:" in style
-    assert "font-weight: 700;" in style
-
-
-def test_has_multiple_classification_labels_detects_duplicate_type_family() -> None:
-    """Overview quality signals should flag issues with conflicting classification labels."""
-    assert _has_multiple_classification_labels(["type::bug", "type::feature"]) is True
-    assert _has_multiple_classification_labels(["type::bug", "severity::high"]) is False
-
-
-def test_mixed_classification_hints_describe_conflicting_labels() -> None:
-    """Mixed classification hints should explain exactly which labels conflict."""
-    hints = _mixed_classification_hints(["type::bug", "type::feature", "severity::high"])
-
-    assert hints == ["Mixed type labels: type::bug + type::feature"]
-
-
-def test_issue_quality_hints_include_reason_details() -> None:
-    """Issue quality hints should surface the specific mixed-classification reason."""
-    row = pd.Series(
-        {
-            "labels": ["type::bug", "type::feature"],
-            "assignee": None,
-            "milestone": None,
-            "state": "opened",
-        }
+def test_compute_issue_signals_and_hints_only_flags_opened_issues() -> None:
+    """Quality signals and hints apply to opened issues and skip closed ones."""
+    signals, hints = compute_issue_signals_and_hints(
+        state="opened",
+        labels=["type::bug", "type::feature"],
+        assignee="Unassigned",
+        milestone=None,
     )
-
-    assert _issue_quality_hints(row) == [
+    assert signals == [
+        SIGNAL_MIXED_CLASSIFICATION,
+        SIGNAL_UNASSIGNED_OWNER,
+        SIGNAL_MISSING_MILESTONE,
+    ]
+    assert hints == [
         "Mixed type labels: type::bug + type::feature",
         "Unassigned owner",
         "Missing milestone",
     ]
 
-
-def test_build_overview_quality_signal_df_collects_three_focus_signals() -> None:
-    """Overview quality signals should cover mixed classification, owner, and milestone gaps (OPEN issues only)."""
-    df = pd.DataFrame(
-        [
-            {
-                "id": 1,
-                "labels": ["type::bug", "type::feature"],
-                "assignee": "alex",
-                "milestone": "Release 24",
-                "state": "opened",
-            },
-            {
-                "id": 2,
-                "labels": ["type::task"],
-                "assignee": None,
-                "milestone": "Release 24",
-                "state": "opened",
-            },
-            {
-                "id": 3,
-                "labels": ["type::feature"],
-                "assignee": "sam",
-                "milestone": None,
-                "state": "opened",
-            },
-            {
-                "id": 4,
-                "labels": ["type::bug"],
-                "assignee": None,
-                "milestone": None,
-                "state": "opened",
-            },
-            {
-                "id": 5,
-                "labels": ["type::bug", "type::feature"],
-                "assignee": None,
-                "milestone": None,
-                "state": "closed",  # Should be ignored
-            },
-        ]
+    closed_signals, closed_hints = compute_issue_signals_and_hints(
+        state="closed",
+        labels=["type::bug", "type::feature"],
+        assignee="Unassigned",
+        milestone=None,
     )
-
-    signal_df = _build_overview_quality_signal_df(df)
-    grouped_signals = signal_df.groupby("error_code")["id"].apply(list).to_dict()
-
-    assert grouped_signals == {
-        "MIXED_CLASSIFICATION": [1],
-        "MISSING_MILESTONE": [3, 4],
-        "UNASSIGNED_OWNER": [2, 4],
-    }
-
-
-def test_selection_mask_for_quality_signal_matches_filtered_issue_rows() -> None:
-    """Clicking an Overview quality-signal bar should filter the matching issues (OPEN issues only)."""
-    df = pd.DataFrame(
-        [
-            {
-                "id": 1,
-                "labels": ["type::bug", "type::feature"],
-                "assignee": "alex",
-                "milestone": "Release 24",
-                "state": "opened",
-            },
-            {
-                "id": 2,
-                "labels": ["type::task"],
-                "assignee": None,
-                "milestone": "Release 24",
-                "state": "opened",
-            },
-            {
-                "id": 3,
-                "labels": ["type::feature"],
-                "assignee": "sam",
-                "milestone": None,
-                "state": "opened",
-            },
-            {
-                "id": 4,
-                "labels": ["type::bug"],
-                "assignee": None,
-                "milestone": None,
-                "state": "closed",  # Should be ignored
-            },
-        ]
-    )
-
-    mixed_mask = _selection_mask_for_quality_signal(df, "MIXED_CLASSIFICATION")
-    unassigned_mask = _selection_mask_for_quality_signal(df, "UNASSIGNED_OWNER")
-    milestone_mask = _selection_mask_for_quality_signal(df, "MISSING_MILESTONE")
-
-    assert mixed_mask.tolist() == [True, False, False, False]
-    assert unassigned_mask.tolist() == [False, True, False, False]
-    assert milestone_mask.tolist() == [False, False, True, False]
-
-
-def test_build_issue_search_mask_matches_terms_across_multiple_columns() -> None:
-    """Grid search should match assignee, context, milestone, and priority cells."""
-    df = pd.DataFrame(
-        [
-            {
-                "iid": 11,
-                "title": "Stabilize auth redirect",
-                "stage": "Review",
-                "days_in_stage": 4,
-                "priority": "high",
-                "context": "customer",
-                "milestone": "v1.2",
-                "assignee": "alex",
-            },
-            {
-                "iid": 12,
-                "title": "Refine local search indexing",
-                "stage": "In Progress",
-                "days_in_stage": 9,
-                "priority": "medium",
-                "context": "platform",
-                "milestone": "v1.3",
-                "assignee": "sam",
-            },
-        ]
-    )
-
-    mask = _build_issue_search_mask(df, "alex customer v1.2 high")
-
-    assert mask.tolist() == [True, False]
-
-
-def test_build_issue_search_mask_supports_fuzzy_matches() -> None:
-    """Grid search should tolerate minor typos against table cell values."""
-    df = pd.DataFrame(
-        [
-            {
-                "iid": 21,
-                "title": "Improve milestone summary",
-                "stage": "Testing",
-                "days_in_stage": 2,
-                "priority": "critical",
-                "context": "security",
-                "milestone": "Release 24",
-                "assignee": "taylor",
-            }
-        ]
-    )
-
-    mask = _build_issue_search_mask(df, "critcal")
-
-    assert mask.tolist() == [True]
-
-
-def test_normalize_issue_search_text_flattens_collection_values() -> None:
-    """Grid search normalization should flatten lists and remove label separators."""
-    normalized = _normalize_issue_search_text(["priority::1", "workflow::review"])
-
-    assert normalized == "priority 1 workflow review"
+    assert closed_signals == []
+    assert closed_hints == []
 
 
 def test_discover_local_projects_reads_seeded_summaries(tmp_path: Path) -> None:

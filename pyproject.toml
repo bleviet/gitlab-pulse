@@ -15,12 +15,9 @@ dependencies = [
   # GitLab API
   "python-gitlab>=4.0",
   "httpx>=0.25",
-  # Dashboard
-  "streamlit>=1.30",
-  "plotly>=5.18",
   "python-dotenv>=1.0",
-  "streamlit-elements>=0.1.0",
-  "streamlit-keyup>=0.3.0",
+  "fastapi>=0.165.0",
+  "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
@@ -60,8 +57,6 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
   "gitlab.*",
-  "streamlit.*",
-  "plotly.*",
 ]
 ignore_missing_imports = true
 

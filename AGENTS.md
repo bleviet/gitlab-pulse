@@ -4,10 +4,10 @@ Canonical instructions for every coding agent working in this repository
 (Codex, Gemini CLI, Claude Code, Antigravity, Copilot, OpenCode, ...). Tool
 entry points only point here; see [Agent configuration layout](#agent-configuration-layout).
 
-GitLab Pulse is a local-first Streamlit analytics application for GitLab issue
-data. A collector pulls issues from the GitLab REST/GraphQL APIs (or a seeder
-generates synthetic data), a processor enriches and validates them against YAML
-rules into Parquet, and a Streamlit dashboard renders them.
+GitLab Pulse is a local-first analytics application for GitLab issue data. A
+collector pulls issues from the GitLab REST/GraphQL APIs (or a seeder generates
+synthetic data), a processor enriches and validates them against YAML rules
+into Parquet, and a FastAPI + React/TypeScript dashboard serves and renders them.
 
 ## Commands
 
@@ -15,16 +15,21 @@ All Python runs through `uv`. Always use `uv run <command>`; never source
 `.venv/bin/activate` (it does not persist across non-interactive agent shells).
 
 ```bash
-uv sync                                              # Install dependencies (incl. dev group)
+uv sync                                              # Install Python dependencies (incl. dev group)
 uv run python app/collector/orchestrator.py          # Layer 1: fetch from GitLab (--project-ids, --full-sync)
 uv run python app/processor/main.py                  # Layer 2: enrich + validate into data/analytics/
-uv run streamlit run app/dashboard/main.py           # Layer 3: dashboard on :8501
+uv run python -m app.dashboard                       # Layer 3: FastAPI server + built SPA on :8501
 uv run python tools/local_data_manager.py            # Seed / inspect / delete synthetic local data
 
-uv run pytest                                        # All tests (tests/, config in pyproject.toml)
+uv run pytest                                        # All Python tests (tests/, config in pyproject.toml)
 uv run pytest tests/test_validator.py -k missing     # Targeted test
 uv run ruff check <files>                            # Lint
 uv run mypy <files>                                  # Type check (strict)
+
+cd frontend && npm ci                                # Install frontend dependencies
+cd frontend && npm run dev                           # Vite dev server on :5173 (proxies /api -> :8501)
+cd frontend && npm run build                         # Type-check + build production SPA to frontend/dist/
+cd frontend && npm test                              # Run Vitest unit tests
 ```
 
 The repository has pre-existing `ruff` and `mypy` findings. Do not fix them
@@ -42,7 +47,7 @@ per-layer specs are in `docs/spec/TSD_*.md`):
 | 0 Raw | `app/collector/` | `data/raw/*.json` (audit copy of API payloads) |
 | 1 Processed | `app/collector/` (`orchestrator.py`, `rest_client.py`, `gql_client.py`, `state.py`) | `data/processed/{issues,milestones,labels}_<project_id>.parquet`, `data/state/sync_state.json` |
 | 2 Analytics | `app/processor/` (`enricher.py`, `validator.py`, `rule_loader.py`) | `data/analytics/issues_valid.parquet`, `data/analytics/data_quality.parquet` |
-| 3 Presentation | `app/dashboard/` (Streamlit) | UI; layouts in `data/config/layouts/*.json` |
+| 3 Presentation | `app/dashboard/` (FastAPI API) + `frontend/` (React/TS SPA) | `/api/dashboard`, `/api/admin/*`, static SPA in `frontend/dist/` |
 
 Shared Pydantic schemas live in `app/shared/schemas.py`. Rules are YAML files in
 `app/config/rules/` (`default.yaml` is the template); `RuleLoader` discovers
@@ -73,28 +78,25 @@ them, and a rule file may restrict itself to `project_ids`.
 7. **Fail per unit, not globally.** A failing project (e.g. 403) is logged and
    skipped; a malformed rule file skips that team. A collector `404` with an
    existing `issues_<id>.parquet` is treated as local seeded data.
-8. **Dashboard composition.** Widgets are pure render functions
-   `(df, config) -> ...` under `app/dashboard/widgets/{charts,kpis,tables}/`,
-   exported from their package `__init__.py` and registered by string ID in
-   `app/dashboard/registry.py`. Views (`app/dashboard/views/`) compose
-   widgets; they should not accumulate data transformations. Keep modules
-   cohesive and treat ~400-500 lines as a review signal for extraction
-   (`views/issue_data.py` and `views/issue_panel.py` are already past it; do
-   not grow them further without extracting).
-9. **Preserve behavior during refactors.** Session-state keys, cache TTLs,
-   widget keys, and layout JSON shape are user-visible contracts. For risky
-   refactors, first add characterization tests at the current boundary.
+8. **Dashboard separation.** The FastAPI layer (`app/dashboard/`) loads Parquet
+   data, collapses contexts, resolves YAML palettes/stage metadata, and exposes
+   JSON endpoints without embedding UI logic. Interactive filtering, search,
+   pagination, and SVG chart rendering run client-side in `frontend/src/`.
+9. **Preserve behavior during refactors.** URL query parameters (`view`,
+   `summary`, `f_*`), API response schemas (`app/dashboard/schemas.py`), and
+   filter/chart interaction semantics are user-visible contracts. For risky
+   refactors, add backend or Vitest unit tests at the boundary.
 
 ### Theming (binding)
 
-- UI chrome colors (backgrounds, text, borders, primary, fonts) belong in
-  `.streamlit/config.toml` (`[theme.light]` / `[theme.dark]`).
-- Semantic data colors (severity, issue type, stage) and Plotly styling belong
-  in `app/dashboard/theme.py`. Never hardcode colors in widgets; use
-  `get_palette()`, `get_severity_colors()`, `get_stage_colors()`,
-  `plotly_layout(...)`, and `plotly_bar_trace_style()`.
-- Keep injected CSS (`get_global_css()`) minimal and limited to what
-  `config.toml` cannot express. Both light and dark must render correctly.
+- UI chrome colors (backgrounds, text, borders, surfaces, fonts) belong in
+  `frontend/src/styles/tokens.css` (`:root` dark default / `[data-theme="light"]`).
+- Semantic data colors (issue type, severity, priority, stage, milestone status)
+  are resolved by `app/dashboard/palettes.py` (with YAML rule overrides) and
+  consumed in `frontend/src/lib/colors.ts`. Never hardcode off-brand colors in
+  components or SVG charts.
+- Self-hosted fonts (`Manrope`, `Space Grotesk`, `Space Mono`) live in
+  `frontend/public/static/` and are declared in `frontend/src/styles/fonts.css`.
 - The palette and fonts follow the bahonavi brand; see the `brand-guidelines`
   and `frontend-design` skills before visual changes.
 
@@ -104,29 +106,25 @@ them, and a rule file may restrict itself to `project_ids`.
   py311). `.editorconfig` governs whitespace: 4-space Python, 2-space
   YAML/JSON/web files, LF, trailing whitespace trimmed (except Markdown).
 - **Types:** type hints on every function signature; mypy runs in strict mode.
-  No `Any` in core pipeline logic.
+  No `Any` in core pipeline logic. TypeScript runs with `strict: true`.
 - **Pydantic v2** for DTOs: `@field_validator` for single fields,
   `@model_validator(mode="after")` for cross-field rules, `frozen=True` for
-  config models.
-- **Imports:** absolute (`from app.dashboard.theme import ...`), not relative.
-- **Docstrings:** Google style on public APIs.
-- **Streamlit width:** use `width="stretch"` for `st.plotly_chart` and
-  `st.dataframe`, never the deprecated `use_container_width=True`. Existing
-  occurrences are legacy; convert only the ones you touch.
-- **Caching:** data loaders use `@st.cache_data` with short TTLs; keep them
-  consistent with `app/dashboard/data_loader.py`.
+  config and response models.
+- **Imports:** absolute (`from app.dashboard.utils import ...`), not relative.
+- **Docstrings:** Google style on public Python APIs.
+- **Caching:** `DashboardService` caches prepared payloads keyed on source file
+  mtimes and invalidates via `clear_cache()` after admin pipeline runs.
 - **Match surrounding code.** Follow the naming and idiom of the file you edit.
 - **No commented-out code.** Delete it.
-- **Dependencies:** add them with `uv add` (or `uv add --dev`); do not bump
-  existing ones unless the task asks for it.
+- **Dependencies:** add Python dependencies with `uv add` (or `uv add --dev`);
+  do not bump existing ones unless the task asks for it.
 
 ### Tests
 
-`tests/` (pytest). Validators are tested with fixture issues (a valid issue, a
-broken one) asserting how they are classified. Use the seeder or
+`tests/` (pytest) and `frontend/src/lib/__tests__/` (Vitest). Validators are
+tested with fixture issues asserting how they are classified. Use the seeder or
 `tools/local_data_manager.py` for realistic local data instead of live GitLab;
-never commit generated `data/` content (only `.gitkeep` and
-`data/config/layouts/default.json` are tracked).
+never commit generated `data/` content (only `.gitkeep` is tracked).
 
 ## Working rules
 

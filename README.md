@@ -1,6 +1,6 @@
 # GitLab Pulse
 
-GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extracts data via the GitLab API, applies custom workflow mapping rules, and generates analytical dashboards. It is designed to be hosted on a local PC or internal server, allowing users to access the dashboard through their web browser.
+GitLab Pulse is a local-first analytics application for GitLab issue data. It extracts data via the GitLab API, applies custom workflow mapping rules, and serves a FastAPI + React/TypeScript dashboard. It is designed to run on a local PC or internal server, allowing teams to inspect issue flow through their web browser.
 
 ## Features
 
@@ -13,7 +13,7 @@ GitLab Pulse is a Streamlit analytics application for GitLab issue data. It extr
 ## Visual Insights
 
 ### Two layouts
-Two layouts share one issue board. **Compact** (default) puts the board first for daily triage; **Analytics** shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews. Switch between them at the top right of the page. The filter and the layout are kept in the URL.
+Two layouts share one issue board. **Analytics** (default) shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews; **Compact** puts the board first for daily triage. Switch between them at the top right of the page. The filter and the layout are kept in the URL.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">
@@ -26,7 +26,7 @@ Two layouts share one issue board. **Compact** (default) puts the board first fo
 </picture>
 
 ### Board and table
-Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. The toolbar, the page bar and the lane headers stay pinned while you scroll. The issue list opens as a table; both show 10, 20 or 30 issues per page. A card's title or a row's title opens the issue in GitLab in a new tab.
+Each board lane shows its stage's priority mix; pick a priority there, or a pill in the summary line above the board, to filter the board. The toolbar, the page bar and the lane headers stay pinned while you scroll. The issue list opens as a table with as many rows as fit in the window (Fit, or 10, 20 or 30 per page); the board shows 10, 20 or 30 cards per lane. A card's title or a row's title opens the issue in GitLab in a new tab.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_board_dark.png">
@@ -66,7 +66,7 @@ flowchart LR
     B -->|Raw JSON| C[("Bronze Data<br>(Raw)")]
     C -->|Apply Rules| D(Processor)
     D -->|Parquet| E[("Silver/Gold Data<br>(Analytics)")]
-    E -->|Render| F[Streamlit Dashboard]
+    E -->|FastAPI + React/TS| F[Web Dashboard]
     
     classDef gitlab fill:#e24329,color:white,stroke:none
     class A gitlab
@@ -115,6 +115,7 @@ To evaluate the dashboard without configuring API access to a live GitLab instan
 ### Prerequisites
 - **Python**: `>=3.11`
 - **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
+- **Node.js**: `>=20` (for building the React/TypeScript frontend)
 
 ### Native Setup (Mac/Linux/WSL)
 Run the automated setup script. It will verify prerequisites, install dependencies, and offer to generate local test data automatically.
@@ -161,8 +162,11 @@ uv run python app/collector/orchestrator.py
 # 2. Transform into Parquet analytics
 uv run python app/processor/main.py
 
-# 3. Launch the dashboard
-uv run streamlit run app/dashboard/main.py
+# 3. Build frontend (first time or after UI edits)
+(cd frontend && npm ci && npm run build)
+
+# 4. Launch the dashboard
+uv run python -m app.dashboard
 ```
 
 ---
@@ -184,7 +188,7 @@ This CLI allows you to reseed specific projects, clear data lakes, and adjust th
 
 - **Least Privilege**: The `GITLAB_TOKEN` only requires `read_api`. The collector never requests write permissions.
 - **Persistent Storage**: If deploying via Docker, ensure the `./data` directory is mapped to a persistent volume. This holds your compiled Parquet data and sync state.
-- **Intranet Ready**: The Streamlit dashboard is designed for internal team use or corporate VPNs. It contains an optional `ADMIN_PASSWORD` (set in `.env`) for administrative actions like manually extracting data from GitLab API and transforming it into Parquet analytics.
+- **Intranet Ready**: The FastAPI + React dashboard is designed for internal team use or corporate VPNs. It contains an optional `ADMIN_PASSWORD` (set in `.env`) for administrative actions like manually extracting data from GitLab API and transforming it into Parquet analytics.
 
 ---
 
@@ -192,7 +196,8 @@ This CLI allows you to reseed specific projects, clear data lakes, and adjust th
 
 For deep technical insights, system architecture, and operational procedures, please refer to the comprehensive guides located in the `docs/guidelines/` directory:
 
-- **[Developer Guidelines (docs/guidelines/GUIDE_Developer.md)](docs/guidelines/GUIDE_Developer.md)**: Details the core philosophy, coding standards, design patterns (Strategy, Factory, Singleton), and Streamlit configuration rules required for contributing to the codebase.
+- **[Layer 3 Rewrite Documentation (docs/layer3-rewrite/README.md)](docs/layer3-rewrite/README.md)**: Diataxis guide (tutorial, how-to guides, reference, and architectural explanation) for the FastAPI + React/TypeScript Layer 3 rewrite.
+- **[Developer Guidelines (docs/guidelines/GUIDE_Developer.md)](docs/guidelines/GUIDE_Developer.md)**: Details the core philosophy, coding standards, design patterns (Strategy, Factory, Singleton), and contribution conventions.
 - **[Operations Guide (docs/guidelines/GUIDE_Operations.md)](docs/guidelines/GUIDE_Operations.md)**: Explains the data update lifecycle, caching mechanisms, the UI-based Admin Panel, project auto-discovery, and how to automate pipeline runs using cron.
 
 ---

@@ -47,15 +47,24 @@ check_prerequisites() {
         exit 1
     fi
     log_success "Found uv"
+
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        log_error "Node.js and npm are required to build the dashboard frontend."
+        exit 1
+    fi
+    log_success "Found node and npm"
 }
 
 install_dependencies() {
     log_step "Installing dependencies..."
-    
+
     # [COMMAND] Install python dependencies
     uv sync
-    
-    log_success "Dependencies installed successfully."
+
+    # [COMMAND] Build React/TypeScript frontend
+    (cd frontend && npm ci && npm run build)
+
+    log_success "Dependencies installed and frontend built successfully."
 }
 
 setup_environment() {
@@ -124,7 +133,7 @@ print_success_local() {
     echo -e "${GREEN}           Setup Complete!             ${NC}"
     echo -e "${GREEN}=======================================${NC}"
     echo -e "\nTo start the dashboard, run:"
-    echo -e "  ${CYAN}uv run streamlit run app/dashboard/main.py${NC}"
+    echo -e "  ${CYAN}uv run python -m app.dashboard${NC}"
     echo -e "\nThen open http://localhost:8501 in your browser."
     echo -e "\nFor full documentation, see README.md."
 }
@@ -137,7 +146,7 @@ print_success_manual() {
     echo -e "1. Edit ${CYAN}.env${NC} and add your GITLAB_URL, GITLAB_TOKEN, and PROJECT_IDS."
     echo -e "2. Run the collector: ${CYAN}uv run python app/collector/orchestrator.py${NC}"
     echo -e "3. Run the processor: ${CYAN}uv run python app/processor/main.py${NC}"
-    echo -e "4. Start the dashboard: ${CYAN}uv run streamlit run app/dashboard/main.py${NC}"
+    echo -e "4. Start the dashboard: ${CYAN}uv run python -m app.dashboard${NC}"
     echo -e "\nFor full documentation, see README.md."
 }
 

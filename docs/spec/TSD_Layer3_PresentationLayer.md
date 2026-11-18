@@ -1,103 +1,50 @@
-# Technical Specification: Layer 3 - Dynamic Dashboard Engine
+# Technical Specification: Layer 3 - Presentation Layer (FastAPI + React/TypeScript)
 
-**Version:** 2.2  
+**Version:** 3.0  
 **Status:** Implemented
 
 ## 1. Overview
 
-The dashboard supports two complementary presentation modes:
+Layer 3 provides a fast, client-reactive presentation architecture split into two cleanly bounded parts:
 
-- a curated **Overview** page for workflow and quality monitoring
-- a user-editable **Custom** page backed by persisted layouts and a widget registry
+- **Backend API (`app/dashboard/`)**: A thin FastAPI server that reads Layer 2 Parquet datasets, collapses context rows, resolves YAML theme palettes and stage metadata, and exposes compressed JSON endpoints plus static SPA serving.
+- **Frontend SPA (`frontend/`)**: A React + TypeScript application bundled with Vite that performs filtering, fuzzy search, chart aggregation, table/board paging, and SVG chart rendering directly in browser memory.
 
-## 2. Architecture
+The legacy Streamlit UI, Plotly wrapper layer, and experimental Custom View builder have been removed.
 
-### 2.1 Widget Registry
+## 2. Backend Architecture (`app/dashboard/`)
 
-`app/dashboard/registry.py` maps widget IDs to render functions. The current registry ships:
+| Module | Responsibility |
+|---|---|
+| `schemas.py` | Frozen Pydantic v2 DTOs (`IssueItem`, `DashboardPayload`, `AdminJobResponse`, etc.) |
+| `data_loader.py` | Parquet readers (`issues_valid.parquet`, `labels_*.parquet`) and `sync_state.json` loader |
+| `utils.py` | Assignee/label normalization, quality signals and hints, hierarchy DFS sort |
+| `palettes.py` | Theme-aware light/dark semantic color maps merged with YAML rule overrides |
+| `service.py` | `DashboardService` with mtime-keyed payload caching and thread-safe invalidation |
+| `admin.py` | Cookie-authenticated `/api/admin/*` endpoints running Layer 1/2 pipeline scripts |
+| `server.py` | FastAPI app factory with GZip compression, CORS for Vite dev, and SPA fallback serving |
+| `__main__.py` | Uvicorn CLI entry point (`uv run python -m app.dashboard`, default port `8501`) |
 
-- 3 KPI widgets
-- 7 chart widgets
-- 1 table widget
+### 2.1 HTTP API Surface
 
-### 2.2 Layout Schema
+- `GET /api/health` -> `{"status": "ok"}`
+- `GET /api/dashboard` -> `DashboardPayload` (issues with collapsed `contexts`, `filter_options`, `label_styles`, `stages`, `palettes`, `sync_status`, `version`, `generated_at`)
+- `GET /api/admin/status` -> `{"authenticated": bool}`
+- `POST /api/admin/login` -> verifies `ADMIN_PASSWORD` and sets an `HttpOnly`, `SameSite=lax` cookie (`pulse_admin_session`)
+- `POST /api/admin/logout` -> revokes session token and clears cookie
+- `POST /api/admin/run/collector` -> executes `app/collector/orchestrator.py` and invalidates payload cache on success
+- `POST /api/admin/run/processor` -> executes `app/processor/main.py` and invalidates payload cache on success
+- `POST /api/admin/clear-cache` -> clears the cached payload
 
-Custom layouts are stored in `data/config/layouts/*.json` using a 12-column grid model:
+## 3. Frontend Architecture (`frontend/src/`)
 
-```json
-{
-  "name": "Management View",
-  "layout": [
-    { "i": "widget_1", "type": "chart_stage_distribution", "x": 0, "y": 0, "w": 12, "h": 4 },
-    { "i": "widget_2", "type": "kpi_flow_metrics", "x": 0, "y": 4, "w": 6, "h": 2 },
-    { "i": "widget_3", "type": "table_issue_detail_grid", "x": 6, "y": 4, "w": 6, "h": 4 }
-  ]
-}
-```
+| Area | Modules |
+|---|---|
+| `styles/` | Self-hosted fonts (`fonts.css`), bahonavi dark/light CSS variables (`tokens.css`), layout and component styles (`global.css`) |
+| `lib/` | Pure TypeScript domain logic (`types.ts`, `colors.ts`, `search.ts`, `facets.ts`, `summary.ts`, `timeline.ts`, `board.ts`, `analytics.ts`, `api.ts`) |
+| `components/charts/` | Responsive SVG charts (`ReleaseTimeline`, `PriorityDonut`, `QualitySignalsChart`, `DailyVelocityChart`, `WorkflowStateRow`) |
+| `components/` | `TopBar`, `SidebarDrawer`, `SummaryBar`, `IssueSearchInput`, `IssuePanel`, `IssueTable`, `IssueBoard`, `AdminModal`, `AnalyticsView` |
 
-### 2.3 Grid Engine
+### 3.1 Rationale for Client-Side Filtering & SVG Charts
 
-`app/dashboard/engine.py` implements a **hybrid rendering strategy**:
-
-1. **Edit Mode**
-   - Uses `streamlit-elements`
-   - Supports drag-and-drop positioning
-   - Supports resize handles
-   - Shows lightweight blueprint cards instead of full widgets
-
-2. **View Mode**
-   - Uses native Streamlit columns
-   - Groups persisted layout items by `y` then `x`
-   - Preserves widget interactivity and normal Streamlit behavior
-
-This hybrid model is the current shipped design: edit with `streamlit-elements`, render with native Streamlit.
-
-## 3. User Interface
-
-### 3.1 Active top-level pages
-
-The active navigation in `app/dashboard/main.py` currently exposes:
-
-- `Overview`
-- `Custom View (experimental)`
-- `Admin` when admin access is enabled in session state
-
-### 3.2 Custom view controls
-
-The Custom page supports:
-
-- layout loading from JSON
-- edit mode toggle
-- drag, resize, and delete while editing
-- widget add actions from the sidebar toolbox
-- explicit save to disk
-
-### 3.3 Admin operations
-
-The Admin page can:
-
-- run the collector
-- run the processor
-- clear Streamlit cached data
-
-## 4. Widget Contract
-
-Registered widgets receive:
-
-- a filtered DataFrame
-- an optional config dictionary
-
-Common config values include:
-
-| Key | Purpose |
-| :---- | :---- |
-| `key` | Unique Streamlit widget key |
-| `height` | Requested render height |
-| widget-specific options | Chart or table behavior overrides |
-
-Quality widgets may also receive `quality_df` in addition to the main analytics DataFrame.
-
-## 5. Current Limitations
-
-- Overview is curated and hard-coded rather than layout-driven
-- Edit-mode interactions depend on `streamlit-elements`
+Because GitLab Pulse typically operates on thousands of issues per workspace, shipping the collapsed issue payload once (~100 KB gzipped) lets every summary pill click, chart slice selection, search keystroke, column sort, and page switch complete in a few milliseconds on the client without network round-trips or server re-execution.
