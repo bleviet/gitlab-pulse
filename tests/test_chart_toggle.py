@@ -91,26 +91,25 @@ def test_unchanged_selection_before_drawing_does_not_confirm(state: dict[str, An
     facets = dict(state["issue_facets"])
 
     panel.apply_chart_selection(
-        {"selection": {"points": bar}}, "stage_bar_1", confirm=False, **scope
+        {"selection": {"points": bar}}, "stage_bar_1", before_draw=True, **scope
     )
     _run([], "stage_bar_1", **scope)
 
     assert state["issue_facets"] == facets
 
 
-def test_new_selection_before_drawing_sets_the_filter_and_reruns(
+def test_new_selection_before_drawing_sets_the_filter_and_does_not_rerun(
     state: dict[str, Any],
 ) -> None:
     bar = [{"x": "P1", "y": 21}]
 
-    with pytest.raises(_Rerun):
-        panel.apply_chart_selection(
-            {"selection": {"points": bar}},
-            "stage_bar_1",
-            "Architecture",
-            "opened",
-            confirm=False,
-        )
+    panel.apply_chart_selection(
+        {"selection": {"points": bar}},
+        "stage_bar_1",
+        "Architecture",
+        "opened",
+        before_draw=True,
+    )
 
     assert state["issue_facets"] == {"stage": "Architecture", "state": "opened", "priority": "P1"}
 
@@ -121,9 +120,45 @@ def test_donut_click_survives_the_early_pass(state: dict[str, Any]) -> None:
     slice_ = [{"x": 0.3, "y": 0.6, "customdata": ["P1", 83]}]
     _run(slice_, "open_donut", state_filter="opened")
     panel.apply_chart_selection(
-        {"selection": {"points": slice_}}, "open_donut", state_filter="opened", confirm=False
+        {"selection": {"points": slice_}}, "open_donut", state_filter="opened", before_draw=True
     )
 
     _run([], "open_donut", state_filter="opened")
 
     assert state["issue_facets"] == {"state": "opened", "priority": "P1"}
+
+
+def test_new_selection_after_drawing_reruns(state: dict[str, Any]) -> None:
+    bar = [{"x": "P1", "y": 21}]
+
+    with pytest.raises(_Rerun):
+        panel.apply_chart_selection({"selection": {"points": bar}}, "stage_bar_1")
+
+
+def test_deselecting_before_drawing_clears_the_filter_without_a_rerun(
+    state: dict[str, Any],
+) -> None:
+    bar = [{"x": "P1", "y": 21}]
+    scope = {"stage_filter": "Architecture", "state_filter": "opened"}
+    _run(bar, "stage_bar_1", **scope)
+    _run(bar, "stage_bar_1", **scope)
+
+    panel.apply_chart_selection({"selection": {"points": []}}, "stage_bar_1", before_draw=True, **scope)
+
+    assert state["issue_facets"] == {}
+
+
+def test_second_donut_click_before_drawing_clears_without_a_rerun(
+    state: dict[str, Any],
+) -> None:
+    state["issue_facets"] = {"query": "crash"}
+    slice_ = [{"customdata": ["P2", 76]}]
+    _run(slice_, "open_donut", state_filter="opened")
+    _run([], "open_donut", state_filter="opened")
+    assert state["issue_facets"] == {"state": "opened", "priority": "P2", "query": "crash"}
+
+    panel.apply_chart_selection(
+        {"selection": {"points": slice_}}, "open_donut", state_filter="opened", before_draw=True
+    )
+
+    assert state["issue_facets"] == {"query": "crash"}

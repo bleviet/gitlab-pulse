@@ -4,9 +4,61 @@ from typing import Any
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.figure_cache import cache_figure, theme_key
 from app.dashboard.theme import get_palette, get_plotly_font_color, plotly_layout
+
+
+@cache_figure
+def _figure(
+    error_counts: pd.DataFrame,
+    color_map: dict[str, str],
+    height: int,
+    theme_key: tuple[object, ...],
+) -> go.Figure:
+    """Build the bar figure (cached; see ``figure_cache``)."""
+    max_count = max(int(error_counts["count"].max()), 1)
+
+    fig = px.bar(
+        error_counts,
+        x="count",
+        y="label",
+        orientation="h",
+        color="error_code",
+        color_discrete_map=color_map,
+        text="count",
+        custom_data=["error_code"],
+    )
+
+    fig.update_traces(
+        marker_line_width=0,
+        texttemplate="<b>%{text}</b>",
+        textposition="outside",
+        textfont={"color": get_plotly_font_color(), "size": 12},
+        cliponaxis=False,
+        hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
+    )
+
+    fig.update_layout(
+        **plotly_layout(
+            height=height,
+            show_xgrid=False,
+            show_ygrid=False,
+            margin={"l": 0, "r": 10, "t": 20, "b": 0},
+            legend_pos="none",
+            bargap=0.3,
+        ),
+    )
+    fig.update_xaxes(showgrid=False, title="", showticklabels=False, range=[0, max_count * 1.2])
+    fig.update_yaxes(
+        showgrid=False,
+        title="",
+        categoryorder="array",
+        categoryarray=error_counts["label"].tolist()[::-1],
+    )
+    return fig
 
 
 def error_distribution(
@@ -53,45 +105,7 @@ def error_distribution(
         code: chart_colors[index % len(chart_colors)]
         for index, code in enumerate(error_counts["error_code"])
     }
-    max_count = max(int(error_counts["count"].max()), 1)
-
-    fig = px.bar(
-        error_counts,
-        x="count",
-        y="label",
-        orientation="h",
-        color="error_code",
-        color_discrete_map=color_map,
-        text="count",
-        custom_data=["error_code"],
-    )
-
-    fig.update_traces(
-        marker_line_width=0,
-        texttemplate="<b>%{text}</b>",
-        textposition="outside",
-        textfont={"color": get_plotly_font_color(), "size": 12},
-        cliponaxis=False,
-        hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
-    )
-
-    fig.update_layout(
-        **plotly_layout(
-            height=height,
-            show_xgrid=False,
-            show_ygrid=False,
-            margin={"l": 0, "r": 10, "t": 20, "b": 0},
-            legend_pos="none",
-            bargap=0.3,
-        ),
-    )
-    fig.update_xaxes(showgrid=False, title="", showticklabels=False, range=[0, max_count * 1.2])
-    fig.update_yaxes(
-        showgrid=False,
-        title="",
-        categoryorder="array",
-        categoryarray=error_counts["label"].tolist()[::-1],
-    )
+    fig = _figure(error_counts, color_map, height, theme_key())
 
     show_modebar = st.session_state.get("show_chart_controls", False)
 

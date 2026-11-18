@@ -49,3 +49,34 @@ def test_highlight_dims_the_other_slices(monkeypatch: pytest.MonkeyPatch) -> Non
     fills = {trace.name: trace.fillcolor for trace in fig.data if trace.fill == "toself"}
     assert not fills["P2"].startswith("rgba")
     assert fills["P1"].startswith("rgba") and fills["Unset"].startswith("rgba")
+
+
+@pytest.mark.parametrize("drop", ["priority_rank", "state"])
+def test_donut_and_bar_render_without_optional_columns(
+    monkeypatch: pytest.MonkeyPatch, drop: str
+) -> None:
+    """Missing ``priority_rank`` or ``state`` columns count all rows, no error."""
+    bar = importlib.import_module("app.dashboard.widgets.charts.priority_bar")
+    figures: list[go.Figure] = []
+    monkeypatch.setattr(
+        widget.st, "plotly_chart", lambda fig, **_: figures.append(fig)
+    )
+    df = pd.DataFrame(
+        {
+            "state": ["opened", "opened", "closed"],
+            "priority": ["P1", "P1", "P2"],
+            "priority_rank": [1, 1, 2],
+        }
+    ).drop(columns=[drop])
+
+    widget.priority_donut(df, {"state_filter": "all", "show_legend": False})
+    bar.priority_bar(df, {"show_all": True})
+
+    assert len(figures) == 2
+    donut_targets = next(t for t in figures[0].data if t.mode == "markers")
+    assert {tuple(item) for item in donut_targets.customdata} == {
+        ("P1", 2),
+        ("P2", 1),
+        (widget.ALL_ISSUES, 3),
+    }
+    assert sorted(int(v) for trace in figures[1].data for v in trace.y) == [1, 2]

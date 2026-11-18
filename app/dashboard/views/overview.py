@@ -127,6 +127,33 @@ def _issue_panel_fragment(
     write_query_state()
 
 
+@st.fragment
+def _analytics_fragment(
+    df: pd.DataFrame,
+    unique_df: pd.DataFrame,
+    stages: list[str],
+    timeline_source: pd.DataFrame,
+    active_milestone: str | None,
+) -> None:
+    """Render the Analytics layout as a fragment.
+
+    A chart click reruns the charts and the board below them, not the
+    sidebar or the data load. The board is a fragment of its own inside
+    (``_issue_panel_fragment``), so a click in it reruns only the board.
+    """
+    render_analytics_layout(
+        unique_df,
+        stages,
+        timeline_source,
+        active_milestone,
+        # The charts above show the stages and the filters, so the board
+        # keeps only the search and the view switch.
+        board=lambda: _issue_panel_fragment(
+            df, stages, show_filters=False, lane_headers=False
+        ),
+    )
+
+
 def render_overview(
     df: pd.DataFrame,
     quality_df: pd.DataFrame | None = None,
@@ -164,17 +191,7 @@ def render_overview(
     )
 
     if layout == "Analytics":
-        render_analytics_layout(
-            unique_df,
-            stages,
-            timeline_source,
-            active_milestone,
-            # The charts above show the stages and the filters, so the board
-            # keeps only the search and the view switch.
-            board=lambda: _issue_panel_fragment(
-                df, stages, show_filters=False, lane_headers=False
-            ),
-        )
+        _analytics_fragment(df, unique_df, stages, timeline_source, active_milestone)
     else:
         _render_release_rail(timeline_source, active_milestone)
         summary = build_summary(unique_df)

@@ -101,7 +101,7 @@ def apply_chart_selection(
     chart_id: str,
     stage_filter: str | None = None,
     state_filter: str | None = None,
-    confirm: bool = True,
+    before_draw: bool = False,
 ) -> None:
     """Filter the board by a new selection in an Analytics chart.
 
@@ -111,10 +111,12 @@ def apply_chart_selection(
     charts drop their highlight. Clicking the segment that set the filter again
     removes it.
 
-    With ``confirm=False`` the call comes from before the chart is drawn (the
-    selection is read from session state): an unchanged selection is then not
-    "reported again", since a chart that redraws its highlight only drops the
-    selection when it is drawn.
+    With ``before_draw=True`` the call comes from before any chart is drawn
+    (the selection is read from session state). An unchanged selection is then
+    not "reported again", since a chart that redraws its highlight only drops
+    the selection when it is drawn, and a change is applied without a rerun:
+    nothing that depends on the filter was drawn yet, so the same run draws
+    the result. Otherwise a change reruns.
     """
     points = (selection or {}).get("selection", {}).get("points") or []
     signatures: dict[str, str] = st.session_state.setdefault("issue_chart_signatures", {})
@@ -127,10 +129,12 @@ def apply_chart_selection(
         signatures.pop(chart_id, None)
         if confirmed.pop(chart_id, False) and st.session_state.get("issue_chart") == chart_id:
             _clear_chart_filter()
+            if not before_draw:
+                st.rerun()
         return
     signature = json.dumps(points, sort_keys=True, default=str)
     if signatures.get(chart_id) == signature:
-        if confirm:
+        if not before_draw:
             confirmed[chart_id] = True
         return
     signatures[chart_id] = signature
@@ -145,23 +149,26 @@ def apply_chart_selection(
         current, "query"
     ) == facets:
         _clear_chart_filter()
+        if not before_draw:
+            st.rerun()
+        return
     if query:
         facets["query"] = query
     st.session_state["issue_summary"] = None
     st.session_state["issue_chart"] = chart_id
     st.session_state["issue_facets"] = facets
     _reset_charts(except_chart=chart_id)
-    st.rerun()
+    if not before_draw:
+        st.rerun()
 
 
 def _clear_chart_filter() -> None:
     """Drop the filter a chart set (a second click on its segment), keeping the
     search text. Analytics shows no filter chips, so this is how a chart filter
-    is removed there.
+    is removed there. The caller reruns when the page needs it.
     """
     query = _get_facets().get("query")
     _set_facets(IssueFacets(query=query) if query else IssueFacets())
-    st.rerun()
 
 
 def active_chart() -> str | None:

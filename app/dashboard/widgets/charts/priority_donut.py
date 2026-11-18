@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.figure_cache import cache_figure, theme_key
 from app.dashboard.theme import (
     get_active_theme_mode,
     get_palette,
@@ -22,72 +23,19 @@ from app.dashboard.theme import (
 ALL_ISSUES = "__all__"
 
 
-def priority_donut(
-    df: pd.DataFrame,
-    config: dict[str, Any] | None = None
-) -> dict | None:
-    """Render donut chart of open issues by priority.
-
-    Args:
-        df: DataFrame of issues
-        config: Optional configuration; ``highlight`` names a priority whose
-            slice stays fully coloured while the others are dimmed.
-    """
-    config = config or {}
-    height = config.get("height", 250)
-    widget_key = config.get("key", "priority_donut")
-    center_text = config.get("center_text", "OPEN<br>ISSUES")
-    show_legend = config.get("show_legend", True)
-
-    if df.empty or "priority" not in df.columns:
-        st.info("No priority data available.")
-        return None
-
-    state_filter = config.get("state_filter", "opened")
-    if "state" in df.columns:
-        if state_filter == "all":
-            work_df = df.copy()
-        else:
-            work_df = df[df["state"] == state_filter].copy()
-    else:
-        work_df = df.copy()
-
-    if work_df.empty:
-        st.info(f"No {state_filter if state_filter != 'all' else ''} issues.")
-        return None
-
-    # Normalize priority: missing values become "Unset"
-    priority = work_df["priority"].astype(object)
-    priority_text = priority.astype(str).str.strip()
-    is_unset = priority.isna() | priority_text.str.lower().isin(
-        ["", "none", "nan", "<na>"]
-    )
-    work_df["priority"] = priority_text.where(~is_unset, "Unset")
-
-    priority_counts = work_df["priority"].value_counts().reset_index()
-    priority_counts.columns = ["Priority", "Count"]
-
-    total_issues = priority_counts["Count"].sum()
-    if total_issues == 0:
-        return None
-
-    palette = get_palette()
-    
-    colors_map = get_priority_colors()
-    neutral = palette.get("neutral", "#95a5a6")
-
-    if "priority_rank" in work_df.columns:
-        ranks = work_df.groupby("priority")["priority_rank"].min().astype(float)
-        priority_counts["Rank"] = priority_counts["Priority"].map(ranks)
-    else:
-        priority_counts["Rank"] = float("nan")
-    priority_counts["IsUnset"] = priority_counts["Priority"] == "Unset"
-    priority_counts = priority_counts.sort_values(["IsUnset", "Rank", "Priority"])
-    
-    labels = priority_counts["Priority"].tolist()
-    values = priority_counts["Count"].tolist()
-    colors = [colors_map.get(lbl, neutral) for lbl in labels]
-
+@cache_figure
+def _figure(
+    labels: list[str],
+    values: list[int],
+    colors: list[str],
+    total_issues: int,
+    highlight: str | None,
+    height: int,
+    center_text: str,
+    show_legend: bool,
+    theme_key: tuple[object, ...],
+) -> go.Figure:
+    """Build the donut figure (cached; see ``figure_cache``)."""
     text_color = get_plotly_font_color()
     mode = get_active_theme_mode()
     bg_color = get_streamlit_theme_color("backgroundColor", "#050811" if mode == "dark" else "#f8f9fc")
@@ -98,7 +46,6 @@ def priority_donut(
     # invisible markers over the ring, and one large marker over the hole,
     # are the click targets. A selection carries ``[label, count]`` in
     # ``customdata``; the centre's label is ``ALL_ISSUES``.
-    highlight = config.get("highlight")
     hole, step = 0.6, 2.0
     sweeps = [360.0 * value / total_issues for value in values]
     starts = [sum(sweeps[:index]) for index in range(len(sweeps))]
@@ -192,6 +139,87 @@ def priority_donut(
             xanchor="left",
             x=1.0
         )
+    )
+    return fig
+
+
+def priority_donut(
+    df: pd.DataFrame,
+    config: dict[str, Any] | None = None
+) -> dict | None:
+    """Render donut chart of open issues by priority.
+
+    Args:
+        df: DataFrame of issues
+        config: Optional configuration; ``highlight`` names a priority whose
+            slice stays fully coloured while the others are dimmed.
+    """
+    config = config or {}
+    height = config.get("height", 250)
+    widget_key = config.get("key", "priority_donut")
+    center_text = config.get("center_text", "OPEN<br>ISSUES")
+    show_legend = config.get("show_legend", True)
+
+    if df.empty or "priority" not in df.columns:
+        st.info("No priority data available.")
+        return None
+
+    state_filter = config.get("state_filter", "opened")
+    columns = [name for name in ("priority", "priority_rank") if name in df.columns]
+    if "state" in df.columns:
+        if state_filter == "all":
+            work_df = df[columns].copy()
+        else:
+            work_df = df.loc[df["state"] == state_filter, columns].copy()
+    else:
+        work_df = df[columns].copy()
+
+    if work_df.empty:
+        st.info(f"No {state_filter if state_filter != 'all' else ''} issues.")
+        return None
+
+    # Normalize priority: missing values become "Unset"
+    priority = work_df["priority"].astype(object)
+    priority_text = priority.astype(str).str.strip()
+    is_unset = priority.isna() | priority_text.str.lower().isin(
+        ["", "none", "nan", "<na>"]
+    )
+    work_df["priority"] = priority_text.where(~is_unset, "Unset")
+
+    priority_counts = work_df["priority"].value_counts().reset_index()
+    priority_counts.columns = ["Priority", "Count"]
+
+    total_issues = priority_counts["Count"].sum()
+    if total_issues == 0:
+        return None
+
+    palette = get_palette()
+    
+    colors_map = get_priority_colors()
+    neutral = palette.get("neutral", "#95a5a6")
+
+    if "priority_rank" in work_df.columns:
+        ranks = work_df.groupby("priority")["priority_rank"].min().astype(float)
+        priority_counts["Rank"] = priority_counts["Priority"].map(ranks)
+    else:
+        priority_counts["Rank"] = float("nan")
+    priority_counts["IsUnset"] = priority_counts["Priority"] == "Unset"
+    priority_counts = priority_counts.sort_values(["IsUnset", "Rank", "Priority"])
+    
+    labels = priority_counts["Priority"].tolist()
+    values = priority_counts["Count"].tolist()
+    colors = [colors_map.get(lbl, neutral) for lbl in labels]
+
+    fig = _figure(
+        labels,
+        values,
+        colors,
+        int(total_issues),
+        config.get("highlight"),
+        height,
+        center_text,
+        show_legend,
+        theme_key(),
     )
 
     show_modebar = st.session_state.get("show_chart_controls", False)

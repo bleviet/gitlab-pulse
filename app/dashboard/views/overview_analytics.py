@@ -195,16 +195,15 @@ def render_analytics_layout(
         )
         select(selection, "quality_signal_chart")
 
-    # A chart click is reported by the run it triggers. Apply it before any
-    # chart is drawn, so that run stops here instead of after building most
-    # of the charts.
+    # A chart click is reported by the run it triggers. It is applied before
+    # any chart is drawn, in the same run, so no chart is built twice.
     for chart_id, (key_base, stage_filter, state_filter) in chart_scopes.items():
         apply_chart_selection(
             st.session_state.get(chart_key(key_base, chart_id)),
             chart_id,
             stage_filter,
             state_filter,
-            confirm=False,
+            before_draw=True,
         )
 
     with st.container(key="overview_analytics"):

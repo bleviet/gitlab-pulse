@@ -151,3 +151,32 @@ def test_no_due_date_label_only_with_undated(
     dated_only = _undated_issues().iloc[[0]]
     fig = _render(monkeypatch, dated_only, style)
     assert not any("No due date" in a.text for a in fig.layout.annotations)
+
+
+def test_hover_reports_closed_and_total_issue_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each milestone's hover text carries its closed/total issue counts."""
+    now = pd.Timestamp.now(tz="UTC").normalize()
+    issues = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "state": ["closed", "closed", "opened", "opened"],
+            "milestone": ["v1", "v1", "v1", "v2"],
+            "milestone_id": [11, 11, 11, 12],
+            "milestone_due_date": [now + pd.Timedelta(days=10)] * 3
+            + [now + pd.Timedelta(days=20)],
+        }
+    )
+    captured: dict[str, go.Figure] = {}
+    monkeypatch.setattr(
+        widget.st, "plotly_chart", lambda fig, **_: captured.setdefault("fig", fig)
+    )
+
+    widget.milestone_timeline(issues, {})
+
+    hover = {
+        point[2]: point[1]
+        for trace in captured["fig"].data
+        if trace.customdata is not None
+        for point in trace.customdata
+    }
+    assert hover == {"v1": "2/3", "v2": "0/1"}

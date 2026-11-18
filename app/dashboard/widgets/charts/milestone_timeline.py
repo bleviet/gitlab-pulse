@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.dashboard.figure_cache import cache_figure, theme_key
 from app.dashboard.theme import (
     FONT_CODE,
     get_active_theme_mode,
@@ -30,89 +31,21 @@ def _natural_key(title: str) -> tuple[tuple[int, int, str], ...]:
     )
 
 
-def milestone_timeline(
-    issues_df: pd.DataFrame,
-    config: dict[str, Any] | None = None
-) -> dict | None:
-    """Render milestone timeline as a scatter plot with markers.
+@cache_figure
+def _figure(
+    display_df: pd.DataFrame,
+    milestone_issue_stats: dict[Any, dict[str, int]],
+    now: pd.Timestamp,
+    highlight_title: str | None,
+    rail: bool,
+    timeline_height: int,
+    rail_title: str | None,
+    theme_key: tuple[object, ...],
+) -> go.Figure | None:
+    """Build the timeline figure (cached; see ``figure_cache``).
 
-    Args:
-        issues_df: DataFrame with all issues (needed for completion stats)
-        config: Optional configuration
-            - key: widget key
-            - height: chart height in pixels
-            - style: ``"default"`` or ``"rail"``, a thin band with a centre
-              rail, round markers alternating above and below it, and a
-              "NOW" line
-            - title: rail style only, a small label at the top left
-
-    Returns:
-        Selection state dictionary (if supported) or None
+    Returns ``None`` when no milestone is left to draw.
     """
-    config = config or {}
-    widget_key = config.get("key", "milestone_timeline")
-    rail = config.get("style") == "rail"
-    raw_height = config.get("height", 160)
-    timeline_height = max(80, min(int(raw_height), 320))
-
-    display_df = None
-
-    # Extract from Issues (e.g. for Subprojects/Groups)
-    if (display_df is None or display_df.empty) and not issues_df.empty and "milestone_id" in issues_df.columns:
-        # Group by milestone title/id to reconstruct milestone metadata
-        # We need id, title, due_date, start_date, state
-
-        # Ensure we have the necessary columns
-        available_cols = issues_df.columns
-        agg_dict = {
-            "milestone_id": "first",
-            "state": lambda x: "closed" if (x == "closed").all() else "active"
-        }
-
-        if "milestone_due_date" in available_cols:
-            agg_dict["milestone_due_date"] = "first"
-        if "milestone_start_date" in available_cols:
-            agg_dict["milestone_start_date"] = "first"
-
-        # Group by milestone title (as it's usually reliable)
-        if "milestone" in available_cols:
-            ms_agg = issues_df[issues_df["milestone"].notna()].groupby("milestone").agg(agg_dict).reset_index()
-
-            # Rename to match expected schema
-            rename_map = {
-                "milestone": "title",
-                "milestone_id": "id",
-            }
-            if "milestone_due_date" in available_cols:
-                rename_map["milestone_due_date"] = "due_date"
-            if "milestone_start_date" in available_cols:
-                rename_map["milestone_start_date"] = "start_date"
-
-            ms_agg = ms_agg.rename(columns=rename_map)
-
-            # Ensure required columns exist even if missing from source
-            if "due_date" not in ms_agg.columns:
-                ms_agg["due_date"] = pd.NaT
-            if "start_date" not in ms_agg.columns:
-                ms_agg["start_date"] = pd.NaT
-
-            display_df = ms_agg
-
-    if display_df is None or display_df.empty:
-        st.info("No milestones to display.")
-        return None
-
-    now = pd.Timestamp.now(tz="UTC")
-
-    # Calculate issue completion per milestone
-    milestone_issue_stats = {}
-    if not issues_df.empty and "milestone_id" in issues_df.columns:
-        for ms_id in display_df["id"].unique():
-            ms_issues = issues_df[issues_df["milestone_id"] == ms_id]
-            total = len(ms_issues)
-            closed = len(ms_issues[ms_issues["state"] == "closed"])
-            milestone_issue_stats[ms_id] = {"total": total, "closed": closed}
-
     # Prepare scatter data
     # Resolve background color once for marker outline "floating" effect
     bg_color = get_streamlit_theme_color(
@@ -152,7 +85,6 @@ def milestone_timeline(
         all_issues_closed = stats["total"] > 0 and stats["closed"] == stats["total"]
 
         # Highlight logic from config (e.g. linked to sidebar)
-        highlight_title = config.get("highlight_milestone")
         is_highlighted = title == highlight_title
         has_highlight = bool(highlight_title)
 
@@ -203,7 +135,6 @@ def milestone_timeline(
         })
 
     if not scatter_data:
-        st.info("No milestones to display.")
         return None
 
     chart_df = pd.DataFrame(scatter_data)
@@ -371,7 +302,7 @@ def milestone_timeline(
                     color=with_alpha(palette["neutral"], 0.8),
                 ),
             )
-        title = config.get("title")
+        title = rail_title
         if title:
             fig.add_annotation(
                 x=0,
@@ -420,6 +351,107 @@ def milestone_timeline(
                 showarrow=False,
                 font=dict(size=10, color=get_plotly_font_color()),
             )
+    return fig
+
+
+def milestone_timeline(
+    issues_df: pd.DataFrame,
+    config: dict[str, Any] | None = None
+) -> dict | None:
+    """Render milestone timeline as a scatter plot with markers.
+
+    Args:
+        issues_df: DataFrame with all issues (needed for completion stats)
+        config: Optional configuration
+            - key: widget key
+            - height: chart height in pixels
+            - style: ``"default"`` or ``"rail"``, a thin band with a centre
+              rail, round markers alternating above and below it, and a
+              "NOW" line
+            - title: rail style only, a small label at the top left
+
+    Returns:
+        Selection state dictionary (if supported) or None
+    """
+    config = config or {}
+    widget_key = config.get("key", "milestone_timeline")
+    rail = config.get("style") == "rail"
+    raw_height = config.get("height", 160)
+    timeline_height = max(80, min(int(raw_height), 320))
+
+    display_df = None
+
+    # Extract from Issues (e.g. for Subprojects/Groups)
+    if (display_df is None or display_df.empty) and not issues_df.empty and "milestone_id" in issues_df.columns:
+        # Group by milestone title/id to reconstruct milestone metadata
+        # We need id, title, due_date, start_date, state
+
+        # Ensure we have the necessary columns
+        available_cols = issues_df.columns
+        agg_dict = {
+            "milestone_id": "first",
+            "state": lambda x: "closed" if (x == "closed").all() else "active"
+        }
+
+        if "milestone_due_date" in available_cols:
+            agg_dict["milestone_due_date"] = "first"
+        if "milestone_start_date" in available_cols:
+            agg_dict["milestone_start_date"] = "first"
+
+        # Group by milestone title (as it's usually reliable)
+        if "milestone" in available_cols:
+            ms_agg = issues_df[issues_df["milestone"].notna()].groupby("milestone").agg(agg_dict).reset_index()
+
+            # Rename to match expected schema
+            rename_map = {
+                "milestone": "title",
+                "milestone_id": "id",
+            }
+            if "milestone_due_date" in available_cols:
+                rename_map["milestone_due_date"] = "due_date"
+            if "milestone_start_date" in available_cols:
+                rename_map["milestone_start_date"] = "start_date"
+
+            ms_agg = ms_agg.rename(columns=rename_map)
+
+            # Ensure required columns exist even if missing from source
+            if "due_date" not in ms_agg.columns:
+                ms_agg["due_date"] = pd.NaT
+            if "start_date" not in ms_agg.columns:
+                ms_agg["start_date"] = pd.NaT
+
+            display_df = ms_agg
+
+    if display_df is None or display_df.empty:
+        st.info("No milestones to display.")
+        return None
+
+    # Whole minutes, so the figure is reused between runs.
+    now = pd.Timestamp.now(tz="UTC").floor("min")
+
+    # Calculate issue completion per milestone
+    milestone_issue_stats = {}
+    if not issues_df.empty and "milestone_id" in issues_df.columns:
+        closed = issues_df["state"].eq("closed")
+        counts = closed.groupby(issues_df["milestone_id"]).agg(["size", "sum"])
+        milestone_issue_stats = {
+            ms_id: {"total": int(total), "closed": int(n_closed)}
+            for ms_id, total, n_closed in counts.itertuples()
+        }
+
+    fig = _figure(
+        display_df,
+        milestone_issue_stats,
+        now,
+        config.get("highlight_milestone"),
+        rail,
+        timeline_height,
+        config.get("title"),
+        theme_key(),
+    )
+    if fig is None:
+        st.info("No milestones to display.")
+        return None
 
     show_modebar = st.session_state.get("show_chart_controls", False)
 
