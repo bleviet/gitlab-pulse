@@ -23,6 +23,64 @@ from app.dashboard.theme import (
 ALL_ISSUES = "__all__"
 
 
+def _value_label(
+    value: int, start: float, sweep: float, height: int, hole: float
+) -> tuple[float, int] | None:
+    """Place a slice value inside its ring segment, or hide it.
+
+    The label is modelled as a horizontal box ``0.6 em`` wide per digit and
+    ``1.2 em`` tall (measured from a rendered chart), 1 px clear of the ring
+    edges and of the 2 px slice separators. Nine positions along the slice are
+    tried with sizes from 12 down to 8 px; the largest size wins, then the
+    position closest to the slice middle.
+
+    Args:
+        value: The slice's issue count.
+        start: Slice start angle in degrees, clockwise from 12 o'clock.
+        sweep: Slice angular width in degrees.
+        height: Chart height in px (the axes span +-1.08 within 10 px margins).
+        hole: Inner radius as a fraction of the outer radius.
+
+    Returns:
+        ``(angle, font size)`` of the label centre, or ``None`` when no
+        position fits at 8 px (the hover still shows the value).
+    """
+    outer = (height - 20) / 2.16
+    inner = hole * outer
+    pad = math.degrees(1 / inner)
+    middle = start + sweep / 2
+    text_length = len(str(value))
+    best: tuple[int, float, float] | None = None
+    for i in range(9):
+        angle = start + sweep * (i + 0.5) / 9
+        cx = (outer + inner) / 2 * math.sin(math.radians(angle))
+        cy = (outer + inner) / 2 * math.cos(math.radians(angle))
+        for size in range(12, 7, -1):
+            half_w, half_h = 0.3 * size * text_length, 0.6 * size
+            nearest = math.hypot(
+                max(abs(cx) - half_w, 0.0), max(abs(cy) - half_h, 0.0)
+            )
+            corners = [
+                (cx + dx, cy + dy) for dx in (-half_w, half_w) for dy in (-half_h, half_h)
+            ]
+            offsets = [
+                (math.degrees(math.atan2(x, y)) - middle + 180) % 360 - 180
+                for x, y in corners
+            ]
+            if (
+                nearest >= inner + 1
+                and all(math.hypot(x, y) <= outer - 1 for x, y in corners)
+                and all(abs(offset) <= sweep / 2 - pad for offset in offsets)
+            ):
+                distance = abs(angle - middle)
+                if best is None or size > best[0] or (
+                    size == best[0] and distance < best[1]
+                ):
+                    best = (size, distance, angle)
+                break
+    return None if best is None else (best[2], best[0])
+
+
 @cache_figure
 def _figure(
     labels: list[str],
@@ -95,14 +153,21 @@ def _figure(
         hovertemplate="%{customdata[0]}: %{customdata[1]}<extra></extra>",
         showlegend=False,
     ))
-    # Slice values, at the middle of each segment.
-    middles = [ring_point(start + sweep / 2, (1 + hole) / 2) for start, sweep in zip(starts, sweeps, strict=True)]
+    # Slice values, inside each segment where they fit.
+    labels_at = [
+        _value_label(value, start, sweep, height, hole)
+        for value, start, sweep in zip(values, starts, sweeps, strict=True)
+    ]
+    points = [
+        ring_point(placed[0] if placed else start, (1 + hole) / 2)
+        for placed, start in zip(labels_at, starts, strict=True)
+    ]
     fig.add_trace(go.Scatter(
-        x=[x for x, _ in middles],
-        y=[y for _, y in middles],
+        x=[x for x, _ in points],
+        y=[y for _, y in points],
         mode="text",
-        text=[str(value) if sweep >= 18 else "" for value, sweep in zip(values, sweeps, strict=True)],
-        textfont=dict(color="#ffffff", size=12),
+        text=[str(value) if placed else "" for value, placed in zip(values, labels_at, strict=True)],
+        textfont=dict(color="#ffffff", size=[placed[1] if placed else 8 for placed in labels_at]),
         hoverinfo="skip",
         showlegend=False,
     ))
