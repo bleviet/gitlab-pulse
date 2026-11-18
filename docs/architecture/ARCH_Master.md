@@ -80,8 +80,7 @@ We replaced Streamlit with a thin FastAPI backend and a React/TypeScript SPA so 
 
 ### 4.2 Active views
 
-- **Analytics** (default): release timeline, priority donuts, quality signals, 7-day velocity line, workflow-state priority bars, and the synchronized issue panel.
-- **Compact** (`?view=compact`): release timeline rail, summary filter pills, inline `Ctrl/Cmd+K` search, and the issue table/board.
+- **Overview workspace (`OverviewWorkspace`)**: single-viewport (`100vh`) workspace with a persistent Release Timeline rail, a `Charts` toggle (default ON; `?view=compact` when hidden), interactive SVG analytics cards (or `SummaryBar` quick-filter pills when charts are hidden), named filter chips, inline `Ctrl/Cmd+K` search, and the issue table/board.
 - **Admin Operations modal**: password-gated cookie session for triggering the Layer 1 collector, Layer 2 processor, and server cache invalidation.
 
 The legacy experimental Custom View layout builder has been removed.

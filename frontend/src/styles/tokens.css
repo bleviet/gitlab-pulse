@@ -35,9 +35,9 @@
   --shadow-card: 0 4px 18px rgba(0, 0, 0, 0.3);
   --grid-opacity: 0.28;
 
-  --r: 16px;
+  --r: 14px;
   --r-sm: 10px;
-  --nav-height: 52px;
+  --nav-height: 44px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   --chart-1: #4facfe;

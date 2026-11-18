@@ -1,24 +1,24 @@
-import { BarChart3, KanbanSquare, Moon, PanelLeft, Shield, Sun } from "lucide-react";
-import type { OverviewLayout, ThemeMode } from "../lib/types";
+import { BarChart3, Moon, PanelLeft, Shield, Sun } from "lucide-react";
+import type { ThemeMode } from "../lib/types";
 
 interface TopBarProps {
-  layout: OverviewLayout;
+  chartsVisible: boolean;
   theme: ThemeMode;
   activeSidebarCount: number;
   isAdmin: boolean;
   onToggleSidebar: () => void;
-  onChangeLayout: (layout: OverviewLayout) => void;
+  onToggleCharts: () => void;
   onToggleTheme: () => void;
   onOpenAdmin: () => void;
 }
 
 export function TopBar({
-  layout,
+  chartsVisible,
   theme,
   activeSidebarCount,
   isAdmin,
   onToggleSidebar,
-  onChangeLayout,
+  onToggleCharts,
   onToggleTheme,
   onOpenAdmin,
 }: TopBarProps) {
@@ -51,24 +51,16 @@ export function TopBar({
       </div>
 
       <div className="pulse-topbar-right">
-        <div className="pulse-segmented" role="group" aria-label="Overview layout">
-          <button
-            type="button"
-            aria-pressed={layout === "analytics"}
-            onClick={() => onChangeLayout("analytics")}
-          >
-            <BarChart3 size={14} />
-            <span>Analytics</span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={layout === "compact"}
-            onClick={() => onChangeLayout("compact")}
-          >
-            <KanbanSquare size={14} />
-            <span>Compact</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="pulse-icon-btn pulse-toggle-btn"
+          aria-pressed={chartsVisible}
+          onClick={onToggleCharts}
+          title={chartsVisible ? "Hide analytics charts" : "Show analytics charts"}
+        >
+          <BarChart3 size={14} />
+          <span>Charts</span>
+        </button>
 
         <button
           type="button"

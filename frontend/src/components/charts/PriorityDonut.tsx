@@ -1,18 +1,19 @@
-import { useMemo, useState } from "react";
-import { buildPriorityDonutData } from "../../lib/analytics";
-import type { IssueItem, ThemeMode } from "../../lib/types";
+import { useState } from "react";
+import type { DonutModel } from "../../lib/analytics";
+import { contrastTextForHex } from "../../lib/colors";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
 interface PriorityDonutProps {
-  issues: IssueItem[];
-  stateFilter: "opened" | "closed";
+  model: DonutModel;
   centerCaption: string;
-  palette: Record<string, string>;
-  priorityOrder: string[];
-  theme: ThemeMode;
-  activePriority: string | null;
+  ariaLabel: string;
+  emptyMessage: string;
+  centerTooltipSubject: string;
+  size?: number;
+  activeSlice: string | null;
   isCenterSelected: boolean;
-  onSelectSlice: (priority: string) => void;
+  showLegend?: boolean;
+  onSelectSlice: (label: string) => void;
   onSelectCenter: () => void;
 }
 
@@ -49,47 +50,44 @@ function donutArcPath(
 }
 
 export function PriorityDonut({
-  issues,
-  stateFilter,
+  model,
   centerCaption,
-  palette,
-  priorityOrder,
-  theme,
-  activePriority,
+  ariaLabel,
+  emptyMessage,
+  centerTooltipSubject,
+  size = 112,
+  activeSlice,
   isCenterSelected,
+  showLegend = true,
   onSelectSlice,
   onSelectCenter,
 }: PriorityDonutProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  const model = useMemo(
-    () => buildPriorityDonutData(issues, stateFilter, palette, priorityOrder, theme),
-    [issues, stateFilter, palette, priorityOrder, theme],
-  );
-
   if (model.total === 0) {
     return (
       <div
         style={{
-          height: "152px",
+          height: `${size}px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           color: "var(--muted)",
-          fontSize: "0.82rem",
+          fontSize: "0.78rem",
         }}
       >
-        No {stateFilter} issues.
+        {emptyMessage}
       </div>
     );
   }
 
-  const size = 152;
   const cx = size / 2;
   const cy = size / 2;
-  const outerR = 66;
-  const innerR = 39;
+  const outerR = Math.round(size * 0.46);
+  const innerR = Math.round(size * 0.25);
+
+  const sliceFont = size >= 120 ? 8.5 : 8;
 
   let cursor = 0;
   const segments = model.slices.map((slice) => {
@@ -99,17 +97,19 @@ export function PriorityDonut({
     cursor = endDeg;
     const midDeg = startDeg + sweep / 2;
     const isHovered = hovered === slice.label;
-    const isSelected = activePriority !== null && activePriority.toLowerCase() === slice.label.toLowerCase();
+    const isSelected = activeSlice !== null && activeSlice.toLowerCase() === slice.label.toLowerCase();
     const isDimmed =
       !isCenterSelected &&
-      activePriority !== null &&
-      activePriority.toLowerCase() !== slice.label.toLowerCase();
+      activeSlice !== null &&
+      activeSlice.toLowerCase() !== slice.label.toLowerCase();
 
-    const shift = isHovered ? 5 : 0;
+    const shift = isHovered ? 4 : 0;
     const shiftVec = polarToCartesian(0, 0, shift, midDeg);
     const labelPos = polarToCartesian(cx, cy, (outerR + innerR) / 2, midDeg);
     const arcPx = ((sweep * Math.PI) / 180) * ((outerR + innerR) / 2);
-    const showLabel = arcPx >= 16;
+    const labelWidth = String(slice.count).length * (sliceFont * 0.62) + 4;
+    const showLabel =
+      arcPx >= Math.max(16, labelWidth) && outerR - innerR - 3 >= labelWidth * 0.85;
 
     return {
       ...slice,
@@ -124,14 +124,24 @@ export function PriorityDonut({
   });
 
   const captionLines = centerCaption.split("\n");
+  const totalFont = Math.max(14, Math.round(size * 0.135));
+  const captionFont = Math.max(7, Number((size * 0.062).toFixed(1)));
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "152px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "0.3rem",
+        minWidth: 0,
+      }}
+    >
       <svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        aria-label={`${stateFilter} issues by priority donut chart`}
+        aria-label={ariaLabel}
         role="img"
         style={{ overflow: "visible" }}
       >
@@ -180,7 +190,7 @@ export function PriorityDonut({
               d={donutArcPath(cx, cy, outerR, innerR, seg.startDeg, seg.endDeg)}
               fill={seg.color}
               stroke="var(--chart-bg)"
-              strokeWidth={2}
+              strokeWidth={1.5}
             />
             {seg.showLabel && (
               <text
@@ -188,10 +198,11 @@ export function PriorityDonut({
                 y={seg.labelPos.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fill="#ffffff"
-                fontSize={10}
+                fill={contrastTextForHex(seg.color)}
+                fontSize={sliceFont}
                 fontWeight={700}
                 fontFamily="var(--font-mono)"
+                letterSpacing="-0.03em"
                 style={{ pointerEvents: "none" }}
               >
                 {seg.count}
@@ -204,7 +215,7 @@ export function PriorityDonut({
         <g
           tabIndex={0}
           role="button"
-          aria-label={`Select all ${stateFilter} issues (${model.total})`}
+          aria-label={`Select all ${centerTooltipSubject} issues (${model.total})`}
           aria-pressed={isCenterSelected}
           style={{ cursor: "pointer" }}
           onClick={onSelectCenter}
@@ -220,7 +231,7 @@ export function PriorityDonut({
               y: e.clientY,
               content: (
                 <div>
-                  Click to filter all <strong>{stateFilter}</strong> issues ({model.total})
+                  Click to filter all <strong>{centerTooltipSubject}</strong> issues ({model.total})
                 </div>
               ),
             })
@@ -240,13 +251,13 @@ export function PriorityDonut({
           />
           <text
             x={cx}
-            y={cy - (captionLines.length > 1 ? 10 : 6)}
+            y={cy - (captionLines.length > 1 ? 8 : 5)}
             textAnchor="middle"
             dominantBaseline="central"
             fill="var(--heading)"
             fontFamily="var(--font-display)"
             fontWeight={700}
-            fontSize={20}
+            fontSize={totalFont}
           >
             {model.total}
           </text>
@@ -254,13 +265,13 @@ export function PriorityDonut({
             <text
               key={line}
               x={cx}
-              y={cy + 9 + idx * 10}
+              y={cy + 6.5 + idx * 8.5}
               textAnchor="middle"
               dominantBaseline="central"
               fill="var(--muted)"
               fontFamily="var(--font-body)"
               fontWeight={600}
-              fontSize={8.5}
+              fontSize={captionFont}
               letterSpacing="0.06em"
             >
               {line}
@@ -268,6 +279,53 @@ export function PriorityDonut({
           ))}
         </g>
       </svg>
+
+      {showLegend && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "0.18rem 0.48rem",
+            maxWidth: "100%",
+          }}
+        >
+          {segments.map((seg) => (
+            <button
+              key={seg.label}
+              type="button"
+              aria-pressed={seg.isSelected}
+              onClick={() => onSelectSlice(seg.label)}
+              style={{
+                border: "none",
+                background: "transparent",
+                padding: "0 2px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.24rem",
+                cursor: "pointer",
+                fontSize: "0.68rem",
+                lineHeight: 1.3,
+                color: seg.isSelected ? "var(--heading)" : "var(--muted)",
+                fontWeight: seg.isSelected ? 700 : 500,
+                opacity: seg.isDimmed ? 0.35 : 1,
+                transition: "opacity 0.16s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  background: seg.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span>{seg.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <ChartTooltip tooltip={tooltip} />
     </div>
   );

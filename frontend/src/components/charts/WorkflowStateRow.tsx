@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { buildStagePriorityBars } from "../../lib/analytics";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildStagePriorityBars, type StageBarBucket } from "../../lib/analytics";
+import { contrastTextForHex } from "../../lib/colors";
 import type { IssueItem, ThemeMode } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
@@ -12,7 +13,12 @@ interface WorkflowStateRowProps {
   activeStage: string | null;
   activePriority: string | null;
   isStageChartFilterActive: boolean;
-  onSelectBar: (stage: string, priority: string) => void;
+  onSelectBar: (
+    stage: string,
+    priority: string,
+    filterState: "opened" | "closed" | "all",
+  ) => void;
+  onSelectStage?: (stage: string, filterState: "opened" | "closed" | "all") => void;
 }
 
 export function WorkflowStateRow({
@@ -25,8 +31,26 @@ export function WorkflowStateRow({
   activePriority,
   isStageChartFilterActive,
   onSelectBar,
+  onSelectStage,
 }: WorkflowStateRowProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(340);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth || 340);
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(Math.round(entry.contentRect.width));
+        }
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const buckets = useMemo(
     () => buildStagePriorityBars(issues, stages, palette, priorityOrder, theme),
@@ -35,166 +59,177 @@ export function WorkflowStateRow({
 
   if (buckets.length === 0) {
     return (
-      <div style={{ color: "var(--muted)", fontSize: "0.84rem", padding: "0.5rem 0" }}>
+      <div
+        ref={listRef}
+        style={{ color: "var(--muted)", fontSize: "0.78rem", padding: "0.4rem 0" }}
+      >
         No stage data available.
       </div>
     );
   }
 
-  return (
-    <div style={{ overflowX: "auto" }}>
+  const openBuckets = buckets.filter((b) => !b.isClosedOnly);
+  const closedBuckets = buckets.filter((b) => b.isClosedOnly);
+  const maxOpenTotal = Math.max(...openBuckets.map((b) => b.total), 1);
+  const maxClosedTotal = Math.max(...closedBuckets.map((b) => b.total), 1);
+  const trackPx = Math.max(containerWidth - 96 - 38 - 14, 80);
+
+  const renderRow = (bucket: StageBarBucket, scaleMax: number) => {
+    const stageMatches = activeStage === bucket.stage;
+    const stageDimmed = isStageChartFilterActive && !stageMatches;
+
+    return (
       <div
+        key={bucket.stage}
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${buckets.length}, minmax(15rem, 1fr))`,
-          gap: "0.65rem",
+          gridTemplateColumns: "minmax(84px, 96px) 1fr 38px",
+          alignItems: "center",
+          gap: "0.45rem",
+          opacity: stageDimmed ? 0.24 : 1,
+          transition: "opacity 0.16s ease",
         }}
-        aria-label="Issues by workflow state"
       >
-        {buckets.map((bucket) => {
-          const maxCount = Math.max(...bucket.bars.map((b) => b.count), 1);
-          const stageMatches = activeStage === bucket.stage;
-          const stageDimmed = isStageChartFilterActive && !stageMatches;
+        <button
+          type="button"
+          title={`${bucket.stage} (${bucket.total})`}
+          aria-pressed={stageMatches && activePriority === null}
+          onClick={() => onSelectStage?.(bucket.stage, bucket.filterState)}
+          style={{
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            textAlign: "left",
+            cursor: onSelectStage ? "pointer" : "default",
+            fontSize: "0.74rem",
+            fontWeight: stageMatches ? 700 : 500,
+            color: stageMatches ? "var(--accent)" : bucket.isClosedOnly ? "var(--muted)" : "var(--text)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {bucket.stage}
+        </button>
 
-          return (
-            <div
-              key={bucket.stage}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.3rem",
-                opacity: stageDimmed ? 0.25 : 1,
-                transition: "opacity 0.16s ease",
-              }}
-            >
-              <div
+        <div
+          style={{
+            height: "18px",
+            borderRadius: "5px",
+            background: "var(--chart-grid)",
+            display: "flex",
+            alignItems: "stretch",
+            gap: "1px",
+            overflow: "hidden",
+          }}
+        >
+          {bucket.bars.map((bar) => {
+            const widthPct = Math.max((bar.count / scaleMax) * 100, 2);
+            const segmentPx = (widthPct / 100) * trackPx;
+            const countStr = String(bar.count);
+            const showCount = segmentPx >= countStr.length * 6 + 8;
+            const isSelected =
+              stageMatches &&
+              activePriority !== null &&
+              activePriority.toLowerCase() === bar.priority.toLowerCase();
+            const barDimmed =
+              stageMatches &&
+              activePriority !== null &&
+              activePriority.toLowerCase() !== bar.priority.toLowerCase();
+            const stateWord = bucket.isClosedOnly
+              ? "closed "
+              : bucket.filterState === "all"
+                ? ""
+                : "open ";
+
+            return (
+              <button
+                key={bar.priority}
+                type="button"
+                aria-label={`${bucket.stage}, ${bar.priority}: ${bar.count} ${stateWord}issues`}
+                aria-pressed={isSelected}
+                onClick={() => onSelectBar(bucket.stage, bar.priority, bucket.filterState)}
+                onMouseEnter={(e) =>
+                  setTooltip({
+                    x: e.clientX,
+                    y: e.clientY,
+                    content: (
+                      <div>
+                        <strong>{bucket.stage}</strong>
+                        {bucket.isClosedOnly ? " (Closed)" : ""} · {bar.priority}: {bar.count}
+                      </div>
+                    ),
+                  })
+                }
+                onMouseMove={(e) =>
+                  setTooltip((prev) =>
+                    prev ? { ...prev, x: e.clientX, y: e.clientY } : null,
+                  )
+                }
+                onMouseLeave={() => setTooltip(null)}
                 style={{
-                  textAlign: "center",
-                  fontSize: "0.72rem",
+                  width: `${widthPct}%`,
+                  minWidth: "5px",
+                  height: "100%",
+                  border: "none",
+                  padding: 0,
+                  background: bar.color,
+                  color: contrastTextForHex(bar.color),
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.62rem",
                   fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  color: stageMatches ? "var(--accent)" : "var(--muted)",
-                  textTransform: "uppercase",
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  opacity: barDimmed ? 0.24 : 1,
+                  outline: isSelected ? "2px solid var(--heading)" : "none",
+                  outlineOffset: "-2px",
+                  transition: "opacity 0.16s ease",
                 }}
               >
-                {bucket.stage}
-              </div>
+                {showCount ? countStr : null}
+              </button>
+            );
+          })}
+        </div>
 
-              {bucket.bars.length === 0 ? (
-                <div
-                  style={{
-                    height: "92px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--muted)",
-                    fontSize: "0.76rem",
-                  }}
-                >
-                  No issues
-                </div>
-              ) : (
-                <div
-                  style={{
-                    height: "92px",
-                    display: "flex",
-                    alignItems: "flex-end",
-                    justifyContent: "center",
-                    gap: "0.45rem",
-                    paddingTop: "18px",
-                  }}
-                >
-                  {bucket.bars.map((bar) => {
-                    const barHeightPct = Math.max((bar.count / maxCount) * 100, 10);
-                    const isSelected =
-                      stageMatches &&
-                      activePriority !== null &&
-                      activePriority.toLowerCase() === bar.priority.toLowerCase();
-                    const barDimmed =
-                      stageMatches &&
-                      activePriority !== null &&
-                      activePriority.toLowerCase() !== bar.priority.toLowerCase();
-
-                    return (
-                      <button
-                        key={bar.priority}
-                        type="button"
-                        aria-label={`${bucket.stage}, ${bar.priority}: ${bar.count} open issues`}
-                        aria-pressed={isSelected}
-                        onClick={() => onSelectBar(bucket.stage, bar.priority)}
-                        onMouseEnter={(e) =>
-                          setTooltip({
-                            x: e.clientX,
-                            y: e.clientY,
-                            content: (
-                              <div>
-                                <strong>{bucket.stage}</strong> · {bar.priority}: {bar.count}
-                              </div>
-                            ),
-                          })
-                        }
-                        onMouseMove={(e) =>
-                          setTooltip((prev) =>
-                            prev ? { ...prev, x: e.clientX, y: e.clientY } : null,
-                          )
-                        }
-                        onMouseLeave={() => setTooltip(null)}
-                        style={{
-                          flex: "0 1 38px",
-                          minWidth: "24px",
-                          height: "100%",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "flex-end",
-                          gap: "3px",
-                          border: "none",
-                          background: "transparent",
-                          padding: 0,
-                          cursor: "pointer",
-                          opacity: barDimmed ? 0.25 : 1,
-                          transition: "opacity 0.16s ease",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: "0.7rem",
-                            fontWeight: 700,
-                            color: "var(--heading)",
-                            lineHeight: 1,
-                          }}
-                        >
-                          {bar.count}
-                        </span>
-                        <div
-                          style={{
-                            width: "100%",
-                            height: `${barHeightPct * 0.56}%`,
-                            minHeight: "6px",
-                            borderRadius: "5px 5px 2px 2px",
-                            background: bar.color,
-                            outline: isSelected ? "2px solid var(--heading)" : "none",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "0.68rem",
-                            color: "var(--muted)",
-                            lineHeight: 1.1,
-                          }}
-                        >
-                          {bar.priority}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.73rem",
+            fontWeight: 700,
+            color: bucket.isClosedOnly ? "var(--muted)" : "var(--heading)",
+            textAlign: "right",
+          }}
+        >
+          {bucket.total}
+        </span>
       </div>
+    );
+  };
+
+  return (
+    <div
+      ref={listRef}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.34rem",
+      }}
+      aria-label="Issues by workflow state"
+    >
+      {openBuckets.map((bucket) => renderRow(bucket, maxOpenTotal))}
+      {openBuckets.length > 0 && closedBuckets.length > 0 && (
+        <div
+          aria-hidden="true"
+          style={{ borderTop: "1px dashed var(--line-strong)", margin: "0.12rem 0" }}
+        />
+      )}
+      {closedBuckets.map((bucket) => renderRow(bucket, maxClosedTotal))}
       <ChartTooltip tooltip={tooltip} />
     </div>
   );

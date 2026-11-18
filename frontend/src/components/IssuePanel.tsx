@@ -3,13 +3,11 @@ import { ChevronLeft, ChevronRight, KanbanSquare, Table2, X } from "lucide-react
 import { getBoardLanes } from "../lib/board";
 import { applyFacets, buildFacetChips, withoutFacet } from "../lib/facets";
 import type {
-  ActiveChartId,
   GlobalFilters,
   IssueFacets,
   IssueItem,
   IssueViewMode,
   LabelStyle,
-  OverviewLayout,
   ThemeMode,
 } from "../lib/types";
 import { IssueBoard } from "./IssueBoard";
@@ -23,19 +21,17 @@ interface IssuePanelProps {
   globalFilters: GlobalFilters;
   defaultStartDate: string;
   defaultEndDate: string;
-  layout: OverviewLayout;
-  activeChart: ActiveChartId;
-  showFilters: boolean;
-  laneHeaders: boolean;
+  chartsVisible: boolean;
+  viewMode: IssueViewMode;
   labelStyles: Record<string, LabelStyle>;
   palette: Record<string, string>;
   priorityOrder: string[];
   theme: ThemeMode;
-  toolbarLeft?: ReactNode;
+  summaryBar?: ReactNode;
+  onChangeViewMode: (mode: IssueViewMode) => void;
   onChangeFacets: (next: IssueFacets) => void;
   onRemoveSidebarFilter: (key: string) => void;
   onClearAll: () => void;
-  onClearChartFilter: () => void;
 }
 
 type TablePageSize = "fit" | 10 | 20 | 30;
@@ -48,27 +44,25 @@ export function IssuePanel({
   globalFilters,
   defaultStartDate,
   defaultEndDate,
-  layout,
-  activeChart,
-  showFilters,
-  laneHeaders,
+  chartsVisible,
+  viewMode,
   labelStyles,
   palette,
   priorityOrder,
   theme,
-  toolbarLeft,
+  summaryBar,
+  onChangeViewMode,
   onChangeFacets,
   onRemoveSidebarFilter,
   onClearAll,
-  onClearChartFilter,
 }: IssuePanelProps) {
-  const [viewMode, setViewMode] = useState<IssueViewMode>("table");
   const [tableSize, setTableSize] = useState<TablePageSize>("fit");
   const [boardSize, setBoardSize] = useState<BoardPageSize>(10);
   const [pageIndex, setPageIndex] = useState(0);
-  const [fitRows, setFitRows] = useState(14);
+  const [fitRows, setFitRows] = useState(16);
   const panelRef = useRef<HTMLElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const filteredIssues = useMemo(() => applyFacets(issues, facets), [issues, facets]);
 
@@ -82,35 +76,43 @@ export function IssuePanel({
     [facets, globalFilters, defaultStartDate, defaultEndDate],
   );
 
-  // Compute responsive Fit row count from viewport height below the panel head
   useEffect(() => {
     const computeFit = () => {
       const headEl = headRef.current;
       if (headEl && panelRef.current) {
         panelRef.current.style.setProperty("--panel-head-h", `${headEl.offsetHeight}px`);
       }
+
+      if (bodyRef.current && window.innerWidth >= 768) {
+        const bodyHeight = bodyRef.current.clientHeight;
+        if (bodyHeight > 0) {
+          const count = Math.max(5, Math.min(100, Math.floor((bodyHeight - 33) / 31)));
+          setFitRows(count);
+          return;
+        }
+      }
+
       const rect = headEl?.getBoundingClientRect();
-      const topUsed = rect ? Math.min(rect.bottom, window.innerHeight * 0.6) : 220;
-      const available = Math.max(window.innerHeight - topUsed - 64, 185);
-      const count = Math.max(5, Math.min(100, Math.floor(available / 37)));
+      const topUsed = rect ? Math.min(rect.bottom, window.innerHeight * 0.6) : 200;
+      const available = Math.max(window.innerHeight - topUsed - 60, 180);
+      const count = Math.max(5, Math.min(100, Math.floor(available / 34)));
       setFitRows(count);
     };
 
     computeFit();
     window.addEventListener("resize", computeFit);
-    const el = headRef.current;
     let ro: ResizeObserver | null = null;
-    if (el && typeof ResizeObserver !== "undefined") {
+    if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(computeFit);
-      ro.observe(el);
+      if (headRef.current) ro.observe(headRef.current);
+      if (bodyRef.current) ro.observe(bodyRef.current);
     }
     return () => {
       window.removeEventListener("resize", computeFit);
       ro?.disconnect();
     };
-  }, [layout, viewMode, chips.length]);
+  }, [chartsVisible, viewMode, chips.length]);
 
-  // Calculate total items to page (total rows in Table, tallest lane card count in Board)
   const boardLanes = useMemo(
     () => getBoardLanes(overviewStages, filteredIssues),
     [overviewStages, filteredIssues],
@@ -132,7 +134,6 @@ export function IssuePanel({
   const pageStart = safePageIndex * pageSize;
   const pageStop = Math.min(pageStart + pageSize, pageTotalItems);
 
-  // Reset page index when filters or view change
   useEffect(() => {
     setPageIndex(0);
   }, [facets, globalFilters, viewMode, tableSize, boardSize]);
@@ -155,13 +156,41 @@ export function IssuePanel({
 
   return (
     <section ref={panelRef} className="issue-panel" aria-label="Issues">
-      <div
-        ref={headRef}
-        className={`issue-panel-sticky-head ${layout === "analytics" ? "below-workflow" : ""}`}
-      >
-        <div className="issue-toolbar">
-          {showFilters ? toolbarLeft : <div />}
-          <div className="issue-toolbar-actions">
+      <div ref={headRef} className="issue-panel-sticky-head">
+        {!chartsVisible && summaryBar && <div className="issue-summary-strip">{summaryBar}</div>}
+
+        <div className="issue-toolbar analytics-single-bar">
+          <div className="analytics-bar-left">
+            <span className="issue-count-caption">
+              {filteredIssues.length.toLocaleString()} issue
+              {filteredIssues.length === 1 ? "" : "s"}
+            </span>
+            {chips.map((chip) => (
+              <button
+                key={`${chip.kind}_${chip.key}`}
+                type="button"
+                className="filter-chip"
+                title="Remove filter"
+                onClick={() => {
+                  if (chip.kind === "facet") {
+                    onChangeFacets(withoutFacet(facets, chip.key as keyof IssueFacets));
+                  } else {
+                    onRemoveSidebarFilter(chip.key);
+                  }
+                }}
+              >
+                <span>{chip.label}</span>
+                <X size={12} aria-hidden="true" />
+              </button>
+            ))}
+            {chips.length > 0 && (
+              <button type="button" className="clear-all-btn" onClick={onClearAll}>
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className="analytics-bar-right">
             <IssueSearchInput
               value={facets.query ?? ""}
               onChange={(nextQuery) => {
@@ -172,11 +201,12 @@ export function IssuePanel({
                 }
               }}
             />
+
             <div className="pulse-segmented" role="group" aria-label="Issue display mode">
               <button
                 type="button"
                 aria-pressed={viewMode === "table"}
-                onClick={() => setViewMode("table")}
+                onClick={() => onChangeViewMode("table")}
               >
                 <Table2 size={14} />
                 <span>Table</span>
@@ -184,147 +214,105 @@ export function IssuePanel({
               <button
                 type="button"
                 aria-pressed={viewMode === "board"}
-                onClick={() => setViewMode("board")}
+                onClick={() => onChangeViewMode("board")}
               >
                 <KanbanSquare size={14} />
                 <span>Board</span>
               </button>
             </div>
-          </div>
-        </div>
 
-        <div className="issue-subbar">
-          <div className="issue-chips">
-            {showFilters &&
-              chips.map((chip) => (
-                <button
-                  key={`${chip.kind}_${chip.key}`}
-                  type="button"
-                  className="filter-chip"
-                  title="Remove filter"
-                  onClick={() => {
-                    if (chip.kind === "facet") {
-                      onChangeFacets(withoutFacet(facets, chip.key as keyof IssueFacets));
-                    } else {
-                      onRemoveSidebarFilter(chip.key);
-                    }
-                  }}
-                >
-                  <span>{chip.label}</span>
-                  <X size={12} aria-hidden="true" />
-                </button>
-              ))}
-            {showFilters && chips.length > 0 && (
-              <button type="button" className="clear-all-btn" onClick={onClearAll}>
-                Clear all
-              </button>
-            )}
-            {!showFilters && activeChart !== null && (
-              <button
-                type="button"
-                className="filter-chip"
-                onClick={onClearChartFilter}
-                title="Clear active chart filter"
-              >
-                <span>Chart filter active</span>
-                <X size={12} aria-hidden="true" />
-              </button>
-            )}
-            <span className="issue-count-caption">
-              {filteredIssues.length.toLocaleString()} issue
-              {filteredIssues.length === 1 ? "" : "s"}
-            </span>
-          </div>
+            <div className="issue-pager">
+              {viewMode === "table" ? (
+                <div className="pulse-segmented" role="group" aria-label="Rows per page">
+                  {(["fit", 10, 20, 30] as const).map((opt) => (
+                    <button
+                      key={String(opt)}
+                      type="button"
+                      aria-pressed={tableSize === opt}
+                      onClick={() => setTableSize(opt)}
+                    >
+                      {opt === "fit" ? "Fit" : opt}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="pulse-segmented" role="group" aria-label="Cards per lane">
+                  {([10, 20, 30] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      aria-pressed={boardSize === opt}
+                      onClick={() => setBoardSize(opt)}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-          <div className="issue-pager">
-            {viewMode === "table" ? (
-              <div className="pulse-segmented" role="group" aria-label="Rows per page">
-                {(["fit", 10, 20, 30] as const).map((opt) => (
+              <span className="issue-count-caption">
+                {viewMode === "table"
+                  ? pageTotalItems === 0
+                    ? "0 of 0"
+                    : `${pageStart + 1}–${pageStop} of ${pageTotalItems}`
+                  : `Page ${safePageIndex + 1} of ${totalPages}`}
+              </span>
+
+              {totalPages > 1 && (
+                <div style={{ display: "inline-flex", gap: "0.25rem" }}>
                   <button
-                    key={String(opt)}
                     type="button"
-                    aria-pressed={tableSize === opt}
-                    onClick={() => setTableSize(opt)}
+                    className="pager-btn"
+                    aria-label="Previous page"
+                    disabled={safePageIndex === 0}
+                    onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                   >
-                    {opt === "fit" ? "Fit" : opt}
+                    <ChevronLeft size={14} />
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div className="pulse-segmented" role="group" aria-label="Cards per lane">
-                {([10, 20, 30] as const).map((opt) => (
                   <button
-                    key={opt}
                     type="button"
-                    aria-pressed={boardSize === opt}
-                    onClick={() => setBoardSize(opt)}
+                    className="pager-btn"
+                    aria-label="Next page"
+                    disabled={safePageIndex >= totalPages - 1}
+                    onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
                   >
-                    {opt}
+                    <ChevronRight size={14} />
                   </button>
-                ))}
-              </div>
-            )}
-
-            <span className="issue-count-caption">
-              {viewMode === "table"
-                ? pageTotalItems === 0
-                  ? "0 of 0"
-                  : `${pageStart + 1}–${pageStop} of ${pageTotalItems}`
-                : `Page ${safePageIndex + 1} of ${totalPages}`}
-            </span>
-
-            {totalPages > 1 && (
-              <div style={{ display: "inline-flex", gap: "0.25rem" }}>
-                <button
-                  type="button"
-                  className="pager-btn"
-                  aria-label="Previous page"
-                  disabled={safePageIndex === 0}
-                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="pager-btn"
-                  aria-label="Next page"
-                  disabled={safePageIndex >= totalPages - 1}
-                  onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {viewMode === "table" ? (
-        <IssueTable
-          issues={filteredIssues}
-          facets={facets}
-          labelStyles={labelStyles}
-          palette={palette}
-          priorityOrder={priorityOrder}
-          theme={theme}
-          pageStart={pageStart}
-          pageStop={pageStop}
-        />
-      ) : (
-        <IssueBoard
-          issues={filteredIssues}
-          laneCountSource={laneCountSource}
-          overviewStages={overviewStages}
-          laneHeaders={laneHeaders}
-          facets={facets}
-          palette={palette}
-          priorityOrder={priorityOrder}
-          theme={theme}
-          pageStart={pageStart}
-          pageSize={pageSize}
-          onToggleLanePill={handleToggleLanePill}
-        />
-      )}
+      <div ref={bodyRef} className="issue-panel-body">
+        {viewMode === "table" ? (
+          <IssueTable
+            issues={filteredIssues}
+            facets={facets}
+            labelStyles={labelStyles}
+            palette={palette}
+            priorityOrder={priorityOrder}
+            theme={theme}
+            pageStart={pageStart}
+            pageStop={pageStop}
+          />
+        ) : (
+          <IssueBoard
+            issues={filteredIssues}
+            laneCountSource={laneCountSource}
+            overviewStages={overviewStages}
+            laneHeaders
+            facets={facets}
+            palette={palette}
+            priorityOrder={priorityOrder}
+            theme={theme}
+            pageStart={pageStart}
+            pageSize={pageSize}
+            onToggleLanePill={handleToggleLanePill}
+          />
+        )}
+      </div>
     </section>
   );
 }

@@ -34,9 +34,9 @@ export function IssueSearchInput({ value, onChange }: IssueSearchInputProps) {
       <Search size={14} className="pulse-search-icon" aria-hidden="true" />
       <input
         ref={inputRef}
-        type="search"
+        type="text"
         value={value}
-        placeholder={`Search issues  ${shortcut}`}
+        placeholder="Search issues"
         aria-label="Search issues"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -47,6 +47,11 @@ export function IssueSearchInput({ value, onChange }: IssueSearchInputProps) {
           }
         }}
       />
+      {!expanded && (
+        <kbd className="pulse-search-kbd" aria-hidden="true">
+          {shortcut}
+        </kbd>
+      )}
       {value && (
         <button
           type="button"

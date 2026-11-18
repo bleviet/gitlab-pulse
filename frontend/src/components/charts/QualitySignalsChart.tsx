@@ -23,12 +23,12 @@ export function QualitySignalsChart({
     return (
       <div
         style={{
-          height: "152px",
+          padding: "0.75rem 0",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           color: "var(--muted)",
-          fontSize: "0.82rem",
+          fontSize: "0.78rem",
         }}
       >
         No quality signals available
@@ -41,11 +41,10 @@ export function QualitySignalsChart({
   return (
     <div
       style={{
-        height: "152px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
-        gap: "0.65rem",
+        gap: "0.42rem",
       }}
       aria-label="Issue quality signals bar chart"
     >
@@ -76,12 +75,12 @@ export function QualitySignalsChart({
             onMouseLeave={() => setTooltip(null)}
             style={{
               display: "grid",
-              gridTemplateColumns: "110px 1fr 40px",
+              gridTemplateColumns: "minmax(88px, 108px) 1fr 34px",
               alignItems: "center",
-              gap: "0.55rem",
+              gap: "0.45rem",
               border: "none",
               background: "transparent",
-              padding: "2px 0",
+              padding: "1px 0",
               cursor: "pointer",
               textAlign: "left",
               opacity: isDimmed ? 0.3 : 1,
@@ -90,7 +89,7 @@ export function QualitySignalsChart({
           >
             <span
               style={{
-                fontSize: "0.78rem",
+                fontSize: "0.75rem",
                 color: isSelected ? "var(--heading)" : "var(--text)",
                 fontWeight: isSelected ? 700 : 500,
                 whiteSpace: "nowrap",
@@ -102,8 +101,8 @@ export function QualitySignalsChart({
             </span>
             <div
               style={{
-                height: "14px",
-                borderRadius: "6px",
+                height: "11px",
+                borderRadius: "5px",
                 background: "var(--chart-grid)",
                 overflow: "hidden",
                 outline: isSelected ? `1.5px solid ${bar.color}` : "none",
@@ -113,7 +112,7 @@ export function QualitySignalsChart({
                 style={{
                   width: `${pct}%`,
                   height: "100%",
-                  borderRadius: "6px",
+                  borderRadius: "5px",
                   background: bar.color,
                   transition: "width 0.25s var(--ease)",
                 }}
@@ -122,7 +121,7 @@ export function QualitySignalsChart({
             <span
               style={{
                 fontFamily: "var(--font-mono)",
-                fontSize: "0.78rem",
+                fontSize: "0.74rem",
                 fontWeight: 700,
                 color: "var(--heading)",
                 textAlign: "right",

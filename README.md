@@ -12,8 +12,8 @@ GitLab Pulse is a local-first analytics application for GitLab issue data. It ex
 
 ## Visual Insights
 
-### Two layouts
-Two layouts share one issue board. **Analytics** (default) shows the release timeline and the charts (priority, daily new vs. closed, quality signals, workflow state) above the board for reviews; **Compact** puts the board first for daily triage. Switch between them at the top right of the page. The filter and the layout are kept in the URL.
+### One workspace, toggleable charts
+GitLab Pulse renders a single-viewport Overview workspace with a persistent Release Timeline rail and a **Charts** toggle in the top bar. Keep **Charts** on (default) for visual breakdown across priority mix, quality signals, 7-day velocity, and workflow stage bars; toggle **Charts** off (`?view=compact`) to reveal the quick-filter summary pills and maximize space for the issue table or board. Filters and the charts toggle state are kept in the URL.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">

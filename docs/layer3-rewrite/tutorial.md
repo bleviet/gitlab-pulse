@@ -35,23 +35,23 @@ uv run python -m app.dashboard
 
 Open `http://127.0.0.1:8501` in your browser.
 
-## 4. Explore the Default Analytics View
+## 4. Explore the Default Workspace With Charts On
 
-The dashboard opens in **Analytics** (selected on the left side of the top-right `Analytics | Compact` switch):
+The dashboard opens in a single-viewport cockpit with the **Charts** toggle active in the top-right bar and the slim **Release Timeline** pinned at the top:
 
-1. **Release Timeline (top left):** Hover over any milestone pin to inspect its due date, closed/total issue count, and status (`Complete`, `Incomplete`, `On Track`, `Overdue`, or `Unscheduled`). Click a pin to filter the entire dashboard to that milestone; click the same pin again to clear the milestone filter.
-2. **Closed & Open Priority Donuts:** Click any priority slice (for example `P1`) to filter the issue list below to that state and priority. Click the center total (`OPEN ISSUES` or `CLOSED ISSUES`) to select all issues in that state.
-3. **Issue Quality Signals & Daily Velocity:** Click a bar in `Issue Quality Signals` (such as `Missing Milestone`) or a day point in `Daily New vs. Closed Issues` to filter the panel below. Notice the sibling elements dim and a `Chart filter active` chip appears above the table.
-4. **Issues by Workflow State:** Click a vertical bar under any stage column (such as `Review`). Only that stage and priority bar remain full opacity, and the issue table/board below filters immediately without a page reload.
+1. **Release Timeline (top strip):** Hover over any milestone pin to inspect its due date, closed/total issue count, and status (`Complete`, `Incomplete`, `On Track`, `Overdue`, or `Unscheduled`). Click a pin to filter the entire dashboard to that milestone; click the same pin again (or click its chip in the toolbar) to clear it.
+2. **Open Mix (Priority & Issue Type Donuts):** Click any slice or legend item in `OPEN PRIORITY` or `OPEN BY TYPE` (for example `P1` or `Bug`) to filter the issue list to open issues matching that priority or type. Click either center total to select all open issues.
+3. **Workflow State:** Click a horizontal priority segment—or a stage name—for any active open stage or closed terminal stage (`Done`) to filter the issue table/board immediately without a page reload.
+4. **Daily New vs. Closed & Issue Quality Signals:** Click a day point in `Daily New vs. Closed` (`New` includes all issues created that day; `Closed` filters closed issues) or a bar in `Issue Quality Signals` (`Open Hints`, such as `Missing Milestone`) to filter the issue panel. Sibling elements dim and named filter chips (such as `Signal: Missing Milestone`) appear directly in the issue toolbar.
 
-## 5. Switch to Compact View for Daily Triage
+## 5. Toggle Charts Off for High-Density Triage
 
-Click **Compact** on the right side of the top-right layout switch. Notice the URL updates to `?view=compact` while carrying over any active filters.
+Click **Charts** in the top-right bar to toggle the four analytics cards off. Notice the URL updates to `?view=compact` while keeping the slim Release Rail at the top and carrying over all active filter chips.
 
-1. **Summary Pills:** Use the `Flow` (`Open`, `New 7d`, `Closed 7d`), `Open by priority`, and `Hints` pills on the left of the toolbar to jump between common triage slices.
+1. **Summary Pills:** When Charts are off, the `Flow` (`Open`, `New 7d`, `Closed 7d`), `Open by priority`, and `Hints` pills appear automatically above the issue toolbar for 1-click triage filtering.
 2. **Inline Search (`Ctrl/Cmd+K`):** Press `Ctrl+K` (or `Cmd+K` on macOS). The search pill widens in place. Type a partial query across title, assignee, milestone, priority, or stage—if an exact multi-word match returns nothing, typo-tolerant fuzzy matching kicks in automatically. Press `Escape` to leave the search field.
 3. **Table and Board Switching:**
-   - In **Table** view, `Fit` sizing fills the available viewport height (use `10`, `20`, or `30` for fixed pages). Click column headers to sort or leave unsorted to view parent-child hierarchy indentation.
+   - In **Table** view, `Fit` sizing automatically fills the expanded height (use `10`, `20`, or `30` for fixed pages). Click column headers to sort or leave unsorted to view parent-child hierarchy indentation.
    - Click **Board** in the toolbar to switch to the Kanban lanes. Sticky lane headers display a stacked priority bar and clickable priority pills. Scroll horizontally on narrow screens—the lane headers remain aligned with the lanes below.
 
 ## 6. Use Filters, Themes, and Admin Operations

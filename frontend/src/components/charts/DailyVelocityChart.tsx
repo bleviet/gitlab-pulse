@@ -6,6 +6,7 @@ import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 interface DailyVelocityChartProps {
   issues: IssueItem[];
   palette: Record<string, string>;
+  height?: number;
   activeDay: string | null;
   activeDayKind: "created" | "closed" | null;
   onSelectPoint: (isoDate: string, kind: "created" | "closed") => void;
@@ -14,18 +15,19 @@ interface DailyVelocityChartProps {
 export function DailyVelocityChart({
   issues,
   palette,
+  height = 108,
   activeDay,
   activeDayKind,
   onSelectPoint,
 }: DailyVelocityChartProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(520);
+  const [width, setWidth] = useState(340);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    setWidth(el.clientWidth || 520);
+    setWidth(el.clientWidth || 340);
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.contentRect.width > 0) {
@@ -38,11 +40,10 @@ export function DailyVelocityChart({
   }, []);
 
   const days = useMemo(() => buildDailyVelocityData(issues), [issues]);
-  const height = 152;
   const padL = 28;
-  const padR = 20;
-  const padT = 26;
-  const padB = 26;
+  const padR = 28;
+  const padT = 22;
+  const padB = 22;
   const innerW = Math.max(width - padL - padR, 40);
   const innerH = height - padT - padB;
 
@@ -62,27 +63,6 @@ export function DailyVelocityChart({
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 4,
-          display: "flex",
-          gap: "0.85rem",
-          fontSize: "0.74rem",
-          color: "var(--muted)",
-          pointerEvents: "none",
-        }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: createdColor }} />
-          New
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: closedColor }} />
-          Closed
-        </span>
-      </div>
       <svg
         width="100%"
         height={height}
@@ -111,14 +91,29 @@ export function DailyVelocityChart({
           const isCreatedActive = activeDay === d.isoDate && activeDayKind === "created";
           const isClosedActive = activeDay === d.isoDate && activeDayKind === "closed";
 
+          let createdLabelY = Math.max(11, cyCreated - 8);
+          let closedLabelY = Math.max(11, cyClosed - 8);
+          if (d.created > 0 && d.closed > 0 && Math.abs(cyCreated - cyClosed) < 18) {
+            const topY = Math.min(cyCreated, cyClosed);
+            const createdIsUpper = cyCreated <= cyClosed;
+            if (topY >= 30) {
+              createdLabelY = createdIsUpper ? topY - 20 : topY - 8;
+              closedLabelY = createdIsUpper ? topY - 8 : topY - 20;
+            } else {
+              const bottomY = Math.max(cyCreated, cyClosed);
+              createdLabelY = createdIsUpper ? Math.max(11, topY - 8) : bottomY + 14;
+              closedLabelY = createdIsUpper ? bottomY + 14 : Math.max(11, topY - 8);
+            }
+          }
+
           return (
             <g key={d.isoDate}>
               <text
                 x={cx}
-                y={height - 6}
+                y={height - 4}
                 textAnchor="middle"
                 fill="var(--muted)"
-                fontSize={10}
+                fontSize={9}
                 fontFamily="var(--font-mono)"
               >
                 {d.label}
@@ -166,10 +161,10 @@ export function DailyVelocityChart({
                 {d.created > 0 && (
                   <text
                     x={cx}
-                    y={cyCreated - 9}
+                    y={createdLabelY}
                     textAnchor="middle"
-                    fill="var(--text)"
-                    fontSize={10}
+                    fill={createdColor}
+                    fontSize={9.5}
                     fontWeight={700}
                     fontFamily="var(--font-mono)"
                   >
@@ -220,10 +215,10 @@ export function DailyVelocityChart({
                 {d.closed > 0 && (
                   <text
                     x={cx}
-                    y={cyClosed + (Math.abs(cyClosed - cyCreated) < 14 ? 14 : -9)}
+                    y={closedLabelY}
                     textAnchor="middle"
-                    fill="var(--text)"
-                    fontSize={10}
+                    fill={closedColor}
+                    fontSize={9.5}
                     fontWeight={700}
                     fontFamily="var(--font-mono)"
                   >

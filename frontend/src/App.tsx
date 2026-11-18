@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminModal } from "./components/AdminModal";
-import { AnalyticsView } from "./components/AnalyticsView";
-import { ReleaseTimeline } from "./components/charts/ReleaseTimeline";
 import { IssuePanel } from "./components/IssuePanel";
+import { OverviewWorkspace } from "./components/OverviewWorkspace";
 import { SidebarDrawer } from "./components/SidebarDrawer";
 import { SummaryBar } from "./components/SummaryBar";
 import { TopBar } from "./components/TopBar";
@@ -12,7 +11,7 @@ import {
   fetchAdminStatus,
   fetchDashboard,
 } from "./lib/api";
-import { getOverviewStages } from "./lib/board";
+import { getOverviewStages, getWorkflowStages } from "./lib/board";
 import {
   applyGlobalFilters,
   applyPreMilestoneFilters,
@@ -25,7 +24,7 @@ import type {
   DashboardPayload,
   GlobalFilters,
   IssueFacets,
-  OverviewLayout,
+  IssueViewMode,
   ThemeMode,
 } from "./lib/types";
 
@@ -48,7 +47,8 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
-  const [layout, setLayout] = useState<OverviewLayout>(initialUrl.layout);
+  const [chartsVisible, setChartsVisible] = useState(initialUrl.chartsVisible);
+  const [viewMode, setViewMode] = useState<IssueViewMode>("table");
   const [summaryId, setSummaryId] = useState<string | null>(initialUrl.summaryId);
   const [facets, setFacets] = useState<IssueFacets>(initialUrl.facets);
   const [activeChart, setActiveChart] = useState<ActiveChartId>(null);
@@ -99,7 +99,6 @@ export function App() {
       .catch(() => setIsAdmin(false));
   }, [loadData]);
 
-  // Apply theme attribute & persist choice
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
@@ -109,20 +108,18 @@ export function App() {
     }
   }, [theme]);
 
-  // Sync URL query parameters without reloads
   useEffect(() => {
-    const nextSearch = buildUrlSearch(layout, summaryId, facets);
+    const nextSearch = buildUrlSearch(chartsVisible, summaryId, facets);
     if (window.location.search !== nextSearch) {
       const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
       window.history.replaceState(null, "", nextUrl);
     }
-  }, [layout, summaryId, facets]);
+  }, [chartsVisible, summaryId, facets]);
 
-  // Handle browser Back / Forward
   useEffect(() => {
     const onPopState = () => {
       const parsed = parseUrlState(window.location.search);
-      setLayout(parsed.layout);
+      setChartsVisible(parsed.chartsVisible);
       setSummaryId(parsed.summaryId);
       setFacets(parsed.facets);
     };
@@ -151,6 +148,7 @@ export function App() {
   );
 
   const overviewStages = useMemo(() => getOverviewStages(scopedIssues), [scopedIssues]);
+  const workflowStages = useMemo(() => getWorkflowStages(scopedIssues), [scopedIssues]);
 
   const summaryGroups = useMemo(
     () => buildSummaryGroups(scopedIssues, activePalette, priorityOrder, theme),
@@ -237,55 +235,20 @@ export function App() {
   };
 
   const activeMilestone = globalFilters.milestone !== "All" ? globalFilters.milestone : null;
-
-  const renderIssuePanel = (showFilters: boolean, laneHeaders: boolean) => (
-    <IssuePanel
-      issues={scopedIssues}
-      overviewStages={overviewStages}
-      facets={facets}
-      globalFilters={globalFilters}
-      defaultStartDate={defaultStartDate}
-      defaultEndDate={defaultEndDate}
-      layout={layout}
-      activeChart={activeChart}
-      showFilters={showFilters}
-      laneHeaders={laneHeaders}
-      labelStyles={payload?.label_styles ?? {}}
-      palette={activePalette}
-      priorityOrder={priorityOrder}
-      theme={theme}
-      toolbarLeft={
-        showFilters ? (
-          <SummaryBar
-            groups={summaryGroups}
-            activeSummaryId={summaryId}
-            facets={facets}
-            onSelectSummary={handleSelectSummary}
-          />
-        ) : undefined
-      }
-      onChangeFacets={handleFacetsChange}
-      onRemoveSidebarFilter={handleRemoveSidebarFilter}
-      onClearAll={handleClearAll}
-      onClearChartFilter={() => {
-        setActiveChart(null);
-        setFacets((prev) => (prev.query ? { query: prev.query } : {}));
-      }}
-    />
-  );
+  const hasCockpit =
+    !loading &&
+    !loadError &&
+    Boolean(payload && payload.issues.length > 0 && scopedIssues.length > 0);
 
   return (
     <div className="pulse-app">
       <TopBar
-        layout={layout}
+        chartsVisible={chartsVisible}
         theme={theme}
         activeSidebarCount={activeSidebarCount}
         isAdmin={isAdmin}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        onChangeLayout={(next) => {
-          if (next === "compact") setActiveChart(null);
-          setLayout(next);
-        }}
+        onToggleCharts={() => setChartsVisible((v) => !v)}
         onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
         onOpenAdmin={() => setAdminModalOpen(true)}
       />
@@ -317,7 +280,7 @@ export function App() {
         onReloadDashboard={() => loadData(true)}
       />
 
-      <main className="pulse-main">
+      <main className={hasCockpit ? "pulse-main analytics-cockpit" : "pulse-main"}>
         {loading ? (
           <div className="pulse-panel" style={{ padding: "2rem", textAlign: "center" }}>
             Loading analytics dataset...
@@ -352,11 +315,13 @@ export function App() {
               Reset filters
             </button>
           </div>
-        ) : layout === "analytics" ? (
-          <AnalyticsView
+        ) : (
+          <OverviewWorkspace
+            chartsVisible={chartsVisible}
+            viewMode={viewMode}
             issues={scopedIssues}
             timelineIssues={preMilestoneIssues}
-            overviewStages={overviewStages}
+            workflowStages={workflowStages}
             activeMilestone={activeMilestone}
             facets={facets}
             activeChart={activeChart}
@@ -369,21 +334,35 @@ export function App() {
               setActiveChart(chartId);
               setFacets(nextFacets);
             }}
-            issuePanel={renderIssuePanel(false, false)}
-          />
-        ) : (
-          <>
-            <div className="pulse-panel" style={{ padding: "0.5rem 0.85rem" }}>
-              <ReleaseTimeline
-                issues={preMilestoneIssues}
+            issuePanel={
+              <IssuePanel
+                issues={scopedIssues}
+                overviewStages={overviewStages}
+                facets={facets}
+                globalFilters={globalFilters}
+                defaultStartDate={defaultStartDate}
+                defaultEndDate={defaultEndDate}
+                chartsVisible={chartsVisible}
+                viewMode={viewMode}
+                labelStyles={payload.label_styles}
                 palette={activePalette}
-                highlightMilestone={activeMilestone}
-                variant="compact"
-                onSelectMilestone={handleToggleMilestone}
+                priorityOrder={priorityOrder}
+                theme={theme}
+                summaryBar={
+                  <SummaryBar
+                    groups={summaryGroups}
+                    activeSummaryId={summaryId}
+                    facets={facets}
+                    onSelectSummary={handleSelectSummary}
+                  />
+                }
+                onChangeViewMode={setViewMode}
+                onChangeFacets={handleFacetsChange}
+                onRemoveSidebarFilter={handleRemoveSidebarFilter}
+                onClearAll={handleClearAll}
               />
-            </div>
-            {renderIssuePanel(true, true)}
-          </>
+            }
+          />
         )}
       </main>
     </div>

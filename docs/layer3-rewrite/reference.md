@@ -58,7 +58,7 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 
 | File | Responsibility | Key Exports |
 |---|---|---|
-| `types.ts` | TypeScript interfaces matching API DTOs and UI state | `IssueItem`, `DashboardPayload`, `GlobalFilters`, `IssueFacets`, `OverviewLayout`, `IssueViewMode`, `ThemeMode`, `ActiveChartId` |
+| `types.ts` | TypeScript interfaces matching API DTOs and UI state | `IssueItem`, `DashboardPayload`, `GlobalFilters`, `IssueFacets`, `IssueViewMode`, `ThemeMode`, `ActiveChartId` |
 | `colors.ts` | Priority & semantic palette resolution | `getPriorityColor`, `buildPriorityColorMap`, `hexWithAlpha` |
 | `search.ts` | Multi-token exact search + LCS fuzzy fallback (`<=4: 0.90`, `<=8: 0.82`, `>8: 0.72`) | `normalizeSearchText`, `similarityRatio`, `filterIssuesBySearch` |
 | `facets.ts` | Global/facet filtering, chip construction, URL state serialization | `applyPreMilestoneFilters`, `applyGlobalFilters`, `applyFacets`, `buildFacetChips`, `withoutFacet`, `parseUrlState`, `buildUrlSearch` |
@@ -77,17 +77,17 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 | `charts/PriorityDonut.tsx` | Responsive SVG donut with clickable slices (`{ state, priority }`) and clickable center (`{ state }`) |
 | `charts/QualitySignalsChart.tsx` | Horizontal bar chart for `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, and `MIXED_CLASSIFICATION` |
 | `charts/DailyVelocityChart.tsx` | 7-day dual-line SVG chart (`New` vs. `Closed`) with clickable date markers |
-| `charts/WorkflowStateRow.tsx` | Aligned per-stage vertical priority bar charts synced to board column width |
-| `TopBar.tsx` | Sticky frosted navbar: `Filters` drawer toggle + badge, logo, `Analytics \| Compact` switch, theme toggle, Admin Ops trigger |
+| `charts/WorkflowStateRow.tsx` | Horizontal stacked priority bars per stage with clickable stage names and priority segments |
+| `TopBar.tsx` | Sticky frosted navbar: `Filters` drawer toggle + badge, logo, `Charts` toggle, theme toggle, Admin Ops trigger |
 | `SidebarDrawer.tsx` | Collapsible drawer: Team/Context/Milestone selectors, `30d`/`90d`/`1y`/`All Time` + custom date bounds, Sync Status refresh, Admin login |
-| `SummaryBar.tsx` | Quick-filter pill groups for Compact toolbar |
+| `SummaryBar.tsx` | Quick-filter pill groups rendered automatically in `IssuePanel` when `Charts` is toggled OFF |
 | `IssueSearchInput.tsx` | Expanding inline search pill (`Ctrl/Cmd+K` focus, `Escape` blur, clear button) |
 | `IssueTable.tsx` | `@tanstack/react-table` grid with sticky header, sortable columns, default hierarchy indentation, colored label pills, conditional `Stage` and `Quality hints` columns |
 | `IssueBoard.tsx` | Kanban board with horizontally scroll-synced sticky lane headers, priority mix bars, clickable lane priority pills, and issue cards |
-| `IssuePanel.tsx` | Sticky toolbar, active filter chips (`Clear all`), `Fit`/10/20/30 paging (`ResizeObserver`), Table/Board switch |
-| `AnalyticsView.tsx` | 12-column responsive Analytics grid + viewport-aware sticky `WorkflowStateRow` above `IssuePanel` |
+| `IssuePanel.tsx` | Unified toolbar with named filter chips (`Clear all`), optional `SummaryBar` strip when charts are hidden, `Fit`/10/20/30 paging (`ResizeObserver`), Table/Board switch |
+| `OverviewWorkspace.tsx` | Single-viewport responsive hybrid workspace: persistent slim Release Rail + `380 px` left analytics rail (`>= 1360px` Table with Charts ON) or 4-card top bento strip (`< 1360px` or Board) beside/above `IssuePanel` |
 | `AdminModal.tsx` | Password prompt and controls for Collector (L1), Processor (L2), Cache Clear, and execution logs |
-| `App.tsx` | Top-level data loader, URL synchronization (`replaceState` / `popstate`), theme persistence, and view switching |
+| `App.tsx` | Top-level data loader, URL synchronization (`replaceState` / `popstate`), theme persistence, and `Charts` toggle state |
 
 ## 4. URL Query Parameters, Shortcuts, and Environment Variables
 
@@ -95,11 +95,12 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 
 | Parameter | Values | Default / Omitted Behavior |
 |---|---|---|
-| `view` | `compact` | Omitted when `analytics` (default) |
+| `view` | `compact` (Charts OFF), `analytics` (alias for ON) | Omitted when Charts ON (default) |
 | `summary` | Summary pill ID (e.g., `open`, `priority_P1`) | Omitted when none |
 | `f_stage` | Stage name | Omitted |
 | `f_state` | `opened`, `closed`, `all` | Omitted (defaults to `opened` in filtering) |
 | `f_priority` | Priority label or `Unset` | Omitted |
+| `f_issue_type` | Issue type label or `Unset` | Omitted |
 | `f_signal` | `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, `MIXED_CLASSIFICATION` | Omitted |
 | `f_recent` | `created`, `closed` | Omitted |
 | `f_day` | `YYYY-MM-DD` (requires valid `f_day_kind`) | Omitted |
