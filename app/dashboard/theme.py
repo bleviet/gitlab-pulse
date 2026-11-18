@@ -669,8 +669,8 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
     background: {bg};
     padding-bottom: 0.5rem;
 }}
-/* The board's toolbar and filter chips, then its lane headers, stay pinned
-   while the board scrolls: below the header bar, or in Analytics below the
+/* The board's toolbar, filter chips and page bar, then its lane headers, stay
+   pinned while the board scrolls: below the header bar, or in Analytics below the
    pinned workflow-state row (the offsets are set by ``views.pinned_header``). */
 .st-key-issue_panel > .st-key-issue_panel_head,
 .st-key-issue_panel > :has(> .st-key-issue_panel_head) {{
@@ -752,16 +752,13 @@ div[data-testid="stRadio"] > div > label[data-checked="true"] {{
 .st-key-issue_page_bar > * {{ flex: 0 0 auto !important; width: auto !important; }}
 .st-key-issue_page_bar [data-testid="stCaptionContainer"] {{ margin: 0 0.3rem; white-space: nowrap; }}
 .st-key-issue_page_bar [data-testid="stCaptionContainer"] p {{ margin: 0; line-height: 2rem; }}
-/* The page bar (size control and pager) stays pinned below the toolbar; on
-   the board, the lane headers are pinned below it. */
-.st-key-issue_panel > .st-key-issue_page_bar,
-.st-key-issue_panel > :has(> .st-key-issue_page_bar) {{
-    position: sticky;
-    top: var(--pulse-board-top, 6rem);
-    z-index: 58;
-    background: {bg};
-    padding-bottom: 0.4rem;
-}}
+/* Second row of the head: filter chips on the left, the page bar (size
+   control and pager) on the right. It does not wrap; the chips wrap inside. */
+.st-key-issue_panel_bar {{ flex-wrap: nowrap; }}
+.st-key-issue_panel_bar > .st-key-issue_panel_chips,
+.st-key-issue_panel_bar > :has(> .st-key-issue_panel_chips) {{ flex: 1 1 0 !important; min-width: 0; }}
+.st-key-issue_panel_bar > .st-key-issue_page_bar,
+.st-key-issue_panel_bar > :has(> .st-key-issue_page_bar) {{ flex: none !important; margin-left: auto; }}
 .st-key-issue_page_bar [data-testid="stButton"] button {{ min-height: 2rem; padding: 0 0.35rem; }}
 .st-key-issue_page_bar [data-testid="stButtonGroup"] button {{ min-height: 2rem; padding: 0.05rem 0.6rem; font-size: 0.82rem; }}
 /* The Overview ends right below the board's panel: no empty room to scroll

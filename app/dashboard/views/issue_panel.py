@@ -15,13 +15,9 @@ from typing import Any, cast
 import pandas as pd
 import streamlit as st
 
-from app.dashboard.data_loader import load_labels
-from app.dashboard.utils import sort_hierarchy
 from app.dashboard.views.issue_data import (
     FACET_QUERY_PREFIX,
     IssueFacets,
-    _issue_quality_hints_text,
-    _priority_cell_style,
     board_lanes,
     collapse_issue_contexts,
     facet_chips,
@@ -35,6 +31,7 @@ from app.dashboard.views.issue_data import (
 )
 from app.dashboard.views.issue_pages import render_page_bar
 from app.dashboard.views.issue_search import render_search_box
+from app.dashboard.views.issue_table import prepare_issue_rows, render_issue_table
 from app.dashboard.widgets import tables
 from app.dashboard.widgets.tables.issue_board import (
     build_board_columns,
@@ -348,98 +345,6 @@ def _set_time_range(label: str) -> None:
     st.session_state["active_range"] = label
 
 
-# --- Issue list --------------------------------------------------------------
-
-def _prepare_issue_rows(issues: pd.DataFrame) -> pd.DataFrame:
-    """Sort the issues and shape them into the rows shown in the table."""
-    rows = issues.sort_values(
-        ["priority_rank", "days_in_stage"], ascending=[True, False], na_position="last"
-    )
-    if "parent_id" in rows.columns:
-        rows = sort_hierarchy(rows, parent_col="parent_id", id_col="iid", title_col="title")
-
-    columns = [
-        "id", "iid", "web_url", "title", "stage", "days_in_stage",
-        "priority", "context", "milestone", "assignee", "state", "labels",
-    ]
-    rows = rows[[column for column in columns if column in rows.columns]].copy()
-    rows["priority"] = rows["priority"].astype(object).fillna("Unset")
-    for column in ("stage", "milestone", "assignee"):
-        if column in rows.columns:
-            rows[column] = rows[column].astype(object).fillna("")
-    rows = rows.reset_index(drop=True)
-    rows["title"] = (
-        rows["web_url"].astype(str)
-        + "#"
-        + rows["iid"].astype(str)
-        + " - "
-        + rows["title"].fillna("")
-    )
-    return rows
-
-
-def _render_issue_table(rows: pd.DataFrame, facets: IssueFacets) -> None:
-    """Render the issue table; the title links to the issue in GitLab."""
-    page = render_page_bar("table", len(rows))
-    rows = rows.iloc[page.start:page.stop]
-    rows = rows.assign(quality_hints=rows.apply(_issue_quality_hints_text, axis=1))
-
-    label_styles = load_labels()
-    context_options = sorted(
-        {label for labels in rows["context"] for label in labels}
-    ) if "context" in rows.columns else []
-    column_config = {
-        "title": st.column_config.LinkColumn(
-            "Title",
-            display_text=r"#(.+)$",
-            width="large",
-            help="Click to open the issue URL",
-        ),
-        "context": st.column_config.MultiselectColumn(
-            "Context",
-            options=context_options,
-            color=[
-                label_styles.get(option, {}).get("color", "gray")
-                for option in context_options
-            ] or None,
-            width="medium",
-        ),
-        "stage": st.column_config.TextColumn("Stage", width="medium"),
-        "days_in_stage": st.column_config.NumberColumn(
-            "In stage",
-            help="Days since the issue entered its current stage",
-            format="%d d",
-            width="small",
-        ),
-        "priority": st.column_config.TextColumn("Priority", width="small"),
-        "milestone": st.column_config.TextColumn("Milestone", width="small"),
-        "assignee": st.column_config.TextColumn("Assignee", width="medium"),
-        "quality_hints": st.column_config.TextColumn("Quality hints", width="medium"),
-    }
-
-    column_order = ["title", "priority", "days_in_stage", "milestone", "assignee"]
-    if "stage" not in facets:
-        column_order.insert(1, "stage")
-    if context_options:
-        column_order.insert(1, "context")
-    if rows["quality_hints"].ne("").any():
-        column_order.append("quality_hints")
-
-    grid_config = {
-        "column_config": column_config,
-        "column_order": column_order,
-        # As tall as the page of rows: no scrolling inside.
-        "height": "content",
-        "on_select": "ignore",
-        "key": "issue_table",
-        "minimize_columns": False,
-        "enable_filters": False,
-    }
-    tables.issue_detail_grid(
-        rows.style.map(_priority_cell_style, subset=["priority"]), config=grid_config
-    )
-
-
 # --- Lane headers ---------------------------------------------------------------
 
 def _lane_header_renderer(
@@ -541,9 +446,9 @@ def _render_toolbar(toolbar: Callable[[], None] | None) -> str:
 
 
 def _render_filter_chips(facets: IssueFacets, count_caption: str) -> None:
-    """Render the active filters and the issue count as a second row, only
-    while there are filters; without filters the count is on the "Open"
-    summary pill.
+    """Render the active filters and the issue count, only while there are
+    filters; without filters the count is on the "Open" summary pill. They are
+    the left part of the row that holds the page bar.
     """
     chips = facet_chips(facets)
     sidebar_chips = _sidebar_filter_chips()
@@ -595,13 +500,15 @@ def render_issue_panel(
             context.
         chart_stages: Stages with open issues, in workflow order (the lanes).
         toolbar: Renders the left part of the board's toolbar row.
-        show_filters: Show the active filters as chips, with the issue count.
-            Off where the charts above show the filters (Analytics).
+        show_filters: Show the active filters as chips, with the issue count,
+            on the left of the page bar's row. Off where the charts above show the
+            filters (Analytics).
         lane_headers: Show a header above each lane. Off where the stages are
             shown above the board (Analytics).
     """
     with st.container(border=True, key="issue_panel"):
-        # Keyed so the toolbar and the chips stay pinned while the board scrolls.
+        # Keyed so the toolbar, the chips and the pager stay pinned while the
+        # board scrolls.
         with st.container(key="issue_panel_head"):
             # The toolbar comes first so a typed search filters in the same run.
             view = _render_toolbar(toolbar)
@@ -613,44 +520,58 @@ def render_issue_panel(
 
             noun = "issue" if len(issues) == 1 else "issues"
             count_caption = f"{len(issues)} {noun}"
-            if show_filters:
-                _render_filter_chips(facets, count_caption)
-
-        if view == "Board":
-            # Lane headers count what the board shows without the stage and priority
-            # refinement, so every lane keeps its full priority mix, and the lanes stay
-            # even when the refinement matches nothing.
-            header_facets = without_facet(without_facet(effective, "stage"), "priority")
-            header_issues = collapse_issue_contexts(filter_issues(df, header_facets))
-            lanes = board_lanes(chart_stages, header_issues)
-            lane_counts = lane_priority_counts(header_issues)
-            if issues.empty and not lane_counts:
-                st.info("No issues match the current filters.")
-            else:
-                longest_lane = max(
-                    (len(cards) for _, cards in build_board_columns(issues, lanes)),
-                    default=0,
-                )
-                cards_page = render_page_bar("board", longest_lane)
-                with st.container(key="issue_board_wrap"):
-                    tables.issue_board(
-                        issues,
-                        {
-                            "key": "issue_board",
-                            "stages": lanes,
-                            "highlight_stage": highlight_stage,
-                            # As tall as the page of cards: no scrolling inside.
-                            "lane_height": None,
-                            "card_start": cards_page.start,
-                            "max_cards": cards_page.stop - cards_page.start,
-                            "min_columns": len(chart_stages),
-                            "lane_headers": lane_headers,
-                            "lane_header": _lane_header_renderer(
-                                facets, lane_counts, priority_color_names(df)
-                            ),
-                        },
+            rows: pd.DataFrame | None = None
+            if view == "Board":
+                # Lane headers count what the board shows without the stage and priority
+                # refinement, so every lane keeps its full priority mix, and the lanes stay
+                # even when the refinement matches nothing.
+                header_facets = without_facet(without_facet(effective, "stage"), "priority")
+                header_issues = collapse_issue_contexts(filter_issues(df, header_facets))
+                lanes = board_lanes(chart_stages, header_issues)
+                lane_counts = lane_priority_counts(header_issues)
+                if issues.empty and not lane_counts:
+                    page_total = None
+                else:
+                    page_total = max(
+                        (len(cards) for _, cards in build_board_columns(issues, lanes)),
+                        default=0,
                     )
-        elif issues.empty:
+            else:
+                rows = None if issues.empty else prepare_issue_rows(issues)
+                page_total = None if rows is None else len(rows)
+
+            # One row: the active filters on the left, the pager on the right.
+            with st.container(
+                key="issue_panel_bar", horizontal=True, vertical_alignment="center"
+            ):
+                if show_filters:
+                    _render_filter_chips(facets, count_caption)
+                page = (
+                    None
+                    if page_total is None
+                    else render_page_bar("board" if view == "Board" else "table", page_total)
+                )
+
+        if page is None:
             st.info("No issues match the current filters.")
-        else:
-            _render_issue_table(_prepare_issue_rows(issues), facets)
+        elif view == "Board":
+            with st.container(key="issue_board_wrap"):
+                tables.issue_board(
+                    issues,
+                    {
+                        "key": "issue_board",
+                        "stages": lanes,
+                        "highlight_stage": highlight_stage,
+                        # As tall as the page of cards: no scrolling inside.
+                        "lane_height": None,
+                        "card_start": page.start,
+                        "max_cards": page.stop - page.start,
+                        "min_columns": len(chart_stages),
+                        "lane_headers": lane_headers,
+                        "lane_header": _lane_header_renderer(
+                            facets, lane_counts, priority_color_names(df)
+                        ),
+                    },
+                )
+        elif rows is not None:
+            render_issue_table(rows, facets, page)

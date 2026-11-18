@@ -1,20 +1,18 @@
 """Keeps the Overview's pinned rows stacked while the page scrolls.
 
 Pinned, from the top: the Analytics workflow-state row (only in Analytics),
-the board's toolbar and filter chips, and the board's lane headers. Their
+the board's toolbar, filter chips and pager, and the board's lane headers. Their
 heights depend on the screen and on the active filters, so CSS alone cannot
 place each one below the previous one. The script below measures them and sets
 CSS variables for the theme CSS:
 
 - ``--pulse-pin-top``: below the workflow-state row (or the header bar).
-- ``--pulse-board-top``: below the board's toolbar and chips (the page bar
-  of ``issue_pages`` is pinned here).
-- ``--pulse-heads-top``: below the page bar (the lane headers are pinned
-  here).
+- ``--pulse-heads-top``: below the board's toolbar, chips and pager (the lane
+  headers are pinned here).
 
-The Analytics workflow-state row is pinned only while it, the toolbar and the
-page bar leave at least 15rem of the window free below them (narrow windows
-stack its charts and make it tall).
+The Analytics workflow-state row is pinned only while it and the board's
+pinned head (toolbar, chips and page bar) leave at least 15rem of the window
+free below them (narrow windows stack its charts and make it tall).
 
 The lane headers' row cannot scroll sideways itself; the script keeps it in
 step with the lanes' row, which can.
@@ -73,19 +71,15 @@ _PIN_SCRIPT = """
     const root = document.documentElement.style;
     const workflow = stickyChild(".st-key-analytics_flow", ".st-key-analytics_workflow");
     const head = stickyChild(".st-key-issue_panel", ".st-key-issue_panel_head");
-    const bar = stickyChild(".st-key-issue_panel", ".st-key-issue_page_bar");
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const headHeight = head ? head.offsetHeight : 0;
-    const barHeight = bar ? bar.offsetHeight : 0;
     // Pinned only while at least 15rem of the window stays free below the pinned rows.
     const fits = workflow
-      && workflow.offsetHeight + headHeight + barHeight <= window.innerHeight - 2.5 * rem - 15 * rem;
+      && workflow.offsetHeight + headHeight <= window.innerHeight - 2.5 * rem - 15 * rem;
     if (workflow) workflow.style.position = fits ? "" : "static";
     const pin = fits ? workflow.offsetHeight : 0;
-    const board = pin + headHeight;
-    const headsTop = board + barHeight;
+    const headsTop = pin + headHeight;
     root.setProperty("--pulse-pin-top", `calc(2.5rem + ${pin}px)`);
-    root.setProperty("--pulse-board-top", `calc(2.5rem + ${board}px)`);
     root.setProperty("--pulse-heads-top", `calc(2.5rem + ${headsTop}px)`);
     pinTableHead(2.5 * rem + headsTop);
   };

@@ -34,7 +34,7 @@ One column, one focus: the issue board, which starts high on the screen (on a 13
 |---|---|
 | Releases | The milestone timeline as a thin rail with its label inside (3.1) |
 | Board toolbar | Summary pills on the left (3.2); search (⌘K) and the Board/Table switch on the right |
-| Filter chips | Only while the board is filtered: one chip per filter, "Clear all", the issue count |
+| Filter chips | Only while the board is filtered: one chip per filter, "Clear all", the issue count. They share the row with the page bar; the page bar (size control and pager) is on the right |
 | Lanes | The board; the workflow state is shown in its lane headers (3.3) |
 
 - The page switch (Overview, Custom View, Admin) is in the sidebar, and Streamlit runs with `toolbarMode = "minimal"` (no "Deploy" button), so the page has no navigation row of its own.
@@ -84,12 +84,12 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 | 2 | Open Issues by Priority (donut), Issue Quality Signals, Daily New vs. Closed Issues (7 days) |
 | 3 | Issues by Workflow State (priority bars per stage); stays pinned below the header while the board scrolls |
 
-The quality signals count open issues only, so they sit next to the open-issues donut. The workflow-state row and the board share a container, so the row is released where the board ends; its stage columns line up with the board's lanes. Below that row, the board's header (search and view switch) is pinned as well; in the Compact layout the board's toolbar with the summary pills and filter chips, and then its lane headers, are pinned below Streamlit's header bar.
+The quality signals count open issues only, so they sit next to the open-issues donut. The workflow-state row and the board share a container, so the row is released where the board ends; its stage columns line up with the board's lanes. Below that row, the board's header (search and view switch) is pinned as well; in the Compact layout the board's toolbar with the summary pills, the filter chips and the page bar, and then its lane headers, are pinned below Streamlit's header bar.
 
 How the pinned rows work (`app/dashboard/views/pinned_header.py`):
 
 - The lane headers are a row of their own above the lanes (`issue_board`), not the top of each lane. The lanes' row scrolls sideways on a small screen, and nothing inside a sideways-scrolling element can stick to the page. A script keeps the headers' row in step with the lanes' sideways scroll.
-- The pinned rows' heights depend on the screen and on the active filters, so the script measures them and sets CSS variables (`--pulse-pin-top`, `--pulse-board-top`, `--pulse-heads-top`) that the theme CSS uses as offsets. The Analytics workflow-state row is pinned only while it, the toolbar and the page bar together leave at least 15rem of the window free below them; otherwise (for example on a narrow window, where its charts stack) it scrolls with the page and counts 0 in the offsets.
+- The pinned rows' heights depend on the screen and on the active filters, so the script measures them and sets CSS variables (`--pulse-pin-top`, `--pulse-heads-top`) that the theme CSS uses as offsets. The Analytics workflow-state row is pinned only while it and the board's pinned head (toolbar, chips and page bar) together leave at least 15rem of the window free below them; otherwise (for example on a narrow window, where its charts stack) it scrolls with the page and counts 0 in the offsets.
 - The original "Open vs. Closed Issues" panel is gone: a click in a donut's centre selects all open (or all closed) issues, and the donuts already show both totals.
 
 The donuts are drawn on x/y axes instead of as Plotly pies, because Plotly reports no click selection for pie (or polar bar) slices. Each slice is a filled ring segment; a grid of invisible markers over the ring and one large marker over the hole are the click targets, carrying `[priority, count]` (the centre: `__all__`) in `customdata`. Since the click targets are invisible, the donut draws its own highlight: while its filter is active, the other slices are dimmed (`highlight` option, from `chart_priority_highlight`).
@@ -123,7 +123,7 @@ The release timeline and sidebar milestone selector are synchronized bidirection
 
 The issue list (`app/dashboard/views/issue_panel.py`) opens as the Table; the choice between Board and Table is kept in `filtered_issues_view` in session state. The search text from the search field (4.5) applies to both views.
 
-**Paging** (`app/dashboard/views/issue_pages.py`). A bar above the table or the board, pinned below the toolbar while the page scrolls (on the board, the lane headers are pinned below it), sets how much is shown: 10 (default), 20 or 30 per page, with previous/next buttons when there is more than one page. The table and the lanes are exactly as tall as one page, with no scrolling inside; the page scrolls instead.
+**Paging** (`app/dashboard/views/issue_pages.py`). A bar on the right of the board header's second row, next to the filter chips, pinned with the toolbar while the page scrolls (on the board, the lane headers are pinned below it), sets how much is shown: 10 (default), 20 or 30 per page, with previous/next buttons when there is more than one page. The table and the lanes are exactly as tall as one page, with no scrolling inside; the page scrolls instead. The chips and the pager used to take a row each; sharing one keeps the board higher on the screen.
 
 - **Table, rows per page** (`height="content"`): the bar shows "11–20 of 408". The table's column header is drawn by Streamlit's grid on a canvas of its own inside the table, so CSS cannot pin it; while it is scrolled under the pinned rows, the script in `pinned_header` shows a copy of that canvas pinned below them. The copy is a picture and takes no clicks (sort on the table's own header).
 - **Board, cards per lane**: the pager turns all lanes together ("Page 2 of 11"); a lane with fewer cards shows "No more issues" on later pages, and each lane notes how many cards follow on the next pages.

@@ -1,7 +1,8 @@
 """Board and table of the issue panel show the same issues (GitHub issue 7)."""
 
-from contextlib import nullcontext
-from typing import Any
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
+from typing import Any, cast
 
 import pandas as pd
 import pytest
@@ -61,17 +62,25 @@ def captured(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         seen["board_ids"] = issues["id"].tolist()
         seen["board_config"] = config
 
-    def table(rows: pd.DataFrame, _facets: Any) -> None:
+    def table(rows: pd.DataFrame, _facets: Any, page: PageWindow) -> None:
         seen["table_ids"] = rows["id"].tolist()
+        seen["table_page"] = page
+
+    seen["page_bars"] = []
+    seen["window"] = PageWindow(0, 50)
+
+    def page_bar(view: str, total: int) -> PageWindow:
+        seen["page_bars"].append((view, total))
+        return cast(PageWindow, seen["window"])
 
     def lane_header(_facets: Any, lane_counts: Any, _colors: Any) -> None:
         seen["lane_counts"] = lane_counts
 
     monkeypatch.setattr(issue_panel, "_render_toolbar", toolbar)
     monkeypatch.setattr(issue_panel, "_render_filter_chips", chips)
-    monkeypatch.setattr(issue_panel, "render_page_bar", lambda *a, **k: range(50))
+    monkeypatch.setattr(issue_panel, "render_page_bar", page_bar)
     monkeypatch.setattr(issue_panel.tables, "issue_board", board)
-    monkeypatch.setattr(issue_panel, "_render_issue_table", table)
+    monkeypatch.setattr(issue_panel, "render_issue_table", table)
     monkeypatch.setattr(issue_panel, "_lane_header_renderer", lane_header)
     return seen
 
@@ -125,46 +134,7 @@ def test_board_keeps_lanes_when_the_full_facets_match_nothing(
 
     assert captured["board_ids"] == []
     assert captured["board_config"]["stages"] == STAGES
-
-
-def test_prepare_issue_rows_leaves_the_hints_to_the_page() -> None:
-    rows = issue_panel._prepare_issue_rows(_issues())
-
-    assert "quality_hints" not in rows.columns
-
-
-def test_table_computes_hints_only_for_the_page(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[int] = []
-    original = issue_panel._issue_quality_hints_text
-
-    def counting(row: pd.Series) -> str:
-        calls.append(1)
-        return original(row)
-
-    shown: dict[str, pd.DataFrame] = {}
-
-    def grid(styler: Any, *_a: Any, **_k: Any) -> None:
-        shown["frame"] = styler.data
-
-    monkeypatch.setattr(issue_panel, "render_page_bar", lambda *a, **k: PageWindow(0, 2))
-    monkeypatch.setattr(issue_panel, "load_labels", lambda: {})
-    monkeypatch.setattr(issue_panel.tables, "issue_detail_grid", grid)
-    monkeypatch.setattr(issue_panel, "_issue_quality_hints_text", counting)
-
-    rows = issue_panel._prepare_issue_rows(_issues().assign(context=[[]] * 4))
-    issue_panel._render_issue_table(rows, {})
-
-    frame = shown["frame"]
-    assert len(calls) == 2
-    assert len(frame) == 2
-    assert frame["quality_hints"].tolist() == [
-        "Unassigned owner | Missing milestone"
-    ] * 2
-    assert frame["quality_hints"].tolist() == [
-        original(row) for _, row in rows.iloc[0:2].iterrows()
-    ]
+    assert captured["page_bars"] == [("board", 0)]
 
 
 def test_table_view_does_not_compute_lane_counts(
@@ -210,3 +180,118 @@ def test_typed_search_is_applied_in_the_same_run(
 
     assert captured["table_ids"] == [2]
     assert captured["caption"] == "1 issue"
+
+
+def test_table_renders_the_page_bar_once_and_shows_its_window(
+    captured: dict[str, Any],
+) -> None:
+    captured["view"] = "Table"
+    captured["window"] = PageWindow(10, 20)
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["page_bars"] == [("table", 1)]
+    assert captured["table_page"] == PageWindow(10, 20)
+
+
+def test_board_renders_the_page_bar_once_and_shows_its_window(
+    captured: dict[str, Any],
+) -> None:
+    captured["window"] = PageWindow(10, 20)
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["page_bars"] == [("board", 1)]
+    config = captured["board_config"]
+    assert config["card_start"] == 10
+    assert config["max_cards"] == 10
+
+
+def test_board_page_total_is_the_longest_lane(captured: dict[str, Any]) -> None:
+    st.session_state["issue_facets"] = {"state": "opened"}
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["page_bars"] == [("board", 2)]
+
+
+def test_table_without_matches_has_no_page_bar(captured: dict[str, Any]) -> None:
+    captured["view"] = "Table"
+    st.session_state["issue_facets"] = {"state": "opened", "query": "zzzz-no-match"}
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["page_bars"] == []
+    assert "table_ids" not in captured
+
+
+def test_board_without_matches_has_no_page_bar(captured: dict[str, Any]) -> None:
+    st.session_state["issue_facets"] = {"state": "opened", "query": "zzzz-no-match"}
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert captured["page_bars"] == []
+    assert "board_ids" not in captured
+
+
+@pytest.mark.parametrize("view", ["Table", "Board"])
+def test_page_bar_row_is_in_the_head_before_the_body(
+    captured: dict[str, Any], monkeypatch: pytest.MonkeyPatch, view: str
+) -> None:
+    events: list[str] = []
+    stack: list[str] = []
+    nesting: dict[str, list[str]] = {}
+    stacks: dict[str, list[str]] = {}
+
+    @contextmanager
+    def container(*_a: Any, **k: Any) -> Iterator[None]:
+        key = str(k.get("key"))
+        nesting[key] = list(stack)
+        events.append(f"enter {key}")
+        stack.append(key)
+        try:
+            yield
+        finally:
+            stack.pop()
+
+    def toolbar(_toolbar: Any) -> str:
+        events.append("toolbar")
+        return view
+
+    def chips(_facets: Any, _caption: str) -> None:
+        stacks["chips"] = list(stack)
+
+    def page_bar(_view: str, _total: int) -> PageWindow:
+        stacks["page_bar"] = list(stack)
+        return PageWindow(0, 50)
+
+    def table(rows: pd.DataFrame, _facets: Any, page: PageWindow) -> None:
+        events.append("body")
+        stacks["body"] = list(stack)
+
+    def board(issues: pd.DataFrame, config: dict[str, Any]) -> None:
+        events.append("body")
+        stacks["body"] = list(stack)
+
+    monkeypatch.setattr(st, "container", container)
+    monkeypatch.setattr(issue_panel, "_render_toolbar", toolbar)
+    monkeypatch.setattr(issue_panel, "_render_filter_chips", chips)
+    monkeypatch.setattr(issue_panel, "render_page_bar", page_bar)
+    monkeypatch.setattr(issue_panel, "render_issue_table", table)
+    monkeypatch.setattr(issue_panel.tables, "issue_board", board)
+
+    issue_panel.render_issue_panel(_issues(), STAGES)
+
+    assert nesting["issue_panel_bar"] == ["issue_panel", "issue_panel_head"]
+    assert stacks["chips"] == ["issue_panel", "issue_panel_head", "issue_panel_bar"]
+    assert stacks["page_bar"] == ["issue_panel", "issue_panel_head", "issue_panel_bar"]
+    if view == "Table":
+        assert stacks["body"] == ["issue_panel"]
+    else:
+        assert stacks["body"][:1] == ["issue_panel"]
+        assert "issue_panel_head" not in stacks["body"]
+    assert (
+        events.index("toolbar")
+        < events.index("enter issue_panel_bar")
+        < events.index("body")
+    )

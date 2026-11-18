@@ -1,8 +1,9 @@
 """Paging for the issue table and the board: 10, 20 or 30 per page.
 
-A bar above the table or the board, pinned below the toolbar while the page
-scrolls, holds the size control and, when there is more than one page, the
-previous/next buttons. The table and the lanes are as tall as one page, with
+A bar holds the size control and, when there is more than one page, the
+previous/next buttons. It is the right part of the second row of the board's
+header, next to the filter chips, and is pinned with the toolbar while the
+page scrolls. The table and the lanes are as tall as one page, with
 no scrolling inside: the page scrolls instead.
 
 - **Table**: rows per page; the bar shows "11–20 of 408".
@@ -87,6 +88,7 @@ def render_page_bar(view: View, total: int) -> PageWindow:
     with st.container(
         key="issue_page_bar",
         horizontal=True,
+        width="content",
         horizontal_alignment="right",
         vertical_alignment="center",
     ):
