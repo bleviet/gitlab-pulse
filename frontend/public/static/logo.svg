@@ -4,14 +4,10 @@
       <stop offset="0%"   stop-color="#ff512f"/>
       <stop offset="100%" stop-color="#dd2476"/>
     </linearGradient>
-    <!-- Subtle inner shadow for depth -->
-    <filter id="gi-inner" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.18"/>
-    </filter>
   </defs>
 
   <!-- Background rounded square -->
-  <rect width="48" height="48" rx="13" fill="url(#gi-bg)" filter="url(#gi-inner)"/>
+  <rect width="48" height="48" rx="13" fill="url(#gi-bg)"/>
 
   <!-- Ascending bar chart (3 pillars) -->
   <!-- Bar 1 — short -->

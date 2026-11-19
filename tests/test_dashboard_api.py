@@ -1,5 +1,6 @@
 """Integration tests for the FastAPI Layer 3 dashboard API."""
 
+import struct
 import subprocess
 from pathlib import Path
 
@@ -102,3 +103,43 @@ def test_admin_auth_and_operations(tmp_path: Path, monkeypatch) -> None:
     assert logout_res.status_code == 200
     assert logout_res.json() == {"authenticated": False}
     assert client.post("/api/admin/clear-cache").status_code == 401
+
+
+def test_favicon_assets_and_missing_icon_do_not_return_html(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    favicon_png = repo_root / "frontend" / "public" / "static" / "favicon.png"
+    favicon_32 = repo_root / "frontend" / "public" / "static" / "favicon-32x32.png"
+    favicon_ico = repo_root / "frontend" / "public" / "favicon.ico"
+
+    for png_path in (favicon_png, favicon_32):
+        assert png_path.is_file()
+        png_bytes = png_path.read_bytes()
+        assert png_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+        bit_depth = struct.unpack(">B", png_bytes[24:25])[0]
+        assert bit_depth == 8
+
+    assert favicon_ico.is_file()
+    assert favicon_ico.read_bytes()[:4] == b"\x00\x00\x01\x00"
+
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    dist_dir.joinpath("index.html").write_text("<html></html>", encoding="utf-8")
+
+    service = DashboardService(
+        analytics_path=tmp_path / "analytics",
+        processed_path=tmp_path / "processed",
+        state_path=tmp_path / "state" / "sync_state.json",
+        rules_path=tmp_path / "rules",
+    )
+    app = create_app(service=service, frontend_dist=dist_dir)
+    client = TestClient(app)
+
+    missing_ico = client.get("/favicon.ico")
+    assert missing_ico.status_code == 404
+
+    dist_dir.joinpath("favicon.ico").write_bytes(favicon_ico.read_bytes())
+    present_ico = client.get("/favicon.ico")
+    assert present_ico.status_code == 200
+    assert present_ico.headers["content-type"].startswith("image/")
+    assert present_ico.headers["cache-control"] == "no-cache"
+    assert present_ico.content[:4] == b"\x00\x00\x01\x00"

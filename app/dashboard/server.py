@@ -18,6 +18,11 @@ load_dotenv()
 _DEFAULT_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
+_ASSET_SUFFIXES = frozenset(
+    {".ico", ".png", ".svg", ".js", ".css", ".woff2", ".ttf", ".map", ".jpg", ".jpeg", ".webp"}
+)
+
+
 def create_app(
     service: DashboardService | None = None,
     frontend_dist: Path | None = None,
@@ -61,7 +66,7 @@ def create_app(
 
         @application.get("/", include_in_schema=False)
         def serve_root() -> FileResponse:
-            return FileResponse(index_file)
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
         @application.get("/{full_path:path}", include_in_schema=False)
         def serve_spa_fallback(full_path: str) -> FileResponse:
@@ -73,8 +78,20 @@ def create_app(
             except ValueError as exc:
                 raise HTTPException(status_code=404, detail="Not found") from exc
             if candidate.is_file():
+                if candidate.suffix.lower() == ".ico":
+                    return FileResponse(
+                        candidate,
+                        media_type="image/x-icon",
+                        headers={"Cache-Control": "no-cache"},
+                    )
                 return FileResponse(candidate)
-            return FileResponse(index_file)
+            if (
+                full_path == "favicon.ico"
+                or full_path.startswith(("static/", "assets/"))
+                or Path(full_path).suffix.lower() in _ASSET_SUFFIXES
+            ):
+                raise HTTPException(status_code=404, detail="Not found")
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
     else:
 
         @application.get("/", include_in_schema=False)
