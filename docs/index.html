@@ -1334,7 +1334,7 @@
             <figcaption><b>localhost:8501</b><span>Overview &middot; Charts ON</span><span class="state">local &middot; your data</span></figcaption>
             <img class="theme-image" src="images/screenshots/hp_analytics_dark.png"
           data-dark="images/screenshots/hp_analytics_dark.png" data-light="images/screenshots/hp_analytics.png"
-          width="2880" height="1800" alt="GitLab Pulse Overview cockpit with unified scope bar, release timeline, Open Mix, Workflow State, velocity, quality signals, and issue table" />
+          width="2880" height="1800" alt="GitLab Pulse Overview cockpit with unified scope bar, release timeline with unscheduled milestone tray, Open Mix, Workflow State, velocity, quality signals, unscheduled milestones, and issue table" />
           </figure>
         </div>
 
@@ -1433,7 +1433,7 @@
       <div class="split reveal">
         <h2>Charts that filter the board.</h2>
         <div class="split-side">
-          <p>Click any slice, legend item, workflow segment, velocity point, or quality hint: the issue table updates in place inside your browser and sibling elements dim. Click it again—or dismiss its chip—to clear the filter.</p>
+          <p>Click any slice, legend item, workflow segment, velocity point, or quality hint: the issue table updates in place inside your browser and sibling elements dim. Click it again—or dismiss its chip—to clear the filter. The <span class="mono">#</span>&nbsp;/&nbsp;<span class="mono">%</span> switch in the top bar shows chart numbers as counts or as shares, for example each priority's share of a workflow stage. Tooltips always show both.</p>
         </div>
       </div>
       <figure class="window wide-shot reveal">
@@ -1447,12 +1447,13 @@
         <div class="pad">
           <h3>Releases on one rail</h3>
           <p>Milestones are coloured by health (overdue, on track, complete) around a line for today. Click one to
-            filter the dashboard by that milestone.</p>
+            filter the dashboard by that milestone. Milestones without a due date stay off the date scale; a tray at
+            the end of the rail counts them and opens the unscheduled milestones panel.</p>
         </div>
         <div class="panel-shot">
           <img class="theme-image" loading="lazy" src="images/screenshots/hp_timeline_dark.png"
           data-dark="images/screenshots/hp_timeline_dark.png" data-light="images/screenshots/hp_timeline.png"
-          width="2830" height="180" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line" />
+          width="2830" height="180" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line and a tray counting 3 unscheduled milestones" />
         </div>
       </article>
 
@@ -1479,7 +1480,18 @@
           width="756" height="158" alt="Issue quality signals showing open hint counts" />
           </div>
         </article>
-        <article class="card span-2 reveal" style="--i: 2">
+        <article class="card reveal" style="--i: 2">
+          <div class="pad">
+            <h3>Unscheduled milestones</h3>
+            <p>Milestones without a due date that still have open issues, split by priority or type. Click one to filter by it.</p>
+          </div>
+          <div class="panel-shot">
+            <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_unscheduled_dark.png"
+          data-dark="images/screenshots/hp_unscheduled_dark.png" data-light="images/screenshots/hp_unscheduled.png"
+          width="756" height="321" alt="Open issues per milestone without a due date, stacked by priority, with a note on one hidden milestone whose issues are all closed" />
+          </div>
+        </article>
+        <article class="card reveal" style="--i: 3">
           <div class="pad">
             <h3>New versus closed, per day</h3>
             <p>A 7-day flow window anchored to recent or historical activity. Click a point to inspect created or closed issues.</p>
