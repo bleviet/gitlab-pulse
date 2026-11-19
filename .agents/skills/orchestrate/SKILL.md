@@ -40,15 +40,16 @@ How to dispatch a role depends on the tool:
    has pre-existing findings, and the audit must only flag new ones.
 4. Write a concise implementation spec:
    - Target files and functions, including changes the architecture rules
-     require (layer boundaries, shared schemas, widget registration, theme
-     helpers, characterization tests).
+     require (layer boundaries, shared schemas, pure domain helpers, theme
+     tokens/palettes, characterization tests).
    - Required inputs, outputs, and edge cases (from the spec, schema, or rule
      YAML, not speculative guards).
    - Exact verification commands: targeted `uv run pytest ...`,
-     `uv run pytest`, `uv run ruff check <files>`, `uv run mypy <files>`.
-     For dashboard changes, add a manual check against seeded data
+     `uv run pytest`, `uv run ruff check <files>`, `uv run mypy <files>`, and
+     for frontend changes `cd frontend && npm run typecheck && npm test && npm run build`.
+     For dashboard changes, add a visual check against seeded data
      (`uv run python tools/local_data_manager.py`, then
-     `uv run streamlit run app/dashboard/main.py`) in light and dark mode.
+     `uv run python -m app.dashboard`) in light and dark mode.
    - Minimal surface area: no speculative abstractions.
 
 ## Phase 2: Implementation (`coder`)

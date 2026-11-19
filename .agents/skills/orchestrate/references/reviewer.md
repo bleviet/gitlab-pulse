@@ -8,5 +8,5 @@ Check the change against the specification and the rules in AGENTS.md for:
 - Over-engineering or unnecessary defensive code.
 - Edge cases from the spec or schema that are not handled.
 - Missing regression tests.
-- Architecture rule violations: upward-layer imports (collector importing processor/dashboard, processor importing dashboard), schemas redefined outside `app/shared/schemas.py`, `iterrows()` or row loops over DataFrames, tz-naive date arithmetic, non-atomic file writes, hardcoded colors instead of `app/dashboard/theme.py` / `.streamlit/config.toml`, `use_container_width` on charts or dataframes, new ruff/mypy findings in touched files, generated `data/` files or `.env` added.
+- Architecture rule violations: upward-layer imports (collector importing processor/dashboard, processor importing dashboard), schemas redefined outside `app/shared/schemas.py`, `iterrows()` or row loops over DataFrames, tz-naive date arithmetic, non-atomic file writes, hardcoded colors instead of `app/dashboard/palettes.py` / `frontend/src/styles/tokens.css`, broken URL facet/view contracts, new ruff/mypy findings in touched files, generated `data/` files or `.env` added.
 Report each finding with file:line, classified as [BLOCKER], [MAJOR], or [NIT].

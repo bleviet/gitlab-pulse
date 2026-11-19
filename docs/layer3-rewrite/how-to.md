@@ -60,7 +60,7 @@ npm run build
 
 1. Add the field to `IssueFacets` in `frontend/src/lib/types.ts`.
 2. Register the key in `FACET_KEYS`, validate it inside `cleanFacets()`, apply the filter predicate in `applyFacets()`, and emit a chip label in `buildFacetChips()` inside `frontend/src/lib/facets.ts`.
-3. Trigger updates via `onChangeFacets` (in `IssuePanel.tsx`) or `onSetChartFilter` (in `AnalyticsView.tsx`).
+3. Trigger updates via `onChangeFacets` (in `IssuePanel.tsx`) or `onSetChartFilter` (in `OverviewWorkspace.tsx`).
 4. Add unit tests in `frontend/src/lib/__tests__/facets.test.ts` verifying filtering, URL serialization (`f_<key>`), and malformed-value rejection.
 
 ## Override Semantic Data Colors via YAML Rules

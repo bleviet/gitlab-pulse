@@ -4,7 +4,10 @@ import {
   applyGlobalFilters,
   buildFacetChips,
   buildUrlSearch,
+  deriveScopedFilterOptions,
+  parseGlobalFiltersUrl,
   parseUrlState,
+  resolvePresetDates,
   withoutFacet,
 } from "../facets";
 import type { GlobalFilters, IssueItem } from "../types";
@@ -142,5 +145,101 @@ describe("facets", () => {
     ]);
 
     expect(applyGlobalFilters(sample, gf).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("cascades context and milestone options and resolves preset dates", () => {
+    const multiTeam = [
+      makeIssue({ id: 1, team: "alpha", contexts: ["proj::A"], milestone: "v1.0" }),
+      makeIssue({ id: 2, team: "alpha", contexts: ["proj::B"], milestone: "v1.1" }),
+      makeIssue({ id: 3, team: "beta", contexts: ["proj::C"], milestone: "v2.0" }),
+    ];
+    const baseOptions = {
+      teams: ["alpha", "beta"],
+      contexts: ["proj::A", "proj::B", "proj::C"],
+      milestones: ["v1.0", "v1.1", "v2.0"],
+      min_date: "2026-01-01",
+      max_date: "2026-11-18",
+    };
+
+    expect(
+      deriveScopedFilterOptions(multiTeam, { team: "alpha", context: "All" }, baseOptions),
+    ).toEqual({
+      teams: ["alpha", "beta"],
+      contexts: ["proj::A", "proj::B"],
+      milestones: ["v1.0", "v1.1"],
+    });
+
+    expect(
+      deriveScopedFilterOptions(multiTeam, { team: "alpha", context: "proj::B" }, baseOptions),
+    ).toEqual({
+      teams: ["alpha", "beta"],
+      contexts: ["proj::A", "proj::B"],
+      milestones: ["v1.1"],
+    });
+
+    expect(resolvePresetDates("30d", "2026-01-01", "2026-11-18")).toEqual({
+      startDate: "2026-10-19",
+      endDate: "2026-11-18",
+    });
+    expect(resolvePresetDates("90d", "2026-01-01", "2026-11-18")).toEqual({
+      startDate: "2026-08-20",
+      endDate: "2026-11-18",
+    });
+    expect(resolvePresetDates("1y", "2026-06-01", "2026-11-18")).toEqual({
+      startDate: "2026-06-01",
+      endDate: "2026-11-18",
+    });
+    expect(resolvePresetDates("all", "2026-01-01", "2026-11-18")).toEqual({
+      startDate: "2026-01-01",
+      endDate: "2026-11-18",
+    });
+    expect(resolvePresetDates("custom", "2026-01-01", "2026-11-18", "2026-03-01", "2026-04-01")).toEqual({
+      startDate: "2026-03-01",
+      endDate: "2026-04-01",
+    });
+  });
+
+  it("round-trips global scope filters in URL search and ignores defaults or malformed dates", () => {
+    const defaultSearch = buildUrlSearch(true, null, {}, {
+      team: "All",
+      context: "All",
+      milestone: "All",
+      preset: "all",
+      startDate: "2026-01-01",
+      endDate: "2026-11-18",
+    });
+    expect(defaultSearch).toBe("");
+
+    const scopedSearch = buildUrlSearch(true, null, { stage: "Review" }, {
+      team: "alpha",
+      context: "proj::A",
+      milestone: "v1.0",
+      preset: "90d",
+    });
+    expect(scopedSearch).toContain("g_team=alpha");
+    expect(scopedSearch).toContain("g_context=proj%3A%3AA");
+    expect(scopedSearch).toContain("g_milestone=v1.0");
+    expect(scopedSearch).toContain("g_preset=90d");
+    expect(parseGlobalFiltersUrl(scopedSearch)).toEqual({
+      team: "alpha",
+      context: "proj::A",
+      milestone: "v1.0",
+      preset: "90d",
+    });
+
+    const customSearch = buildUrlSearch(false, null, {}, {
+      preset: "custom",
+      startDate: "2026-05-01",
+      endDate: "2026-06-15",
+    });
+    expect(parseGlobalFiltersUrl(customSearch)).toEqual({
+      preset: "custom",
+      startDate: "2026-05-01",
+      endDate: "2026-06-15",
+    });
+
+    expect(parseGlobalFiltersUrl("?g_preset=custom&g_start=not-a-date&g_end=2026-99-99")).toEqual({
+      preset: "custom",
+    });
   });
 });

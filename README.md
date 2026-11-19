@@ -13,16 +13,16 @@ GitLab Pulse is a local-first analytics application for GitLab issue data. It ex
 ## Visual Insights
 
 ### One workspace, toggleable charts
-GitLab Pulse renders a single-viewport Overview workspace with a persistent Release Timeline rail and a **Charts** toggle in the top bar. Keep **Charts** on (default) for visual breakdown across priority mix, quality signals, 7-day velocity, and workflow stage bars; toggle **Charts** off (`?view=compact`) to reveal the quick-filter summary pills and maximize space for the issue table or board. Filters and the charts toggle state are kept in the URL.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">
-  <img alt="Compact layout" src="docs/images/screenshots/hp_compact.png">
-</picture>
+GitLab Pulse renders a single-viewport Overview workspace with a persistent Release Timeline rail, a unified tokenized scope bar in the top navigation bar (type `proj v14` to quick-apply context and milestone together), and a **Charts** toggle. Keep **Charts** on (default) for `Open Mix` (`Priority · Type`), `Workflow State` (open stages and closed `Done` with inline priority counts), `Daily New vs. Closed`, and `Issue Quality Signals`; toggle **Charts** off (`?view=compact`) to reveal quick-filter summary pills and maximize space for the issue table or board. Scopes, facets, search, and chart visibility all stay synced in the URL.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_analytics_dark.png">
-  <img alt="Analytics layout" src="docs/images/screenshots/hp_analytics.png">
+  <img alt="Charts ON cockpit layout" src="docs/images/screenshots/hp_analytics.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_compact_dark.png">
+  <img alt="Charts OFF triage layout" src="docs/images/screenshots/hp_compact.png">
 </picture>
 
 ### Board and table
@@ -39,15 +39,15 @@ Each board lane shows its stage's priority mix; pick a priority there, or a pill
 </picture>
 
 ### Search
-Press Ctrl+K (⌘K on macOS) to focus the search field in the toolbar; the board filters as you type, with fuzzy matching across title, assignee, context, milestone, priority and stage.
+Use the TopBar scope bar to fuzzy-search `Context`, `Milestone`, or `Team` (`proj v14`), or press `Ctrl+K` (`⌘K` on macOS) to focus the toolbar issue search field with typo-tolerant matching across title, assignee, context, milestone, priority, and stage.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_search_dark.png">
-  <img alt="Search field filtering the board" src="docs/images/screenshots/hp_search.png">
+  <img alt="Unified scope search and issue search filtering the table" src="docs/images/screenshots/hp_search.png">
 </picture>
 
 ### Charts as filters
-In the Analytics layout, a click on a bar, a donut slice, a day or a quality signal filters the board below; a second click clears it.
+With Charts on, clicking a donut slice or legend item, a workflow-state bar segment or stage name (open or `Done`), a velocity day point, or a quality signal filters the issue list in place; clicking the active element again clears it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_chart_filter_dark.png">
@@ -58,7 +58,7 @@ In the Analytics layout, a click on a bar, a donut slice, a day or a quality sig
 
 ## Architecture
 
-GitLab Pulse implements a standard **Medallion Data Architecture** (Bronze ➡️ Silver ➡️ Gold) for data processing.
+GitLab Pulse implements a standard **Medallion Data Architecture** (Bronze -> Silver -> Gold) for data processing.
 
 ```mermaid
 flowchart LR
@@ -180,7 +180,7 @@ uv run python tools/local_data_manager.py
 ```
 This CLI allows you to reseed specific projects, clear data lakes, and adjust the assignment rates or team sizes for realistic testing. 
 
-> 🤖 **AI Support**: A dedicated `SKILL.md` is provided in the repository to help AI assistants automatically detect, manage, and interact with the local data manager script on your behalf.
+> **AI Support**: A dedicated `SKILL.md` is provided in the repository to help AI assistants automatically detect, manage, and interact with the local data manager script on your behalf.
 
 ---
 

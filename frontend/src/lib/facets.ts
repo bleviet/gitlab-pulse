@@ -1,5 +1,11 @@
 import { filterIssuesBySearch } from "./search";
-import type { GlobalFilters, IssueFacets, IssueItem } from "./types";
+import type {
+  FilterOptions,
+  GlobalFilters,
+  IssueFacets,
+  IssueItem,
+  TimePreset,
+} from "./types";
 
 export const RECENT_DAYS = 7;
 export const FACET_QUERY_PREFIX = "f_";
@@ -272,6 +278,113 @@ export function buildFacetChips(
   return chips;
 }
 
+const PRESET_VALUES: TimePreset[] = ["30d", "90d", "1y", "all", "custom"];
+
+function isValidIsoDate(value: string | null): value is string {
+  return Boolean(
+    value &&
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      !Number.isNaN(Date.parse(`${value}T00:00:00Z`)),
+  );
+}
+
+export function subtractDaysIso(endIso: string, days: number, minIso: string): string {
+  const endMs = Date.parse(`${endIso}T00:00:00Z`);
+  if (Number.isNaN(endMs)) return minIso;
+  const candidate = new Date(endMs - days * 86_400_000).toISOString().slice(0, 10);
+  return minIso && candidate < minIso ? minIso : candidate;
+}
+
+export function resolvePresetDates(
+  preset: TimePreset,
+  minDate: string,
+  maxDate: string,
+  currentStart = "",
+  currentEnd = "",
+): { startDate: string; endDate: string } {
+  if (preset === "all") {
+    return { startDate: minDate, endDate: maxDate };
+  }
+  if (preset === "custom") {
+    return {
+      startDate: currentStart || minDate,
+      endDate: currentEnd || maxDate,
+    };
+  }
+  const days = preset === "30d" ? 30 : preset === "90d" ? 90 : 365;
+  return {
+    startDate: maxDate ? subtractDaysIso(maxDate, days, minDate) : minDate,
+    endDate: maxDate,
+  };
+}
+
+export function deriveScopedFilterOptions(
+  issues: IssueItem[],
+  filters: Pick<GlobalFilters, "team" | "context">,
+  baseOptions: FilterOptions,
+): { teams: string[]; contexts: string[]; milestones: string[] } {
+  const contexts = (() => {
+    if (filters.team === "All") return baseOptions.contexts;
+    const contextSet = new Set<string>();
+    for (const issue of issues) {
+      if (issue.team !== filters.team) continue;
+      for (const ctx of issue.contexts) {
+        contextSet.add(ctx);
+      }
+    }
+    return baseOptions.contexts.filter((c) => contextSet.has(c));
+  })();
+
+  const milestones = (() => {
+    if (filters.team === "All" && filters.context === "All") {
+      return baseOptions.milestones;
+    }
+    const milestoneSet = new Set<string>();
+    for (const issue of issues) {
+      if (filters.team !== "All" && issue.team !== filters.team) continue;
+      if (filters.context !== "All" && !issue.contexts.includes(filters.context)) continue;
+      if (issue.milestone) {
+        milestoneSet.add(issue.milestone);
+      }
+    }
+    return baseOptions.milestones.filter((m) => milestoneSet.has(m));
+  })();
+
+  return {
+    teams: baseOptions.teams,
+    contexts,
+    milestones,
+  };
+}
+
+export function parseGlobalFiltersUrl(search: string): Partial<GlobalFilters> {
+  const params = new URLSearchParams(search);
+  const parsed: Partial<GlobalFilters> = {};
+
+  const team = (params.get("g_team") ?? "").trim();
+  if (team && team !== "All") parsed.team = team;
+
+  const context = (params.get("g_context") ?? "").trim();
+  if (context && context !== "All") parsed.context = context;
+
+  const milestone = (params.get("g_milestone") ?? "").trim();
+  if (milestone && milestone !== "All") parsed.milestone = milestone;
+
+  const presetRaw = (params.get("g_preset") ?? "").trim().toLowerCase();
+  if (PRESET_VALUES.includes(presetRaw as TimePreset)) {
+    const preset = presetRaw as TimePreset;
+    parsed.preset = preset;
+    if (preset === "custom") {
+      const start = (params.get("g_start") ?? "").trim();
+      const end = (params.get("g_end") ?? "").trim();
+      if (isValidIsoDate(start)) parsed.startDate = start;
+      if (isValidIsoDate(end)) parsed.endDate = end;
+    }
+  }
+
+  return parsed;
+}
+
 export function parseUrlState(search: string): {
   chartsVisible: boolean;
   summaryId: string | null;
@@ -297,6 +410,7 @@ export function buildUrlSearch(
   chartsVisible: boolean,
   summaryId: string | null,
   facets: IssueFacets,
+  globalFilters?: Partial<GlobalFilters>,
 ): string {
   const params = new URLSearchParams();
   if (!chartsVisible) {
@@ -309,6 +423,28 @@ export function buildUrlSearch(
     const val = facets[key];
     if (val) {
       params.set(`${FACET_QUERY_PREFIX}${key}`, val);
+    }
+  }
+  if (globalFilters) {
+    if (globalFilters.team && globalFilters.team !== "All") {
+      params.set("g_team", globalFilters.team);
+    }
+    if (globalFilters.context && globalFilters.context !== "All") {
+      params.set("g_context", globalFilters.context);
+    }
+    if (globalFilters.milestone && globalFilters.milestone !== "All") {
+      params.set("g_milestone", globalFilters.milestone);
+    }
+    if (globalFilters.preset && globalFilters.preset !== "all") {
+      params.set("g_preset", globalFilters.preset);
+      if (globalFilters.preset === "custom") {
+        if (isValidIsoDate(globalFilters.startDate ?? null)) {
+          params.set("g_start", globalFilters.startDate as string);
+        }
+        if (isValidIsoDate(globalFilters.endDate ?? null)) {
+          params.set("g_end", globalFilters.endDate as string);
+        }
+      }
     }
   }
   const encoded = params.toString();

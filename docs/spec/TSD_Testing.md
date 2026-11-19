@@ -5,21 +5,24 @@
 
 ## 1. Automated Test Suite
 
-The repository currently ships a focused pytest suite covering:
+The repository ships a Python `pytest` suite (`tests/`) and a frontend `Vitest` suite (`frontend/src/lib/__tests__/`):
 
-- dashboard grid engine behavior
-- processor validation and enrichment behavior
-- collector orchestration edge cases
-- local synthetic data tools
-- setup/config safety checks
+- Backend (`uv run pytest`: 41 tests):
+  - FastAPI dashboard endpoints, auth/admin routes, and `DashboardService` mtime caching
+  - Processor validation and enrichment behavior
+  - Collector orchestration edge cases
+  - Hierarchy sorting
+  - Local synthetic data tools and setup/config safety checks
+- Frontend (`cd frontend && npm test`: 6 test files, 23 tests):
+  - `analytics.test.ts`, `board.test.ts`, `facets.test.ts`, `scopeSearch.test.ts`, `search.test.ts`, `timeline.test.ts`
+  - Plus TypeScript strict check (`npm run typecheck`) and production bundle build (`npm run build`)
 
-Current command:
+Current commands:
 
 ```bash
 uv run pytest tests/ -v
+cd frontend && npm run typecheck && npm test && npm run build
 ```
-
-At the time of this update, the suite contains **39 passing tests**.
 
 ## 2. Covered Surfaces
 
@@ -39,13 +42,14 @@ Tests verify:
 - validation failures for missing or conflicting labels
 - distinct issue counting in quality summaries
 
-### 2.3 Dashboard behavior
+### 2.3 Dashboard & Frontend Domain Logic
 
 Tests verify:
 
-- Streamlit grid width calculation
-- layout row grouping and ordering
-- overview/local-data helper functions used by the dashboard
+- `/api/health`, `/api/dashboard`, and `/api/admin/*` endpoints and session auth
+- `DashboardService` context collapsing, YAML palette resolution, and file-mtime cache invalidation
+- issue hierarchy indentation, lane ordering, and priority ranking
+- unified fuzzy scope search (`proj v14`), `Ctrl/Cmd+K` fuzzy issue search, URL query serialization (`f_*` / `g_*` / `view`), workflow state closed buckets, and milestone rail status calculations
 
 ### 2.4 Local demo tooling
 
@@ -63,7 +67,8 @@ Tests verify:
 ```bash
 uv run python tools/seeder.py --count 1000 --inject-errors
 uv run python app/processor/main.py
-uv run streamlit run app/dashboard/main.py
+cd frontend && npm run build && cd ..
+uv run python -m app.dashboard
 ```
 
 ### 3.2 Local data manager

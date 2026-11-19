@@ -1,6 +1,6 @@
 # Tutorial: First Run With the FastAPI + React Dashboard
 
-This walkthrough takes you from a fresh checkout of branch `feat/fastapi-react-dashboard` to running the dashboard locally on synthetic data and exercising Analytics view, Compact view, search, filters, and Admin Operations.
+This walkthrough takes you from a fresh checkout of branch `feat/fastapi-react-dashboard` to running the dashboard locally on synthetic data and exercising Charts on/off modes, tokenized scope search, inline issue search, and Admin Operations.
 
 ## Prerequisites
 
@@ -54,8 +54,8 @@ Click **Charts** in the top-right bar to toggle the four analytics cards off. No
    - In **Table** view, `Fit` sizing automatically fills the expanded height (use `10`, `20`, or `30` for fixed pages). Click column headers to sort or leave unsorted to view parent-child hierarchy indentation.
    - Click **Board** in the toolbar to switch to the Kanban lanes. Sticky lane headers display a stacked priority bar and clickable priority pills. Scroll horizontally on narrow screens—the lane headers remain aligned with the lanes below.
 
-## 6. Use Filters, Themes, and Admin Operations
+## 6. Use Global Scope Search, Time Presets, Themes, and Admin Operations
 
-1. Click **Filters** at the top-left of the navigation bar to open the collapsible drawer. Filter by `Domain / Team`, `Context / Sub-Project`, `Milestone`, or `Time Range` (`30 Days`, `90 Days`, `1 Year`, `All Time`). A badge on the `Filters` button shows how many drawer filters are active after you close it.
+1. Use the unified scope input centered in the top bar to filter by `Context`, `Milestone`, or `Team` (when multiple teams exist). Type multi-term fuzzy queries like `proj v14` to see `Quick apply` pairs (`project::A + v1.4`), or pick individual suggestions; each selection appears as a removable token. Beside it, pick `30d`, `90d`, `1y`, `All`, or click the calendar button for custom dates, and click the status-dot refresh button next to `Charts` to check or reload data.
 2. Click the sun/moon icon in the top-right bar to switch between dark mode (default) and light mode; the preference is saved in `localStorage` without reloading the page.
 3. Click **Ops** in the top-right bar, authenticate with your `ADMIN_PASSWORD` (default `admin`), and click **Run Processor (L2)** or **Clear Cache & Reload** to rebuild analytics and refresh the browser payload in place.

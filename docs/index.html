@@ -1331,10 +1331,10 @@
 
         <div class="hero-shot rise" style="--i: 4">
           <figure class="window">
-            <figcaption><b>localhost:8501</b><span>Overview &middot; Compact</span><span class="state">local &middot; your data</span></figcaption>
-            <img class="theme-image" src="images/screenshots/hp_compact_dark.png"
-          data-dark="images/screenshots/hp_compact_dark.png" data-light="images/screenshots/hp_compact.png"
-          width="2560" height="1600" alt="The Compact layout: a release rail, summary pills, and the issue board with a lane per workflow stage" />
+            <figcaption><b>localhost:8501</b><span>Overview &middot; Charts ON</span><span class="state">local &middot; your data</span></figcaption>
+            <img class="theme-image" src="images/screenshots/hp_analytics_dark.png"
+          data-dark="images/screenshots/hp_analytics_dark.png" data-light="images/screenshots/hp_analytics.png"
+          width="2880" height="1800" alt="GitLab Pulse Overview cockpit with unified scope bar, release timeline, Open Mix, Workflow State, velocity, quality signals, and issue table" />
           </figure>
         </div>
 
@@ -1343,10 +1343,10 @@
           <div class="marquee-track">
             <ul>
               <li>GitLab.com</li><li>Self-managed GitLab</li><li>REST API</li><li>GraphQL</li><li>YAML rules</li>
-              <li>Parquet</li><li>Streamlit</li><li>Plotly</li><li>Docker</li><li>uv</li>
+              <li>Parquet</li><li>FastAPI</li><li>React</li><li>TypeScript</li><li>Docker</li><li>uv</li>
               <li aria-hidden="true">GitLab.com</li><li aria-hidden="true">Self-managed GitLab</li>
               <li aria-hidden="true">REST API</li><li aria-hidden="true">GraphQL</li><li aria-hidden="true">YAML rules</li>
-              <li aria-hidden="true">Parquet</li><li aria-hidden="true">Streamlit</li><li aria-hidden="true">Plotly</li>
+              <li aria-hidden="true">Parquet</li><li aria-hidden="true">FastAPI</li><li aria-hidden="true">React</li><li aria-hidden="true">TypeScript</li>
               <li aria-hidden="true">Docker</li><li aria-hidden="true">uv</li>
             </ul>
           </div>
@@ -1358,18 +1358,16 @@
     <section class="block wrap" id="overview">
       <p class="marker reveal" style="--c: var(--chart-2)"><span>Overview</span></p>
       <div class="split reveal">
-        <h2>Two layouts. One board, one filter, one link.</h2>
+        <h2>One workspace. Toggleable charts, unified scope, one link.</h2>
         <div class="split-side">
-          <p><b>Compact</b> puts the board first for daily triage: a thin release rail, the summary pills, and the
-            lanes. <b>Analytics</b> puts the charts above the same board for reviews. Both share the filter, and the
-            filter and the layout are kept in the URL, so a link shows the same view.</p>
+          <p>Keep <b>Charts</b> on for the 380&nbsp;px analytics rail next to your live issue table, or toggle charts off for high-density triage with quick-filter summary pills. The release rail, time presets, unified scope search, active facets, and view toggle stay synced in the URL.</p>
         </div>
       </div>
       <figure class="window wide-shot reveal">
-        <figcaption><b>localhost:8501</b><span>Overview &middot; Analytics</span></figcaption>
-        <img class="theme-image" loading="lazy" src="images/screenshots/hp_analytics_dark.png"
-          data-dark="images/screenshots/hp_analytics_dark.png" data-light="images/screenshots/hp_analytics.png"
-          width="2560" height="1426" alt="The Analytics layout: release timeline, priority donuts, quality signals, daily new versus closed issues, and issues by workflow state" />
+        <figcaption><b>localhost:8501</b><span>Overview &middot; Charts OFF (?view=compact)</span></figcaption>
+        <img class="theme-image" loading="lazy" src="images/screenshots/hp_compact_dark.png"
+          data-dark="images/screenshots/hp_compact_dark.png" data-light="images/screenshots/hp_compact.png"
+          width="2880" height="1800" alt="The Charts OFF overview: release rail, quick-filter summary pills, and full-height issue table" />
       </figure>
     </section>
 
@@ -1388,7 +1386,7 @@
         </div>
         <img class="theme-image editor-shot" loading="lazy" src="images/screenshots/hp_board_dark.png"
           data-dark="images/screenshots/hp_board_dark.png" data-light="images/screenshots/hp_board.png"
-          width="1544" height="1054" alt="Three board lanes; the Implementation lane is marked after picking its P1 priority" />
+          width="2862" height="1520" alt="Board lanes with the Implementation P1 priority pill active and marked" />
       </div>
 
       <div class="bento">
@@ -1397,7 +1395,7 @@
             <div>
               <h3>A table when you need the columns</h3>
               <p>The same issues as rows: title that opens the issue in GitLab, context labels, stage, priority, days in stage,
-                milestone, assignee, and quality hints. By default the table shows as many rows as fit in the window (or 10, 20 or 30 per page), each page shown in full.</p>
+                milestone, assignee, and quality hints. By default the table shows as many rows as fit in the window (Fit, or 10, 20 or 30 per page), each page shown in full.</p>
             </div>
             <div class="chips">
               <span class="chip" style="--c: var(--chart-7)">Fit &middot; 10 &middot; 20 &middot; 30 rows</span>
@@ -1406,7 +1404,7 @@
           </div>
           <img class="theme-image shot-top" loading="lazy" src="images/screenshots/hp_table_dark.png"
           data-dark="images/screenshots/hp_table_dark.png" data-light="images/screenshots/hp_table.png"
-          width="2464" height="1122" alt="The issue table with ten rows and the page bar" />
+          width="2862" height="1520" alt="The issue table filling the viewport height with pinned column headers" />
         </article>
       </div>
     </section>
@@ -1415,19 +1413,17 @@
     <section class="block wrap" id="search">
       <p class="marker reveal" style="--c: var(--chart-6)"><span>Search</span></p>
       <div class="split reveal">
-        <h2>Press <span class="mono">&#8984;K</span> and type.</h2>
+        <h2>Fuzzy scope &amp; <span class="mono">&#8984;K</span> issue search.</h2>
         <div class="split-side">
-          <p>The search field in the toolbar widens and takes the cursor; the board filters as you type. Every word
-            has to appear in the title, assignee, context, milestone, priority, or stage, with a fallback to similar
-            words when nothing matches exactly.</p>
-          <p class="keys">Press <kbd>Ctrl</kbd><kbd>K</kbd> or <kbd>&#8984;</kbd><kbd>K</kbd> anywhere on the page</p>
+          <p>Type multi-term queries like <span class="mono">proj v14</span> in the top scope input to quick-apply Context and Milestone tokens together, or press <span class="mono">&#8984;K</span> to filter the table instantly across title, assignee, context, milestone, priority, and stage with typo-tolerant matching.</p>
+          <p class="keys">Press <kbd>Ctrl</kbd><kbd>K</kbd> or <kbd>&#8984;</kbd><kbd>K</kbd> for issue search</p>
         </div>
       </div>
       <figure class="window wide-shot reveal">
-        <figcaption><b>localhost:8501</b><span>Overview &middot; Compact &middot; search &ldquo;crash&rdquo;</span></figcaption>
+        <figcaption><b>localhost:8501</b><span>Scope &ldquo;proj v14&rdquo; + issue search &ldquo;crash&rdquo;</span></figcaption>
         <img class="theme-image" loading="lazy" src="images/screenshots/hp_search_dark.png"
           data-dark="images/screenshots/hp_search_dark.png" data-light="images/screenshots/hp_search.png"
-          width="2464" height="1240" alt="The search field holding the word crash, and the board filtered to the 37 matching issues" />
+          width="2880" height="1520" alt="Unified scope search showing Quick apply combinations for proj v14 alongside issue search results for crash" />
       </figure>
     </section>
 
@@ -1437,16 +1433,14 @@
       <div class="split reveal">
         <h2>Charts that filter the board.</h2>
         <div class="split-side">
-          <p>Click a bar, a donut slice, a day, or a quality signal: the board below shows those issues, and the
-            other charts dim. Click it again to clear the filter. The workflow-state row stays pinned above the board,
-            with each stage over its lane.</p>
+          <p>Click any slice, legend item, workflow segment, velocity point, or quality hint: the issue table updates in place inside your browser and sibling elements dim. Click it again—or dismiss its chip—to clear the filter.</p>
         </div>
       </div>
       <figure class="window wide-shot reveal">
-        <figcaption><b>localhost:8501</b><span>Overview &middot; Analytics &middot; Implementation, P2</span></figcaption>
+        <figcaption><b>localhost:8501</b><span>Overview &middot; Workflow State: Implementation, P2</span></figcaption>
         <img class="theme-image" loading="lazy" src="images/screenshots/hp_chart_filter_dark.png"
           data-dark="images/screenshots/hp_chart_filter_dark.png" data-light="images/screenshots/hp_chart_filter.png"
-          width="2504" height="1308" alt="The P2 bar of the Implementation stage selected; the other bars are dimmed and the board shows P2 issues with the Implementation lane marked" />
+          width="2880" height="1800" alt="Workflow State Implementation P2 segment selected with sibling stages dimmed and matching issues listed beside it" />
       </figure>
 
       <article class="card big reveal" style="margin-top: 1.25rem">
@@ -1456,44 +1450,44 @@
             filter the dashboard by that milestone.</p>
         </div>
         <div class="panel-shot">
-          <img class="theme-image" loading="lazy" style="width: 928px" src="images/screenshots/hp_timeline_dark.png"
+          <img class="theme-image" loading="lazy" src="images/screenshots/hp_timeline_dark.png"
           data-dark="images/screenshots/hp_timeline_dark.png" data-light="images/screenshots/hp_timeline.png"
-          width="1856" height="444" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line" />
+          width="2830" height="180" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line" />
         </div>
       </article>
 
       <div class="panels">
         <article class="card reveal">
           <div class="pad">
-            <h3>Priority mix</h3>
-            <p>Open and closed issues by priority. The centre selects them all.</p>
+            <h3>Open mix: priority &amp; type</h3>
+            <p>Open issues broken down by priority and work type, with clickable color legends and totals.</p>
           </div>
           <div class="panel-shot">
-            <img class="theme-image" loading="lazy" style="width: 309px" src="images/screenshots/hp_priority_dark.png"
+            <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_priority_dark.png"
           data-dark="images/screenshots/hp_priority_dark.png" data-light="images/screenshots/hp_priority.png"
-          width="618" height="444" alt="Open issues by priority: 408 open issues as a donut" />
+          width="756" height="378" alt="Open issues by priority and issue type donuts with clickable legends" />
           </div>
         </article>
         <article class="card reveal" style="--i: 1">
           <div class="pad">
             <h3>Quality signals</h3>
-            <p>Open issues without a milestone, an assignee, or a clear type.</p>
+            <p>Open issues missing a milestone, assignee, or clean classification.</p>
           </div>
           <div class="panel-shot">
-            <img class="theme-image" loading="lazy" style="width: 309px" src="images/screenshots/hp_quality_dark.png"
+            <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_quality_dark.png"
           data-dark="images/screenshots/hp_quality_dark.png" data-light="images/screenshots/hp_quality.png"
-          width="618" height="444" alt="Issue quality signals: missing milestone, unassigned owner, mixed classification" />
+          width="756" height="158" alt="Issue quality signals showing open hint counts" />
           </div>
         </article>
         <article class="card span-2 reveal" style="--i: 2">
           <div class="pad">
             <h3>New versus closed, per day</h3>
-            <p>The last seven days. Click a day to see the issues opened or closed on it.</p>
+            <p>A 7-day flow window anchored to recent or historical activity. Click a point to inspect created or closed issues.</p>
           </div>
           <div class="panel-shot">
-            <img class="theme-image" loading="lazy" style="width: 617px" src="images/screenshots/hp_velocity_dark.png"
+            <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_velocity_dark.png"
           data-dark="images/screenshots/hp_velocity_dark.png" data-light="images/screenshots/hp_velocity.png"
-          width="1234" height="444" alt="Daily new versus closed issues over seven days" />
+          width="756" height="300" alt="Daily new versus closed issues over seven days" />
           </div>
         </article>
       </div>
@@ -1506,7 +1500,7 @@
         <h2>Your issues stay on your machine.</h2>
         <div class="split-side">
           <p>A collector pulls issues from the GitLab REST and GraphQL APIs, a processor applies your YAML rules and
-            writes Parquet files, and the dashboard reads them. Nothing leaves the machine it runs on.</p>
+            writes Parquet files, and the FastAPI + React dashboard serves them. Nothing leaves the machine it runs on.</p>
         </div>
       </div>
       <article class="card big headless reveal">
@@ -1517,13 +1511,13 @@
           <a class="more" href="https://github.com/bleviet/gitlab-pulse#connecting-live-gitlab-data">Connect your GitLab <span aria-hidden="true">&rarr;</span></a>
         </div>
         <div class="terminal" role="img"
-          aria-label="Terminal: uv run python app/collector/orchestrator.py; uv run python app/processor/main.py; uv run streamlit run app/dashboard/main.py">
+          aria-label="Terminal: uv run python app/collector/orchestrator.py; uv run python app/processor/main.py; uv run python -m app.dashboard">
           <div class="c"># fetch issues from the GitLab API (only what changed)</div>
           <div><span class="p">$</span> <span class="k">uv run python</span> <span class="f">app/collector/orchestrator.py</span></div>
           <div class="c"># map labels to stages with your rules, write Parquet</div>
           <div><span class="p">$</span> <span class="k">uv run python</span> <span class="f">app/processor/main.py</span></div>
-          <div class="c"># open the dashboard on http://localhost:8501</div>
-          <div><span class="p">$</span> <span class="k">uv run streamlit run</span> <span class="f">app/dashboard/main.py</span></div>
+          <div class="c"># start the FastAPI + React dashboard on http://localhost:8501</div>
+          <div><span class="p">$</span> <span class="k">uv run python -m</span> <span class="f">app.dashboard</span></div>
           <div class="c"># or try it first with synthetic data</div>
           <div><span class="p">$</span> <span class="k">docker compose up</span> <span class="o">--build</span></div>
         </div>
@@ -1556,8 +1550,7 @@
         <div class="sheet-row reveal">
           <span class="addr mono">0x0C</span>
           <h3>Links that keep the view</h3>
-          <p>Filters, the layout, and the search are part of the URL, so a shared link opens the same
-            view.</p>
+          <p>Global scope tokens, date presets, chart facets, search text, and the Charts toggle stay synced in the URL so any shared link restores the same view.</p>
         </div>
         <div class="sheet-row reveal">
           <span class="addr mono">0x10</span>

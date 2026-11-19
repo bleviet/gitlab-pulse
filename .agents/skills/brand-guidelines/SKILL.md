@@ -1,6 +1,6 @@
 ---
 name: brand-guidelines
-description: Applies bahonavi's official brand colors, gradients, and typography to any artifact that may benefit from having bahonavi's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply, including the GitLab Pulse Streamlit dashboard theme (.streamlit/config.toml, app/dashboard/theme.py), charts, docs diagrams, and screenshots.
+description: Applies bahonavi's official brand colors, gradients, and typography to any artifact that may benefit from having bahonavi's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply, including the GitLab Pulse React dashboard theme (frontend/src/styles/tokens.css, app/dashboard/palettes.py), SVG charts, docs diagrams, and screenshots.
 ---
 
 # bahonavi Brand Styling
@@ -15,21 +15,17 @@ bahonavi (*Back Home Navigation*) builds intelligent software, web applications,
 
 ## Where the brand lives in GitLab Pulse
 
-The dashboard is a Streamlit app, so the tokens below are not CSS variables
-here. They are mapped as follows; change the mapping, not the tokens:
+UI chrome colors and fonts are CSS variables in the React frontend; semantic data colors are resolved in Python from YAML rule overrides and served to SVG charts:
 
 | Brand token | GitLab Pulse location |
 |---|---|
-| `--bg`, `--bg-card`, `--text`, `--accent` (link), `--brand` (primary) | `.streamlit/config.toml` `[theme.dark]` / `[theme.light]` (`backgroundColor`, `secondaryBackgroundColor`, `textColor`, `linkColor`, `primaryColor`) and their `.sidebar` tables |
-| `--chart-1` ... `--chart-8` (dark) | `.streamlit/config.toml` `chartCategoricalColors` |
-| Semantic data colors (issue type, stage, severity, milestone), light and dark | `_SEMANTIC_LIGHT` / `_SEMANTIC_DARK` in `app/dashboard/theme.py`, read via `get_palette()` |
-| Fonts | Self-hosted in `app/dashboard/static/` (served at `/app/static/`) and registered in `[[theme.fontFaces]]`; `FONT_BODY` / `FONT_HEADING` / `FONT_CODE` in `theme.py` |
-| Logo, favicon | `app/dashboard/static/logo.svg`, `app/dashboard/static/favicon.png`, `docs/images/logo.svg` |
+| `--bg`, `--bg-card`, `--bg-raise`, `--surface`, `--text`, `--heading`, `--muted`, `--accent`, `--brand`, `--grad` | `frontend/src/styles/tokens.css` under `:root` (dark default) and `[data-theme="light"]` |
+| `--chart-1` ... `--chart-8` | `frontend/src/styles/tokens.css` (`:root` / `[data-theme="light"]`) |
+| Semantic data colors (issue type, priority, severity, stage, milestone), light and dark | `_SEMANTIC_LIGHT` / `_SEMANTIC_DARK` + `resolve_palettes()` in `app/dashboard/palettes.py`, consumed in `frontend/src/lib/colors.ts` |
+| Fonts | Self-hosted in `frontend/public/static/` (`Manrope`, `Space Grotesk`, `Space Mono`) and declared in `frontend/src/styles/fonts.css` |
+| Logo, favicon | `frontend/public/static/logo.svg`, `frontend/public/static/favicon.png`, `docs/images/logo.svg` |
 
-The dashboard defaults to dark (`[theme] base = "dark"`); both modes must stay
-usable because users can switch in Streamlit settings. GitLab Pulse also uses
-**Space Mono** as the code / monospace font (`codeFont`), which is not part of
-the general brand typography below.
+The dashboard defaults to dark mode in `frontend/src/App.tsx`; both modes must stay usable via the TopBar theme switcher. GitLab Pulse also uses **Space Mono** as the monospace font (`--font-mono`) for tabular counts, dates, and issue IDs.
 
 ---
 

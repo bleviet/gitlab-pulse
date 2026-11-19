@@ -1,12 +1,16 @@
-import { BarChart3, Moon, PanelLeft, Shield, Sun } from "lucide-react";
-import type { ThemeMode } from "../lib/types";
+import type { ReactNode } from "react";
+import { BarChart3, Moon, RefreshCw, Shield, Sun } from "lucide-react";
+import type { SyncStatus, ThemeMode } from "../lib/types";
 
 interface TopBarProps {
   chartsVisible: boolean;
   theme: ThemeMode;
-  activeSidebarCount: number;
   isAdmin: boolean;
-  onToggleSidebar: () => void;
+  scopeBar?: ReactNode;
+  syncStatus?: SyncStatus;
+  version?: string;
+  refreshing: boolean;
+  onRefreshData: () => void;
   onToggleCharts: () => void;
   onToggleTheme: () => void;
   onOpenAdmin: () => void;
@@ -15,27 +19,24 @@ interface TopBarProps {
 export function TopBar({
   chartsVisible,
   theme,
-  activeSidebarCount,
   isAdmin,
-  onToggleSidebar,
+  scopeBar,
+  syncStatus,
+  version,
+  refreshing,
+  onRefreshData,
   onToggleCharts,
   onToggleTheme,
   onOpenAdmin,
 }: TopBarProps) {
+  const isSyncError = Boolean(syncStatus && /error|fail/i.test(syncStatus.status));
+  const syncTitle = syncStatus
+    ? `Status: ${syncStatus.status} · Last sync: ${syncStatus.last_sync}${version ? ` · v${version}` : ""} — Click to refresh`
+    : "Refresh dashboard data";
+
   return (
     <header className="pulse-topbar">
       <div className="pulse-topbar-left">
-        <button
-          type="button"
-          className="pulse-icon-btn"
-          aria-label="Toggle filters sidebar"
-          onClick={onToggleSidebar}
-        >
-          <PanelLeft size={16} />
-          <span>Filters</span>
-          {activeSidebarCount > 0 && <span className="pulse-badge">{activeSidebarCount}</span>}
-        </button>
-
         <div className="pulse-brand">
           <img
             src="/static/logo.svg"
@@ -50,7 +51,26 @@ export function TopBar({
         </div>
       </div>
 
+      {scopeBar && <div className="pulse-topbar-center">{scopeBar}</div>}
+
       <div className="pulse-topbar-right">
+        {syncStatus && (
+          <button
+            type="button"
+            className="pulse-icon-btn"
+            disabled={refreshing}
+            onClick={onRefreshData}
+            title={syncTitle}
+            aria-label={`Refresh data (${syncStatus.status}, last sync ${syncStatus.last_sync})`}
+          >
+            <span
+              className={`scope-status-dot${isSyncError ? " error" : ""}`}
+              aria-hidden="true"
+            />
+            <RefreshCw size={14} className={refreshing ? "pulse-spin" : undefined} />
+          </button>
+        )}
+
         <button
           type="button"
           className="pulse-icon-btn pulse-toggle-btn"

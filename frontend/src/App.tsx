@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminModal } from "./components/AdminModal";
 import { IssuePanel } from "./components/IssuePanel";
 import { OverviewWorkspace } from "./components/OverviewWorkspace";
-import { SidebarDrawer } from "./components/SidebarDrawer";
+import { ScopeBar } from "./components/ScopeBar";
 import { SummaryBar } from "./components/SummaryBar";
 import { TopBar } from "./components/TopBar";
 import {
@@ -16,7 +16,10 @@ import {
   applyGlobalFilters,
   applyPreMilestoneFilters,
   buildUrlSearch,
+  deriveScopedFilterOptions,
+  parseGlobalFiltersUrl,
   parseUrlState,
+  resolvePresetDates,
 } from "./lib/facets";
 import { buildSummaryGroups, type SummaryItem } from "./lib/summary";
 import type {
@@ -40,8 +43,12 @@ function getInitialTheme(): ThemeMode {
 
 export function App() {
   const initialUrl = useMemo(() => parseUrlState(window.location.search), []);
+  const initialGlobal = useMemo(() => parseGlobalFiltersUrl(window.location.search), []);
 
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
+  const payloadRef = useRef<DashboardPayload | null>(null);
+  payloadRef.current = payload;
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -53,18 +60,17 @@ export function App() {
   const [facets, setFacets] = useState<IssueFacets>(initialUrl.facets);
   const [activeChart, setActiveChart] = useState<ActiveChartId>(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [globalFilters, setGlobalFilters] = useState<GlobalFilters>({
-    team: "All",
-    context: "All",
-    milestone: "All",
-    startDate: "",
-    endDate: "",
-    preset: "all",
-  });
+  const [globalFilters, setGlobalFilters] = useState<GlobalFilters>(() => ({
+    team: initialGlobal.team ?? "All",
+    context: initialGlobal.context ?? "All",
+    milestone: initialGlobal.milestone ?? "All",
+    startDate: initialGlobal.startDate ?? "",
+    endDate: initialGlobal.endDate ?? "",
+    preset: initialGlobal.preset ?? "all",
+  }));
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -79,10 +85,37 @@ export function App() {
       const minD = data.filter_options.min_date ?? "";
       const maxD = data.filter_options.max_date ?? "";
       setGlobalFilters((prev) => {
-        if (prev.preset === "all" && !prev.startDate && !prev.endDate) {
-          return { ...prev, startDate: minD, endDate: maxD };
-        }
-        return prev;
+        const team =
+          prev.team !== "All" && data.filter_options.teams.includes(prev.team)
+            ? prev.team
+            : "All";
+        const validContexts = deriveScopedFilterOptions(
+          data.issues,
+          { team, context: "All" },
+          data.filter_options,
+        ).contexts;
+        const context =
+          prev.context !== "All" && validContexts.includes(prev.context)
+            ? prev.context
+            : "All";
+        const validMilestones = deriveScopedFilterOptions(
+          data.issues,
+          { team, context },
+          data.filter_options,
+        ).milestones;
+        const milestone =
+          prev.milestone !== "All" && validMilestones.includes(prev.milestone)
+            ? prev.milestone
+            : "All";
+        const dates = resolvePresetDates(prev.preset, minD, maxD, prev.startDate, prev.endDate);
+        return {
+          team,
+          context,
+          milestone,
+          preset: prev.preset,
+          startDate: dates.startDate,
+          endDate: dates.endDate,
+        };
       });
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -109,19 +142,40 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
-    const nextSearch = buildUrlSearch(chartsVisible, summaryId, facets);
+    if (!payload) return;
+    const nextSearch = buildUrlSearch(chartsVisible, summaryId, facets, globalFilters);
     if (window.location.search !== nextSearch) {
       const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
       window.history.replaceState(null, "", nextUrl);
     }
-  }, [chartsVisible, summaryId, facets]);
+  }, [payload, chartsVisible, summaryId, facets, globalFilters]);
 
   useEffect(() => {
     const onPopState = () => {
       const parsed = parseUrlState(window.location.search);
+      const parsedGlobal = parseGlobalFiltersUrl(window.location.search);
+      const curPayload = payloadRef.current;
+      const minD = curPayload?.filter_options.min_date ?? "";
+      const maxD = curPayload?.filter_options.max_date ?? "";
+      const preset = parsedGlobal.preset ?? "all";
+      const dates = resolvePresetDates(
+        preset,
+        minD,
+        maxD,
+        parsedGlobal.startDate ?? "",
+        parsedGlobal.endDate ?? "",
+      );
       setChartsVisible(parsed.chartsVisible);
       setSummaryId(parsed.summaryId);
       setFacets(parsed.facets);
+      setGlobalFilters({
+        team: parsedGlobal.team ?? "All",
+        context: parsedGlobal.context ?? "All",
+        milestone: parsedGlobal.milestone ?? "All",
+        preset,
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+      });
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -136,6 +190,14 @@ export function App() {
   }, [payload, theme]);
 
   const priorityOrder = payload?.palettes.priority_order ?? [];
+
+  const scopedFilterOptions = useMemo(
+    () =>
+      payload
+        ? deriveScopedFilterOptions(payload.issues, globalFilters, payload.filter_options)
+        : { teams: [], contexts: [], milestones: [] },
+    [payload, globalFilters],
+  );
 
   const preMilestoneIssues = useMemo(
     () => (payload ? applyPreMilestoneFilters(payload.issues, globalFilters) : []),
@@ -155,19 +217,37 @@ export function App() {
     [scopedIssues, activePalette, priorityOrder, theme],
   );
 
-  const activeSidebarCount = useMemo(() => {
-    let count = 0;
-    if (globalFilters.team !== "All") count += 1;
-    if (globalFilters.context !== "All") count += 1;
-    if (globalFilters.milestone !== "All") count += 1;
-    if (
-      (globalFilters.startDate && globalFilters.startDate !== defaultStartDate) ||
-      (globalFilters.endDate && globalFilters.endDate !== defaultEndDate)
-    ) {
-      count += 1;
+  const handleChangeGlobalFilters = (next: GlobalFilters) => {
+    if (!payload) {
+      setGlobalFilters(next);
+      return;
     }
-    return count;
-  }, [globalFilters, defaultStartDate, defaultEndDate]);
+    const validForTeam = deriveScopedFilterOptions(
+      payload.issues,
+      { team: next.team, context: "All" },
+      payload.filter_options,
+    );
+    const context =
+      next.context !== "All" && validForTeam.contexts.includes(next.context)
+        ? next.context
+        : "All";
+    const validForContext = deriveScopedFilterOptions(
+      payload.issues,
+      { team: next.team, context },
+      payload.filter_options,
+    );
+    const milestone =
+      next.milestone !== "All" && validForContext.milestones.includes(next.milestone)
+        ? next.milestone
+        : "All";
+    setGlobalFilters({ ...next, context, milestone });
+  };
+
+  const handleApplyIssueQueryFromScope = (query: string) => {
+    setSummaryId(null);
+    setActiveChart(null);
+    setFacets((prev) => ({ ...prev, query }));
+  };
 
   const handleToggleMilestone = (title: string) => {
     setGlobalFilters((prev) => ({
@@ -245,31 +325,30 @@ export function App() {
       <TopBar
         chartsVisible={chartsVisible}
         theme={theme}
-        activeSidebarCount={activeSidebarCount}
         isAdmin={isAdmin}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        syncStatus={payload?.sync_status}
+        version={payload?.version}
+        refreshing={refreshing}
+        onRefreshData={() => void loadData(true)}
         onToggleCharts={() => setChartsVisible((v) => !v)}
         onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
         onOpenAdmin={() => setAdminModalOpen(true)}
+        scopeBar={
+          payload && (
+            <ScopeBar
+              issues={payload.issues}
+              filters={globalFilters}
+              options={scopedFilterOptions}
+              minDate={defaultStartDate}
+              maxDate={defaultEndDate}
+              matchedCount={scopedIssues.length}
+              totalCount={payload.issues.length}
+              onChangeFilters={handleChangeGlobalFilters}
+              onApplyIssueQuery={handleApplyIssueQueryFromScope}
+            />
+          )
+        }
       />
-
-      {payload && (
-        <SidebarDrawer
-          open={sidebarOpen}
-          filters={globalFilters}
-          options={payload.filter_options}
-          syncStatus={payload.sync_status}
-          version={payload.version}
-          isAdmin={isAdmin}
-          refreshing={refreshing}
-          onClose={() => setSidebarOpen(false)}
-          onChangeFilters={setGlobalFilters}
-          onRefreshData={() => void loadData(true)}
-          onAdminLogin={handleAdminLogin}
-          onAdminLogout={handleAdminLogout}
-          onOpenAdminModal={() => setAdminModalOpen(true)}
-        />
-      )}
 
       <AdminModal
         open={adminModalOpen}
@@ -309,7 +388,7 @@ export function App() {
         ) : scopedIssues.length === 0 ? (
           <div className="pulse-panel" style={{ padding: "1.5rem", textAlign: "center" }}>
             <p style={{ margin: "0 0 0.75rem", color: "var(--muted)" }}>
-              No issues match the current sidebar filters.
+              No issues match the current filters.
             </p>
             <button type="button" className="pulse-btn-secondary" onClick={handleClearAll}>
               Reset filters

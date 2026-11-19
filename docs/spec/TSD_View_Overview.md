@@ -1,7 +1,7 @@
 # Technical Specification: Overview View
 
 **Status:** Implemented  
-**Scope:** Current behavior of the primary dashboard view in `frontend/src/App.tsx`, `frontend/src/components/AnalyticsView.tsx`, and `frontend/src/components/IssuePanel.tsx`.
+**Scope:** Current behavior of the primary dashboard view in `frontend/src/App.tsx`, `frontend/src/components/OverviewWorkspace.tsx`, `frontend/src/components/ScopeBar.tsx`, and `frontend/src/components/IssuePanel.tsx`.
 
 ## 1. Purpose
 
@@ -19,14 +19,15 @@ It also accepts:
 
 ## 3. Unified Workspace Modes
 
-The Overview uses one `100vh` workspace (`OverviewWorkspace` in `frontend/src/components/OverviewWorkspace.tsx`) controlled by a **Charts** toggle in the top-right navigation bar. Active facets and sidebar filters persist across toggles, and hiding charts sets `?view=compact` in the URL for shareability and backwards compatibility.
+The Overview uses one `100vh` workspace (`OverviewWorkspace` in `frontend/src/components/OverviewWorkspace.tsx`) controlled by a **Charts** toggle in the top-right navigation bar. Active facets and global scope filters persist across toggles and in URL query parameters (`?view=compact` when charts are hidden, plus `g_*` and `f_*`) for shareability and backwards compatibility.
 
 | State | Purpose | Above / Beside the Issue Panel |
 |---|---|---|
-| Charts ON (default) | Visual flow & review cockpit | Persistent `72 px` Release Rail + `380 px` left analytics rail (`>= 1360px` Table) or 4-card top bento strip (`< 1360px` / Board) |
-| Charts OFF (`?view=compact`) | High-density daily triage | Persistent `72 px` Release Rail + `SummaryBar` quick-filter pills (`Flow`, `Open by priority`, `Hints`) inside the panel header |
+| Charts ON (default) | Visual flow & review cockpit | Persistent `78 px` Release Rail + `380 px` left analytics rail (`>= 1360px` Table) or 4-card top bento strip (`< 1360px` / Board) |
+| Charts OFF (`?view=compact`) | High-density daily triage | Persistent `78 px` Release Rail + `SummaryBar` quick-filter pills (`Flow`, `Open by priority`, `Hints`) inside the panel header |
 
-- The global Filters drawer (`SidebarDrawer`) is collapsed by default and opens from the top-left Filters button (displaying a badge when sidebar filters are active); active sidebar filters and board facets always appear as named removable chips in the issue panel toolbar.
+- Global scope filters (`ScopeBar` in `TopBar`) stay inline across screen sizes, combining a unified tokenized fuzzy scope picker (`Context`, `Milestone`, and `Team` when multiple exist—supporting multi-term queries such as `proj v14` and quick-apply pairs) with inline `30d`/`90d`/`1y`/`All` presets and a custom date popover (wrapping onto a second bar row below `960 px` instead of hiding behind a drawer or Filters button); active global scopes and board facets always appear as named removable chips in the issue panel toolbar.
+- An ambient refresh/sync status button in `TopBar` exposes sync health, last sync timestamp, and app version on hover and triggers data reload on click.
 - On a narrow window, board lanes keep a minimum width of 15rem and scroll sideways instead of squeezing cards; wide lanes wrap cards into multiple columns.
 
 ### 3.1 Release rail
@@ -35,7 +36,7 @@ The Overview uses one `100vh` workspace (`OverviewWorkspace` in `frontend/src/co
 
 ### 3.2 Summary pills
 
-`SummaryBar` (`frontend/src/components/SummaryBar.tsx`), rendered in the left part of the board's toolbar row using counts computed by `buildSummaryGroups` (`frontend/src/lib/summary.ts`) from issues after the sidebar filters, independent of the board's facets.
+`SummaryBar` (`frontend/src/components/SummaryBar.tsx`), rendered in the left part of the board's toolbar row using counts computed by `buildSummaryGroups` (`frontend/src/lib/summary.ts`) from issues after global scope filters, independent of the board's facets.
 
 | Group | Pill | Count | Board filter |
 |---|---|---|---|
@@ -45,7 +46,7 @@ The Overview uses one `100vh` workspace (`OverviewWorkspace` in `frontend/src/co
 | Open by priority | P1, P2, ... Unset | open issues per priority, ordered by `priority_rank`, "Unset" last, each with a coloured dot | open issues of that priority |
 | Hints | No milestone, Unassigned, Mixed | open issues with that quality signal | that quality signal |
 
-There is no pill for all closed issues; in the Analytics layout, a click in the centre of the closed-issues donut selects them.
+There is no pill for all closed issues; in the Charts layout, clicking a closed stage (such as `Done`) or segment in `Workflow State` selects closed issues.
 
 Picking a pill replaces the board's filter (the search text is kept) and shows the pill as pressed; picking it again resets the board to all open issues.
 
@@ -82,15 +83,15 @@ The board is always visible and shows all open issues until something filters it
 
 Open issues are the default: a missing `state` means `opened`, and only `closed` or `all` is shown as a chip (not next to a 7-day filter, which already says which issues it covers).
 
-While the board is filtered, a row under the toolbar shows one removable chip per facet and per active sidebar filter (team, context, milestone, time range), "Clear all" and the issue count.
+While the board is filtered, a row under the toolbar shows one removable chip per facet and per active global scope filter (team, context, milestone, time range), "Clear all" and the issue count.
 
 ### 4.1.1 URL state
 
-The facets and the picked summary pill are mirrored into query parameters (`summary`, `f_stage`, `f_state`, `f_priority`, `f_issue_type`, `f_signal`, `f_recent`, `f_day`, `f_day_kind`, `f_query`; the layout uses `view`), so a refresh or a shared link restores the same view. The URL is only read when it differs from what the session last wrote, which is the case on page load. Malformed values are ignored. Sidebar filters are not part of the URL.
+The facets, the picked summary pill, and active global scope filters are mirrored into query parameters (`summary`, `f_stage`, `f_state`, `f_priority`, `f_issue_type`, `f_signal`, `f_recent`, `f_day`, `f_day_kind`, `f_query`, `g_team`, `g_context`, `g_milestone`, `g_preset`, `g_start`, `g_end`; the layout uses `view`), so a refresh or a shared link restores the same workspace view. Malformed values are ignored.
 
 ### 4.2 Milestone synchronization
 
-The release timeline and sidebar milestone selector are synchronized bidirectionally through session state. Selecting a milestone from the timeline updates the sidebar filter, and clearing the sidebar resets timeline selection state.
+The release timeline and milestone scope filter are synchronized bidirectionally through session and URL state. Selecting a milestone from the timeline updates the milestone token in `ScopeBar` (`g_milestone`), and clearing it via the token/toolbar chip resets timeline selection state.
 
 ### 4.3 Issue board and table
 

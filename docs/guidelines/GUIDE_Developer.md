@@ -74,11 +74,11 @@ Used for **Data Validation**.
 * **Problem:** We have raw dicts and need either a ValidIssue or a QualityIssue.  
 * **Implementation:** A ValidationFactory takes a raw row and the DomainConfig, applies the rules, and returns the correct object type. This encapsulates the complex "if/else" logic of the business rules.
 
-### **3.3. Singleton / Memoization (Layer 3\)**
+### **3.3. Caching & Payload Preparation (Layer 3)**
 
-Used for **Data Loading**.
+Used for **Data Loading** in `DashboardService` (`app/dashboard/service.py`).
 
-* **Implementation:** Streamlit's @st.cache\_data acts as a Singleton provider for the DataFrames. It ensures we only parse the Parquet files once per TTL window, regardless of how many users view the app.
+* **Implementation:** `DashboardService` acts as an mtime-keyed cache over `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`. It collapses multi-context rows into unique issues and resolves YAML palettes once per file modification timestamp (`st_mtime_ns`), with explicit invalidation via `clear_cache()`.
 
 ## **4\. Extensibility & OCP (Open/Closed Principle)**
 
@@ -139,69 +139,25 @@ Do not edit main.py.
 * **Why:** Consistent codebases are easier to read and maintain. If the file uses `type: ignore` comments, follow that pattern. If it uses specific variable naming conventions, adopt them.
 * **Review:** Changes that introduce inconsistent styling (e.g., using camelCase in a snake_case file) will be rejected.
 
-## **9. Streamlit Configuration**
+## **9. Layer 3 Configuration & Theming (FastAPI + React/TypeScript)**
 
 ### **9.1. Network Access (Local Development)**
 
-When running the dashboard on one machine and accessing it from another (e.g., via `http://192.168.x.x:8501`), you may encounter:
+By default, `uv run python -m app.dashboard` binds to `127.0.0.1:8501`. When exposing the server on a local network interface during development, pass `--host`:
 
-```
-TypeError: Failed to fetch dynamically imported module: http://<IP>:8501/static/js/index.*.js
-```
-
-**Root Cause:** By default, Streamlit binds to `localhost`, so when the browser fetches JavaScript/CSS assets from an external IP, the requests fail.
-
-**Solution:** Configure `.streamlit/config.toml`:
-
-```toml
-[server]
-headless = true
-# Bind to all interfaces so the app is accessible from other machines
-address = "0.0.0.0"
-# Disable CORS and XSRF protection for local network access during development
-enableCORS = false
-enableXsrfProtection = false
+```bash
+uv run python -m app.dashboard --host 0.0.0.0 --port 8501
 ```
 
-> ⚠️ **Production Warning:** `enableCORS = false` is acceptable for local development but **should not be used in production**. For production deployments, use a reverse proxy (nginx, Caddy, Traefik) that handles CORS properly.
+For hot-reload frontend development, run `uv run python -m app.dashboard --reload` on `:8501` alongside `cd frontend && npm run dev` on `:5173` (which proxies `/api/*` to `http://127.0.0.1:8501`). Put TLS termination and access controls in a reverse proxy (nginx, Caddy, Traefik) for shared deployments.
 
-### **9.2. Native Theming (Required)**
+### **9.2. CSS Tokens & Semantic Colors (Required)**
 
-The dashboard uses Streamlit's official theme configuration in `.streamlit/config.toml` for UI chrome (backgrounds, text, secondary text, primary buttons).
+UI chrome and data colors follow the `brand-guidelines` and `frontend-design` skills:
 
-**Rule:** UI colors (like backgrounds) belong in `config.toml`. Semantic data colors (like "bug severity red" or "staging server yellow") belong in `app/dashboard/theme.py`.
-
-```toml
-[theme]
-base = "light"
-font = "Inter, sans-serif"
-
-# Example of UI Chrome (Do this here)
-primaryColor = "#00A8E8"
-backgroundColor = "#ffffff"
-```
-
-**Guidelines:**
-- Let users switch mode through Streamlit settings (⋮ → Settings → Theme).
-- Keep CSS injection minimal and limited to effects not expressible through `config.toml`.
-- When accessing colors for Plotly charts or Pandas DataFrames, **never** hardcode colors. Always use the central theme API:
-
-```python
-from app.dashboard.theme import get_palette, plotly_layout
-
-# For semantic domain colors (issue types, severities, stages, etc.)
-palette = get_palette()
-stripe_color = palette["surface_hover"]  # zebra-stripe mid-tone for data grids
-
-# For Plotly Charts — always use plotly_layout() instead of manual font/color dicts
-fig.update_layout(
-    **plotly_layout(
-        height=300,
-        show_xgrid=False,
-        show_ygrid=True,
-    )
-)
-```
+* **UI Chrome Tokens:** Declared in `frontend/src/styles/tokens.css` under `:root` (dark default) and `[data-theme="light"]`. Do not hardcode hex values for backgrounds, text, borders, or surfaces inside components.
+* **Semantic Data Palettes:** Defined in `app/dashboard/palettes.py` (`_SEMANTIC_DARK` / `_SEMANTIC_LIGHT`), merged with `colors.light` / `colors.dark` overrides from the team rule YAML, and resolved on the client via `frontend/src/lib/colors.ts`.
+* **Self-Hosted Fonts:** `Manrope`, `Space Grotesk`, and `Space Mono` are stored in `frontend/public/static/` and loaded via `frontend/src/styles/fonts.css` with zero external requests.
 
 ### **9.3. Timezone-Aware Date Arithmetic**
 

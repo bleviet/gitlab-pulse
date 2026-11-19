@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: gitlab-pulse:local
     ports:
-      - "8501:8501" # Expose Streamlit dashboard port
+      - "8501:8501" # Expose dashboard port
     volumes:
       - ./data:/app/data # Persist data
     env_file:

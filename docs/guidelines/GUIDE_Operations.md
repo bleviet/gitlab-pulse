@@ -13,7 +13,7 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 | :--- | :--- | :--- | :--- | :--- |
 | **L1** | **Collector** | Fetches new data from GitLab API | `uv run python app/collector/orchestrator.py` | Daily / Hourly |
 | **L2** | **Processor** | Applies rules & validation Logic | `uv run python app/processor/main.py` | After L1 |
-| **L3** | **Dashboard** | Visualizes processed data | `uv run streamlit run app/dashboard/main.py` | Continuous |
+| **L3** | **Dashboard** | Serves API & React SPA over processed data | `uv run python -m app.dashboard` | Continuous |
 
 ---
 
@@ -29,34 +29,29 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 - It transforms the raw JSON/Parquet (L1) into enriched Analytics Parquet (L2).
 - If you run the Collector but skip the Processor, the Dashboard will continue showing old data.
 
-### **Q: Will the Streamlit visual be updated?**
-**A:** Yes, but with a delay.
-- **Cache TTL:** The Dashboard caches data in memory for **2 minutes** (120 seconds).
-- **Auto-Refresh:** If you leave the dashboard open, it will reload data from disk every 2 minutes.
-- **Manual Refresh:** To see changes immediately after running the Processor:
-  1. Go to the Dashboard.
-  2. Press `C` (Clear Cache) or click **Wait for it...** > **Clear Cache** in the menu.
-  3. Refresh the browser page.
+### **Q: When does the dashboard reflect newly processed data?**
+**A:** On the very next request after Parquet or YAML files change on disk.
+- **Automatic Mtime Check:** `DashboardService` tracks modification timestamps (`st_mtime_ns`) on `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`, rebuilding its in-memory payload automatically when files change.
+- **Manual Refresh:** Click the ambient refresh button (status dot + arrows icon) in the top-right navigation bar to reload `/api/dashboard` immediately without reloading the browser page.
 
 ### **Q: I updated `default.yaml`. How do I see the changes?**
-**A:** Configuration changes (e.g., new label mappings, color changes) are applied during **Layer 2 Processing**.
+**A:** Color overrides under `colors.light` / `colors.dark` are resolved at read time via `DashboardService` mtime detection. Changes to classification rules, workflow stages, or quality rules take effect during **Layer 2 Processing**:
 1. **Edit:** Modify `app/config/rules/default.yaml`.
 2. **Apply:** Run the Processor:
    ```bash
    uv run python app/processor/main.py
    ```
-3. **View:** Refresh the Dashboard (and clear cache).
+3. **View:** Click the top-right refresh button (or open **Ops** -> **Clear Cache & Reload**).
 
 ---
 
 ## **3. Admin Interface (UI-based Operations)**
 
-For operators who prefer a graphical interface, the Dashboard includes a password-protected **Admin Panel**.
+For operators who prefer a graphical interface, the Dashboard includes a password-protected **Admin Operations** modal.
 
 ### **3.1. Accessing the Admin Panel**
-1. Open the Dashboard Sidebar.
-2. Expand **"⚡ Admin Access"**.
-3. Enter the password (default: `admin`, or set via `ADMIN_PASSWORD` env var).
+1. Click **Ops** (or **Admin**) in the top-right navigation bar.
+2. Enter the password (default: `admin`, or set via `ADMIN_PASSWORD` env var).
 
 ### **3.2. Available Actions**
 | Action | Description |

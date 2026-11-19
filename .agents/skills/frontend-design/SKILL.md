@@ -1,38 +1,32 @@
 ---
 name: frontend-design
-description: Create distinctive, production-grade frontend interfaces with high design quality anchored to bahonavi's brand. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics and stays on-brand for bahonavi. In GitLab Pulse this applies to the Streamlit dashboard (app/dashboard/) and Plotly charts, with the Streamlit constraints in this skill taking precedence over generic web techniques.
+description: Create distinctive, production-grade frontend interfaces with high design quality anchored to bahonavi's brand. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics and stays on-brand for bahonavi. In GitLab Pulse this applies to the React/TypeScript SPA (frontend/src/), custom SVG charts (frontend/src/components/charts/), and standalone pages like docs/index.html.
 ---
 
 This skill guides creation of distinctive, production-grade frontend interfaces for bahonavi that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices, always grounded in the bahonavi brand identity.
 
 > **Brand reference**: Always consult `.agents/skills/brand-guidelines/SKILL.md` for the full bahonavi color system, typography, gradients, and design tokens before generating any UI.
 
-## GitLab Pulse: Streamlit constraints (take precedence)
+## GitLab Pulse: FastAPI + React/TypeScript dashboard constraints
 
-The dashboard is Streamlit + Plotly, not hand-written HTML/CSS. The guidance
-further down is written for web pages; translate it with these rules:
+When editing the dashboard (`frontend/src/`), follow these repository rules:
 
-- **Theme chrome** (backgrounds, text, borders, primary, fonts) goes in
-  `.streamlit/config.toml`, not in CSS tokens. Do not redeclare a `:root`
-  token set in the dashboard.
-- **Data colors** come from `app/dashboard/theme.py`: `get_palette()`,
-  `get_severity_colors()`, `get_issue_type_colors()`, `get_stage_colors()`.
-  Add a new semantic color to both `_SEMANTIC_LIGHT` and `_SEMANTIC_DARK`
-  instead of hardcoding a hex value in a widget.
-- **Plotly charts** use `fig.update_layout(**plotly_layout(...))` and
-  `plotly_bar_trace_style()` for fonts, grid, and backgrounds; render with
-  `st.plotly_chart(fig, width="stretch")`.
-- **Custom CSS** is a last resort: extend `get_global_css()` in `theme.py` only
-  for effects `config.toml` cannot express, and check it in light and dark.
-  Do not add per-widget `st.markdown("<style>...")` blocks.
-- **Fonts** are self-hosted in `app/dashboard/static/`; do not add new font families.
-- **Motion and layout tricks** (staggered reveals, overlapping grids, noise
-  backgrounds) generally do not apply inside Streamlit; prefer clear hierarchy,
-  consistent spacing, and readable charts. Widgets render inside the layout
-  grid (`app/dashboard/engine.py`), so they must work at any column width.
-- Verify visually with seeded data (`tools/local_data_manager.py`) in both
-  theme modes. README screenshots in `docs/images/screenshots/` exist in a
-  light and a `_dark` variant; update both when a visible widget changes.
+- **Theme chrome** (backgrounds, text, borders, surfaces, fonts) belongs in
+  `frontend/src/styles/tokens.css` under `:root` and `[data-theme="light"]`, and
+  layout/component rules go in `frontend/src/styles/global.css`. Never hardcode
+  off-brand hex colors in React components.
+- **Semantic data colors** come from `app/dashboard/palettes.py`
+  (`_SEMANTIC_LIGHT` / `_SEMANTIC_DARK`, merged with YAML overrides) and are
+  consumed on the client via `frontend/src/lib/colors.ts`.
+- **Charts** are responsive React SVG components in
+  `frontend/src/components/charts/` using `ResizeObserver` and CSS variables; do
+  not introduce heavy third-party charting bundles or external font requests.
+- **Fonts** (`Manrope`, `Space Grotesk`, `Space Mono`) are self-hosted in
+  `frontend/public/static/` and declared in `frontend/src/styles/fonts.css`.
+- Verify changes with `cd frontend && npm run typecheck && npm test && npm run build`
+  and visually check both dark and light themes against seeded data
+  (`tools/local_data_manager.py`). Update both `_dark` and light screenshots in
+  `docs/images/screenshots/` when visible workspace layout changes.
 
 The rest of this skill applies fully to standalone web output (e.g.
 `docs/index.html`, HTML artifacts, landing pages).

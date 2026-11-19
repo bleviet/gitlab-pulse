@@ -52,20 +52,21 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 ### 3.2 Styles (`frontend/src/styles/`)
 - `fonts.css`: `@font-face` declarations for `"Manrope"`, `"Space Grotesk"`, and `"Space Mono"` served from `/static/`.
 - `tokens.css`: `:root` (dark default) and `[data-theme="light"]` CSS custom properties following bahonavi design tokens (`--bg`, `--bg-card`, `--bg-raise`, `--surface`, `--line`, `--line-strong`, `--text`, `--heading`, `--muted`, `--accent`, `--brand`, `--brand-2`, `--grad`, `--chart-1..8`, `--chart-bg`, `--chart-grid`, `--chart-axis`, `--chart-label`, `--chart-tooltip-bg`).
-- `global.css`: bahonavi corner-glow and 72px blueprint-grid background, sticky topbar/panel/lane-header rules, drawer/modal styles, table/board card styling, `:focus-visible` outlines, and `prefers-reduced-motion` guards.
+- `global.css`: bahonavi corner-glow and 72px blueprint-grid background, sticky topbar/panel/lane-header rules, scope/popover/modal styles, table/board card styling, `:focus-visible` outlines, and `prefers-reduced-motion` guards.
 
 ### 3.3 Pure Domain Modules (`frontend/src/lib/`)
 
 | File | Responsibility | Key Exports |
 |---|---|---|
 | `types.ts` | TypeScript interfaces matching API DTOs and UI state | `IssueItem`, `DashboardPayload`, `GlobalFilters`, `IssueFacets`, `IssueViewMode`, `ThemeMode`, `ActiveChartId` |
-| `colors.ts` | Priority & semantic palette resolution | `getPriorityColor`, `buildPriorityColorMap`, `hexWithAlpha` |
+| `colors.ts` | Priority, issue-type, & contrast color resolution | `getPriorityColor`, `getIssueTypeColor`, `buildPriorityColorMap`, `hexWithAlpha`, `contrastTextForHex` |
 | `search.ts` | Multi-token exact search + LCS fuzzy fallback (`<=4: 0.90`, `<=8: 0.82`, `>8: 0.72`) | `normalizeSearchText`, `similarityRatio`, `filterIssuesBySearch` |
-| `facets.ts` | Global/facet filtering, chip construction, URL state serialization | `applyPreMilestoneFilters`, `applyGlobalFilters`, `applyFacets`, `buildFacetChips`, `withoutFacet`, `parseUrlState`, `buildUrlSearch` |
+| `scopeSearch.ts` | Fuzzy scoring and multi-dimension combined quick-apply matching for `ScopeBar` | `scoreScopeCandidate`, `buildScopeSuggestions` |
+| `facets.ts` | Global/facet filtering, cascading options, chip construction, URL state serialization | `applyPreMilestoneFilters`, `applyGlobalFilters`, `applyFacets`, `buildFacetChips`, `deriveScopedFilterOptions`, `resolvePresetDates`, `withoutFacet`, `parseGlobalFiltersUrl`, `parseUrlState`, `buildUrlSearch` |
 | `summary.ts` | Compact summary pill groups (`Flow`, `Open by priority`, `Hints`) | `buildSummaryGroups` |
 | `timeline.ts` | Milestone status grouping, natural version sort, rail geometry | `naturalCompare`, `buildMilestoneTimelineData` |
-| `board.ts` | Workflow stage ordering, lane mapping, default/hierarchy sorting, lane priority mix | `getOverviewStages`, `getBoardLanes`, `sortIssuesDefault`, `sortIssuesHierarchy`, `computeLanePriorityCounts` |
-| `analytics.ts` | Client-side aggregations for Analytics charts | `buildPriorityDonutData`, `buildQualitySignalsData`, `buildDailyVelocityData`, `buildStagePriorityBars` |
+| `board.ts` | Workflow stage ordering, lane mapping, default/hierarchy sorting, lane priority mix | `getOverviewStages`, `getWorkflowStages`, `getBoardLanes`, `sortIssuesDefault`, `sortIssuesHierarchy`, `computeLanePriorityCounts` |
+| `analytics.ts` | Client-side aggregations for Analytics charts | `buildPriorityDonutData`, `buildIssueTypeDonutData`, `buildQualitySignalsData`, `buildDailyVelocityData`, `buildStagePriorityBars` |
 | `api.ts` | Typed `fetch` wrappers with `credentials: "include"` | `fetchDashboard`, `fetchAdminStatus`, `adminLogin`, `adminLogout`, `runCollector`, `runProcessor`, `clearDashboardCache` |
 
 ### 3.4 React Components (`frontend/src/components/`)
@@ -74,12 +75,12 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 |---|---|
 | `charts/ChartTooltip.tsx` | Viewport-clamped floating tooltip shared by SVG charts |
 | `charts/ReleaseTimeline.tsx` | Responsive SVG milestone rail (`compact` and `analytics` variants, `NOW` marker, `No due date` divider, clickable milestone pins) |
-| `charts/PriorityDonut.tsx` | Responsive SVG donut with clickable slices (`{ state, priority }`) and clickable center (`{ state }`) |
-| `charts/QualitySignalsChart.tsx` | Horizontal bar chart for `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, and `MIXED_CLASSIFICATION` |
-| `charts/DailyVelocityChart.tsx` | 7-day dual-line SVG chart (`New` vs. `Closed`) with clickable date markers |
-| `charts/WorkflowStateRow.tsx` | Horizontal stacked priority bars per stage with clickable stage names and priority segments |
-| `TopBar.tsx` | Sticky frosted navbar: `Filters` drawer toggle + badge, logo, `Charts` toggle, theme toggle, Admin Ops trigger |
-| `SidebarDrawer.tsx` | Collapsible drawer: Team/Context/Milestone selectors, `30d`/`90d`/`1y`/`All Time` + custom date bounds, Sync Status refresh, Admin login |
+| `charts/PriorityDonut.tsx` | Responsive SVG donut with clickable slices, clickable center total, and compact clickable legend (used for Open Priority and Open Issue Type) |
+| `charts/QualitySignalsChart.tsx` | Horizontal bar chart for `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, and `MIXED_CLASSIFICATION` (`Open Hints`) |
+| `charts/DailyVelocityChart.tsx` | 7-day dual-line SVG chart (`New` vs. `Closed`) with historical anchoring and clickable date markers |
+| `charts/WorkflowStateRow.tsx` | Horizontal stacked priority bars with inline counts across open stages and closed terminal stages (`Done`) |
+| `TopBar.tsx` | Sticky frosted navbar: logo, center `ScopeBar`, ambient Sync Status / Refresh button, `Charts` toggle, theme toggle, Admin Ops trigger |
+| `ScopeBar.tsx` | Unified tokenized fuzzy scope picker (`Context`, `Milestone`, and `Team` when `> 1`, supporting multi-term combined quick-apply like `proj v14`) beside inline `30d`/`90d`/`1y`/`All` presets and a custom date popover |
 | `SummaryBar.tsx` | Quick-filter pill groups rendered automatically in `IssuePanel` when `Charts` is toggled OFF |
 | `IssueSearchInput.tsx` | Expanding inline search pill (`Ctrl/Cmd+K` focus, `Escape` blur, clear button) |
 | `IssueTable.tsx` | `@tanstack/react-table` grid with sticky header, sortable columns, default hierarchy indentation, colored label pills, conditional `Stage` and `Quality hints` columns |
@@ -106,10 +107,16 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 | `f_day` | `YYYY-MM-DD` (requires valid `f_day_kind`) | Omitted |
 | `f_day_kind` | `created`, `closed` | Omitted |
 | `f_query` | Search text | Omitted |
+| `g_team` | Team / Domain name | Omitted (`All`) |
+| `g_context` | Context / Sub-project name | Omitted (`All`) |
+| `g_milestone` | Milestone title | Omitted (`All`) |
+| `g_preset` | `30d`, `90d`, `1y`, `custom` | Omitted (`all`) |
+| `g_start` | `YYYY-MM-DD` (when `g_preset=custom`) | Omitted |
+| `g_end` | `YYYY-MM-DD` (when `g_preset=custom`) | Omitted |
 
 ### 4.2 Keyboard Shortcuts
 - `Ctrl+K` (or `Cmd+K` on macOS): focus and select the inline issue search box.
-- `Escape`: blur search input, close `SidebarDrawer`, or close `AdminModal`.
+- `Escape`: blur search input, close open `ScopeBar` popovers, or close `AdminModal`.
 
 ### 4.3 Server Environment Variables
 - `HOST`: bind address for `python -m app.dashboard` (default `127.0.0.1`).
