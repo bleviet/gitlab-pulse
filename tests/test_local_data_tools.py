@@ -16,7 +16,12 @@ from app.dashboard.utils import (
     normalize_issue_labels,
 )
 from tools.local_data_manager import delete_local_projects, discover_local_projects
-from tools.seeder import build_local_issue_url, generate_issues, seed_data
+from tools.seeder import (
+    UNDATED_MILESTONES,
+    build_local_issue_url,
+    generate_issues,
+    seed_data,
+)
 
 
 def test_generate_issues_respects_max_team_members() -> None:
@@ -88,6 +93,23 @@ def test_generate_issues_populates_grouped_child_tasks_within_project() -> None:
         assert parent["work_item_type"] == "ISSUE"
         assert int(task["iid"]) in parent["child_ids"]
 
+
+
+def test_generate_issues_seeds_undated_milestones() -> None:
+    df = generate_issues(count=400, seed=42)
+    with_ms = df[df["milestone"].notna()]
+
+    undated = with_ms[with_ms["milestone"].isin(UNDATED_MILESTONES)]
+    open_undated = undated[undated["state"] == "opened"]
+    assert not open_undated.empty
+    assert undated["milestone_due_date"].isna().all()
+
+    spike = with_ms[with_ms["milestone"] == "Spike: GraphQL sync"]
+    assert len(spike) >= 1
+    assert (spike["state"] == "closed").all()
+
+    distinct_due = with_ms.groupby("milestone")["milestone_due_date"].nunique()
+    assert (distinct_due <= 1).all()
 
 
 def test_normalize_assignee_labels_maps_missing_values_to_unassigned() -> None:

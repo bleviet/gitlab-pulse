@@ -47,6 +47,7 @@ WORKFLOW_LABELS = [
     "workflow::done",
 ]
 WORK_ITEM_TYPES = ["ISSUE", "TASK"]
+UNDATED_MILESTONES: tuple[str, ...] = ("v2.0", "Tech Debt", "Customer Requests")
 
 
 def generate_issues(
@@ -136,17 +137,22 @@ def generate_issues(
         milestone_start_date: datetime | None = None
 
         if random.random() < 0.6:
-            ms_ver = random.randint(1, 5)
-            milestone = f"v1.{ms_ver}"
-            milestone_id = 500 + ms_ver
+            if random.random() < 0.25:
+                undated_idx = random.randrange(len(UNDATED_MILESTONES))
+                milestone = UNDATED_MILESTONES[undated_idx]
+                milestone_id = 601 + undated_idx
+            else:
+                ms_ver = random.randint(1, 5)
+                milestone = f"v1.{ms_ver}"
+                milestone_id = 500 + ms_ver
 
-            # Simulated schedule: v1.1 starts Jan 1st 2025, each lasts 30 days
-            base_date = datetime(2025, 1, 1)
-            ms_start = base_date + timedelta(days=(ms_ver - 1) * 30)
-            ms_due = ms_start + timedelta(days=28)
+                # Simulated schedule: v1.1 starts Jan 1st 2025, each lasts 30 days
+                base_date = datetime(2025, 1, 1)
+                ms_start = base_date + timedelta(days=(ms_ver - 1) * 30)
+                ms_due = ms_start + timedelta(days=28)
 
-            milestone_start_date = ms_start
-            milestone_due_date = ms_due
+                milestone_start_date = ms_start
+                milestone_due_date = ms_due
 
         issue = {
             "id": issue_id,
@@ -181,8 +187,28 @@ def generate_issues(
 
     # Post-processing: Wire parent ISSUEs and child TASKs within each project
     _assign_task_hierarchy(issues, inject_errors=inject_errors)
+    _assign_closed_spike_milestone(issues)
 
     return pd.DataFrame(issues)
+
+
+def _assign_closed_spike_milestone(issues: list[dict[str, object]]) -> None:
+    """Put a few closed leaf issues into an undated milestone with no open issues.
+
+    Args:
+        issues: Generated issue dicts, modified in place.
+    """
+    candidates = [
+        issue
+        for issue in issues
+        if issue["state"] == "closed"
+        and issue["milestone"] is None
+        and issue["parent_id"] is None
+        and not issue["child_ids"]
+    ]
+    for issue in candidates[:5]:
+        issue["milestone"] = "Spike: GraphQL sync"
+        issue["milestone_id"] = 610
 
 
 def _priority_sort_key(issue: dict[str, object]) -> tuple[int, datetime]:
@@ -208,7 +234,7 @@ def _sync_child_scope_with_parent(
 ) -> None:
     """Copy milestone and context labels from parent so parent/child stay in scope together."""
     for field in ("milestone", "milestone_id", "milestone_due_date", "milestone_start_date"):
-        if parent.get(field) is not None:
+        if parent.get("milestone") is not None:
             task[field] = parent.get(field)
 
     task_labels_raw = task.get("labels")

@@ -56,6 +56,7 @@ Tests verify:
 Tests verify:
 
 - seeder assignment-rate and team-size behavior
+- seeded milestones without a due date (open and all-closed) with at most one due date per milestone title
 - local issue URL generation
 - local project discovery and deletion utilities
 - overview quality-signal helpers
