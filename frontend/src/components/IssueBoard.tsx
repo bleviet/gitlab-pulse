@@ -1,7 +1,9 @@
 import { useMemo, useRef } from "react";
+import { Check, ListTree } from "lucide-react";
 import {
   computeLanePriorityCounts,
   getBoardLanes,
+  getChildTaskCount,
   sortIssuesDefault,
 } from "../lib/board";
 import { getPriorityColor, hexWithAlpha } from "../lib/colors";
@@ -18,7 +20,11 @@ interface IssueBoardProps {
   theme: ThemeMode;
   pageStart: number;
   pageSize: number;
+  coveredIds: ReadonlySet<number>;
+  activeIssueId: number | null;
   onToggleLanePill: (stage: string, priority: string) => void;
+  onOpenIssue: (issueId: number) => void;
+  onToggleCovered: (issueId: number) => void;
 }
 
 export function IssueBoard({
@@ -32,7 +38,11 @@ export function IssueBoard({
   theme,
   pageStart,
   pageSize,
+  coveredIds,
+  activeIssueId,
   onToggleLanePill,
+  onOpenIssue,
+  onToggleCovered,
 }: IssueBoardProps) {
   const headScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
@@ -172,14 +182,61 @@ export function IssueBoard({
                   visibleCards.map((card) => {
                     const prio = card.priority || "Unset";
                     const prioColor = getPriorityColor(prio, palette, priorityOrder, theme);
+                    const isCovered = coveredIds.has(card.id);
+                    const isActive = activeIssueId === card.id;
+                    const cardClass = [
+                      "board-card",
+                      isCovered ? "board-card-covered" : "",
+                      isActive ? "board-card-active" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
                     return (
                       <article
                         key={card.id}
-                        className="board-card"
+                        className={cardClass}
                         style={{ ["--card-prio-color" as string]: prioColor }}
                       >
                         <div className="board-card-head">
-                          <span className="board-card-iid">#{card.iid}</span>
+                          <span className="board-card-id-group">
+                            <button
+                              type="button"
+                              className={`issue-cover-btn ${isCovered ? "covered" : ""}`}
+                              aria-pressed={isCovered}
+                              aria-label={
+                                isCovered
+                                  ? `Unmark #${card.iid} as covered today`
+                                  : `Mark #${card.iid} as covered today`
+                              }
+                              title={
+                                isCovered
+                                  ? "Covered today — click to unmark"
+                                  : "Mark as covered today"
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleCovered(card.id);
+                              }}
+                            >
+                              {isCovered && <Check size={11} strokeWidth={3} aria-hidden="true" />}
+                            </button>
+                            <span className="board-card-iid">#{card.iid}</span>
+                            {getChildTaskCount(card) > 0 && (
+                              <span
+                                className="issue-children-badge"
+                                title={`${getChildTaskCount(card)} child task${getChildTaskCount(card) === 1 ? "" : "s"}`}
+                                aria-label={`${getChildTaskCount(card)} child task${getChildTaskCount(card) === 1 ? "" : "s"}`}
+                              >
+                                <ListTree size={11} aria-hidden="true" />
+                                <span>{getChildTaskCount(card)}</span>
+                              </span>
+                            )}
+                            {isActive && (
+                              <span className="issue-viewing-tag" title="Currently viewing">
+                                Viewing
+                              </span>
+                            )}
+                          </span>
                           <span
                             className="prio-badge"
                             style={{
@@ -198,11 +255,21 @@ export function IssueBoard({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="board-card-title"
+                            onClick={() => onOpenIssue(card.id)}
+                            onAuxClick={(e) => {
+                              if (e.button === 1) onOpenIssue(card.id);
+                            }}
                           >
                             {card.title}
                           </a>
                         ) : (
-                          <span className="board-card-title">{card.title}</span>
+                          <span
+                            className="board-card-title"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => onOpenIssue(card.id)}
+                          >
+                            {card.title}
+                          </span>
                         )}
                         <div className="board-card-foot">
                           <span

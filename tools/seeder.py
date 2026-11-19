@@ -125,17 +125,9 @@ def generate_issues(
         # Labels
         labels = _generate_labels(inject_errors, state)
 
-        # Work item type
-        work_item_type = random.choices(WORK_ITEM_TYPES, weights=[0.8, 0.2])[0]
-
-        # Hierarchy (only for tasks)
+        # Work item type (~72% ISSUE, ~28% TASK so parent issues have 2-5 child tasks)
+        work_item_type = random.choices(WORK_ITEM_TYPES, weights=[0.72, 0.28])[0]
         parent_id: int | None = None
-        if work_item_type == "TASK" and random.random() < 0.9:
-            # Sometimes reference existing issue, sometimes orphan
-            if inject_errors and random.random() < 0.02:
-                parent_id = 99999  # Zombie: non-existent parent
-            elif i > 0:
-                parent_id = 10000 + random.randint(0, max(0, i - 1))
 
         # Milestone generation
         milestone: str | None = None
@@ -187,26 +179,126 @@ def generate_issues(
         }
         issues.append(issue)
 
-    # Post-processing: Populate child_ids
-    # Create a quick lookup map
-    issue_map = {issue["id"]: issue for issue in issues}
-
-    for issue in issues:
-        issue_parent_id = issue.get("parent_id")
-        if isinstance(issue_parent_id, int) and issue_parent_id in issue_map:
-            parent = issue_map[issue_parent_id]
-            child_ids = parent.get("child_ids")
-            if isinstance(child_ids, list):
-                typed_child_ids = cast(list[int], child_ids)
-            else:
-                typed_child_ids = []
-                parent["child_ids"] = typed_child_ids
-
-            child_iid = issue.get("iid")
-            if isinstance(child_iid, int):
-                typed_child_ids.append(child_iid)  # linking by IID as per schema
+    # Post-processing: Wire parent ISSUEs and child TASKs within each project
+    _assign_task_hierarchy(issues, inject_errors=inject_errors)
 
     return pd.DataFrame(issues)
+
+
+def _priority_sort_key(issue: dict[str, object]) -> tuple[int, datetime]:
+    """Order candidate parent issues to match dashboard default sort (P1 + oldest update first)."""
+    labels = issue.get("labels")
+    typed_labels = labels if isinstance(labels, list) else []
+    if "priority::1" in typed_labels:
+        prio = 0
+    elif "priority::2" in typed_labels:
+        prio = 1
+    elif "priority::3" in typed_labels:
+        prio = 2
+    else:
+        prio = 3
+    updated_at = issue.get("updated_at")
+    ts = updated_at if isinstance(updated_at, datetime) else datetime.max
+    return (prio, ts)
+
+
+def _sync_child_scope_with_parent(
+    task: dict[str, object],
+    parent: dict[str, object],
+) -> None:
+    """Copy milestone and context labels from parent so parent/child stay in scope together."""
+    for field in ("milestone", "milestone_id", "milestone_due_date", "milestone_start_date"):
+        if parent.get(field) is not None:
+            task[field] = parent.get(field)
+
+    task_labels_raw = task.get("labels")
+    parent_labels_raw = parent.get("labels")
+    if not isinstance(task_labels_raw, list) or not isinstance(parent_labels_raw, list):
+        return
+    if not task_labels_raw:
+        return
+
+    parent_contexts = [lbl for lbl in parent_labels_raw if lbl in CONTEXT_LABELS]
+    if not parent_contexts:
+        return
+    non_context = [lbl for lbl in task_labels_raw if lbl not in CONTEXT_LABELS]
+    task["labels"] = non_context + parent_contexts
+
+
+def _assign_task_hierarchy(
+    issues: list[dict[str, object]],
+    inject_errors: bool = False,
+) -> None:
+    """Assign child TASKs to parent ISSUEs in the same project (2-5 tasks per parent)."""
+    parents_by_proj_state: dict[tuple[int, str], list[dict[str, object]]] = {}
+    parents_by_proj: dict[int, list[dict[str, object]]] = {}
+
+    for issue in issues:
+        if issue.get("work_item_type") != "ISSUE":
+            continue
+        proj = issue.get("project_id")
+        state = issue.get("state")
+        if not isinstance(proj, int) or not isinstance(state, str):
+            continue
+        parents_by_proj_state.setdefault((proj, state), []).append(issue)
+        parents_by_proj.setdefault(proj, []).append(issue)
+
+    for key, group in parents_by_proj_state.items():
+        parents_by_proj_state[key] = sorted(group, key=_priority_sort_key)
+    for proj, group in parents_by_proj.items():
+        parents_by_proj[proj] = sorted(group, key=_priority_sort_key)
+
+    target_capacity: dict[int, int] = {}
+    for issue in issues:
+        issue_id = issue.get("id")
+        if issue.get("work_item_type") == "ISSUE" and isinstance(issue_id, int):
+            target_capacity[issue_id] = random.randint(2, 5)
+
+    for task in issues:
+        if task.get("work_item_type") != "TASK":
+            continue
+        if random.random() >= 0.92:
+            continue
+        if inject_errors and random.random() < 0.02:
+            task["parent_id"] = 99999  # Zombie: non-existent parent
+            continue
+
+        proj = task.get("project_id")
+        state = task.get("state")
+        if not isinstance(proj, int) or not isinstance(state, str):
+            continue
+
+        candidates = parents_by_proj_state.get((proj, state)) or parents_by_proj.get(proj, [])
+        if not candidates:
+            continue
+
+        chosen_parent: dict[str, object] | None = None
+        for candidate in candidates:
+            cand_id = candidate.get("id")
+            cand_children = candidate.get("child_ids")
+            current_len = len(cand_children) if isinstance(cand_children, list) else 0
+            cap = target_capacity.get(cand_id, 3) if isinstance(cand_id, int) else 3
+            if current_len < cap:
+                chosen_parent = candidate
+                break
+
+        if chosen_parent is None:
+            chosen_parent = random.choice(candidates)
+
+        parent_id = chosen_parent.get("id")
+        child_iid = task.get("iid")
+        if not isinstance(parent_id, int) or not isinstance(child_iid, int):
+            continue
+
+        task["parent_id"] = parent_id
+        child_ids = chosen_parent.get("child_ids")
+        if isinstance(child_ids, list):
+            typed_child_ids = cast(list[int], child_ids)
+        else:
+            typed_child_ids = []
+            chosen_parent["child_ids"] = typed_child_ids
+        typed_child_ids.append(child_iid)
+        _sync_child_scope_with_parent(task, chosen_parent)
 
 
 def build_local_issue_url(

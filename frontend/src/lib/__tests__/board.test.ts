@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeLanePriorityCounts,
   getBoardLanes,
+  getChildTaskCount,
   getOverviewStages,
   sortIssuesHierarchy,
 } from "../board";
@@ -70,12 +71,16 @@ describe("board and summary", () => {
     ];
 
     const rows = sortIssuesHierarchy(issues);
-    expect(rows.map((r) => [r.issue.iid, r.depth])).toEqual([
-      [1, 0],
-      [2, 1],
-      [3, 2],
-      [5, 0],
+    expect(rows.map((r) => [r.issue.iid, r.depth, r.childCount])).toEqual([
+      [1, 0, 1],
+      [2, 1, 1],
+      [3, 2, 0],
+      [5, 0, 0],
     ]);
+
+    const parentWithChildIds = makeIssue({ id: 20, iid: 20, child_ids: [21, 22, 23] });
+    expect(getChildTaskCount(parentWithChildIds)).toBe(3);
+    expect(getChildTaskCount(parentWithChildIds, 1)).toBe(3);
   });
 
   it("builds summary groups and lane priority counts in rank order with Unset last", () => {

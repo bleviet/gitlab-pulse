@@ -65,6 +65,31 @@ def test_generate_issues_adds_example_activity_notes() -> None:
     assert {"author_name", "author_username", "body", "created_at", "system"} <= set(notes[0])
 
 
+def test_generate_issues_populates_grouped_child_tasks_within_project() -> None:
+    """Seeder should attach child tasks to parent ISSUE items in the same project."""
+    df = generate_issues(
+        count=200,
+        project_ids=[101, 102],
+        seed=42,
+    )
+
+    by_id = df.set_index("id")
+    parents_with_children = df[df["child_ids"].apply(lambda ids: len(ids) >= 2)]
+    assert len(parents_with_children) > 0
+    assert (parents_with_children["work_item_type"] == "ISSUE").all()
+
+    tasks_with_parent = df[df["parent_id"].notna()]
+    assert len(tasks_with_parent) > 0
+    for _, task in tasks_with_parent.iterrows():
+        parent_id = int(task["parent_id"])
+        assert parent_id in by_id.index
+        parent = by_id.loc[parent_id]
+        assert parent["project_id"] == task["project_id"]
+        assert parent["work_item_type"] == "ISSUE"
+        assert int(task["iid"]) in parent["child_ids"]
+
+
+
 def test_normalize_assignee_labels_maps_missing_values_to_unassigned() -> None:
     """Dashboard assignee labels should treat missing values consistently."""
     labels = normalize_assignee_labels(

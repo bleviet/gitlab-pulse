@@ -68,6 +68,11 @@ export function sortIssuesDefault(issues: IssueItem[]): IssueItem[] {
 export interface HierarchyRow {
   issue: IssueItem;
   depth: number;
+  childCount: number;
+}
+
+export function getChildTaskCount(issue: IssueItem, directChildrenCount = 0): number {
+  return Math.max(issue.child_ids.length, directChildrenCount);
 }
 
 export function sortIssuesHierarchy(issues: IssueItem[]): HierarchyRow[] {
@@ -110,8 +115,13 @@ export function sortIssuesHierarchy(issues: IssueItem[]): HierarchyRow[] {
   const dfs = (item: IssueItem, depth: number): void => {
     if (visited.has(item.id)) return;
     visited.add(item.id);
-    rows.push({ issue: item, depth });
-    for (const child of childrenMap.get(item.id) ?? []) {
+    const children = childrenMap.get(item.id) ?? [];
+    rows.push({
+      issue: item,
+      depth,
+      childCount: getChildTaskCount(item, children.length),
+    });
+    for (const child of children) {
       dfs(child, depth + 1);
     }
   };

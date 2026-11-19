@@ -1,7 +1,26 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, KanbanSquare, Table2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  KanbanSquare,
+  RotateCcw,
+  Table2,
+  X,
+} from "lucide-react";
 import { getBoardLanes } from "../lib/board";
 import { applyFacets, buildFacetChips, withoutFacet } from "../lib/facets";
+import {
+  createEmptyStandupState,
+  filterIssuesByCoverage,
+  markIssueOpened,
+  nextCoveredFilterMode,
+  parseStandupState,
+  STANDUP_STORAGE_KEY,
+  toggleIssueCovered,
+  type CoveredFilterMode,
+  type StandupState,
+} from "../lib/standup";
 import type {
   GlobalFilters,
   IssueFacets,
@@ -60,15 +79,68 @@ export function IssuePanel({
   const [boardSize, setBoardSize] = useState<BoardPageSize>(10);
   const [pageIndex, setPageIndex] = useState(0);
   const [fitRows, setFitRows] = useState(16);
+  const [standupState, setStandupState] = useState<StandupState>(() => {
+    try {
+      return parseStandupState(localStorage.getItem(STANDUP_STORAGE_KEY));
+    } catch {
+      return createEmptyStandupState();
+    }
+  });
+  const [coveredFilterMode, setCoveredFilterMode] = useState<CoveredFilterMode>("all");
   const panelRef = useRef<HTMLElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
-  const filteredIssues = useMemo(() => applyFacets(issues, facets), [issues, facets]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(STANDUP_STORAGE_KEY, JSON.stringify(standupState));
+    } catch {
+      // ignore storage restriction
+    }
+  }, [standupState]);
+
+  const coveredSet = useMemo(
+    () => new Set(standupState.coveredIds),
+    [standupState.coveredIds],
+  );
+
+  const facetFilteredIssues = useMemo(() => applyFacets(issues, facets), [issues, facets]);
+
+  const coveredInViewCount = useMemo(
+    () => facetFilteredIssues.filter((issue) => coveredSet.has(issue.id)).length,
+    [facetFilteredIssues, coveredSet],
+  );
+
+  const totalCoveredToday = standupState.coveredIds.length;
+  const effectiveCoveredFilter: CoveredFilterMode =
+    totalCoveredToday === 0 ? "all" : coveredFilterMode;
+
+  const filteredIssues = useMemo(
+    () => filterIssuesByCoverage(facetFilteredIssues, coveredSet, effectiveCoveredFilter),
+    [facetFilteredIssues, coveredSet, effectiveCoveredFilter],
+  );
+
+  const handleOpenIssue = useCallback((issueId: number) => {
+    setStandupState((prev) => markIssueOpened(prev, issueId));
+  }, []);
+
+  const handleToggleCovered = useCallback((issueId: number) => {
+    setStandupState((prev) => toggleIssueCovered(prev, issueId));
+  }, []);
+
+  const handleResetStandup = useCallback(() => {
+    setStandupState(createEmptyStandupState());
+    setCoveredFilterMode("all");
+  }, []);
 
   const laneCountSource = useMemo(
-    () => applyFacets(issues, withoutFacet(withoutFacet(facets, "stage"), "priority")),
-    [issues, facets],
+    () =>
+      filterIssuesByCoverage(
+        applyFacets(issues, withoutFacet(withoutFacet(facets, "stage"), "priority")),
+        coveredSet,
+        effectiveCoveredFilter,
+      ),
+    [issues, facets, coveredSet, effectiveCoveredFilter],
   );
 
   const chips = useMemo(
@@ -136,7 +208,7 @@ export function IssuePanel({
 
   useEffect(() => {
     setPageIndex(0);
-  }, [facets, globalFilters, viewMode, tableSize, boardSize]);
+  }, [facets, globalFilters, viewMode, tableSize, boardSize, effectiveCoveredFilter]);
 
   const handleToggleLanePill = (stage: string, priority: string) => {
     const isSame =
@@ -154,6 +226,14 @@ export function IssuePanel({
     }
   };
 
+  const remainingInViewCount = Math.max(0, facetFilteredIssues.length - coveredInViewCount);
+  const standupPillLabel =
+    effectiveCoveredFilter === "remaining"
+      ? `Remaining (${remainingInViewCount})`
+      : effectiveCoveredFilter === "covered"
+        ? `Covered only (${coveredInViewCount})`
+        : `${coveredInViewCount}/${facetFilteredIssues.length} covered`;
+
   return (
     <section ref={panelRef} className="issue-panel" aria-label="Issues">
       <div ref={headRef} className="issue-panel-sticky-head">
@@ -165,6 +245,29 @@ export function IssuePanel({
               {filteredIssues.length.toLocaleString()} issue
               {filteredIssues.length === 1 ? "" : "s"}
             </span>
+            {totalCoveredToday > 0 && (
+              <span className="standup-toolbar-group" role="group" aria-label="Covered today">
+                <button
+                  type="button"
+                  className={`standup-filter-pill ${effectiveCoveredFilter !== "all" ? "active" : ""}`}
+                  aria-pressed={effectiveCoveredFilter !== "all"}
+                  title="Click to cycle filter: All -> Remaining -> Covered today"
+                  onClick={() => setCoveredFilterMode((prev) => nextCoveredFilterMode(prev))}
+                >
+                  <CheckCircle2 size={13} aria-hidden="true" />
+                  <span>{standupPillLabel}</span>
+                </button>
+                <button
+                  type="button"
+                  className="standup-reset-btn"
+                  aria-label="Reset today's covered issues"
+                  title="Reset today's covered issues"
+                  onClick={handleResetStandup}
+                >
+                  <RotateCcw size={12} aria-hidden="true" />
+                </button>
+              </span>
+            )}
             {chips.map((chip) => (
               <button
                 key={`${chip.kind}_${chip.key}`}
@@ -183,8 +286,15 @@ export function IssuePanel({
                 <X size={12} aria-hidden="true" />
               </button>
             ))}
-            {chips.length > 0 && (
-              <button type="button" className="clear-all-btn" onClick={onClearAll}>
+            {(chips.length > 0 || effectiveCoveredFilter !== "all") && (
+              <button
+                type="button"
+                className="clear-all-btn"
+                onClick={() => {
+                  setCoveredFilterMode("all");
+                  onClearAll();
+                }}
+              >
                 Clear all
               </button>
             )}
@@ -296,6 +406,10 @@ export function IssuePanel({
             theme={theme}
             pageStart={pageStart}
             pageStop={pageStop}
+            coveredIds={coveredSet}
+            activeIssueId={standupState.activeId}
+            onOpenIssue={handleOpenIssue}
+            onToggleCovered={handleToggleCovered}
           />
         ) : (
           <IssueBoard
@@ -309,7 +423,11 @@ export function IssuePanel({
             theme={theme}
             pageStart={pageStart}
             pageSize={pageSize}
+            coveredIds={coveredSet}
+            activeIssueId={standupState.activeId}
             onToggleLanePill={handleToggleLanePill}
+            onOpenIssue={handleOpenIssue}
+            onToggleCovered={handleToggleCovered}
           />
         )}
       </div>

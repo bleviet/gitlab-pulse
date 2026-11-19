@@ -8,7 +8,7 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ListTree } from "lucide-react";
 import { sortIssuesDefault, sortIssuesHierarchy, type HierarchyRow } from "../lib/board";
 import { getPriorityColor, hexWithAlpha } from "../lib/colors";
 import type { IssueFacets, IssueItem, LabelStyle, ThemeMode } from "../lib/types";
@@ -22,6 +22,10 @@ interface IssueTableProps {
   theme: ThemeMode;
   pageStart: number;
   pageStop: number;
+  coveredIds: ReadonlySet<number>;
+  activeIssueId: number | null;
+  onOpenIssue: (issueId: number) => void;
+  onToggleCovered: (issueId: number) => void;
 }
 
 const columnHelper = createColumnHelper<HierarchyRow>();
@@ -35,6 +39,10 @@ export function IssueTable({
   theme,
   pageStart,
   pageStop,
+  coveredIds,
+  activeIssueId,
+  onOpenIssue,
+  onToggleCovered,
 }: IssueTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -48,6 +56,15 @@ export function IssueTable({
     [issues],
   );
 
+  const iidColWidth = useMemo(() => {
+    let maxDigits = 3;
+    for (const issue of issues) {
+      const len = String(issue.iid).length;
+      if (len > maxDigits) maxDigits = len;
+    }
+    return `${maxDigits + 1.5}ch`;
+  }, [issues]);
+
   const columns = useMemo(() => {
     const showHierarchyIndent = sorting.length === 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,27 +73,85 @@ export function IssueTable({
         id: "title",
         header: "Title",
         cell: (info) => {
-          const { issue, depth } = info.row.original;
+          const { issue, depth, childCount } = info.row.original;
           const indentPx = showHierarchyIndent && depth > 0 ? depth * 18 : 0;
-          const linkText = `#${issue.iid} - ${issue.title}`;
+          const isCovered = coveredIds.has(issue.id);
+          const isActive = activeIssueId === issue.id;
+          const innerContent = (
+            <>
+              <span className="issue-iid-prefix">#{issue.iid}</span>
+              <span
+                className="issue-title-text"
+                style={indentPx > 0 ? { paddingLeft: `${indentPx}px` } : undefined}
+              >
+                {showHierarchyIndent && depth > 0 && (
+                  <span className="issue-hierarchy-arrow" aria-hidden="true">
+                    ↳
+                  </span>
+                )}
+                {issue.title}
+              </span>
+            </>
+          );
           return (
-            <div style={{ paddingLeft: `${indentPx}px`, minWidth: "240px" }}>
-              {showHierarchyIndent && depth > 0 && (
-                <span style={{ color: "var(--muted)", marginRight: "0.3rem" }} aria-hidden="true">
-                  ↳
-                </span>
-              )}
+            <div className="issue-title-cell" style={{ minWidth: "240px" }}>
+              <button
+                type="button"
+                className={`issue-cover-btn ${isCovered ? "covered" : ""}`}
+                aria-pressed={isCovered}
+                aria-label={
+                  isCovered
+                    ? `Unmark #${issue.iid} as covered today`
+                    : `Mark #${issue.iid} as covered today`
+                }
+                title={
+                  isCovered
+                    ? "Covered today — click to unmark"
+                    : "Mark as covered today"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCovered(issue.id);
+                }}
+              >
+                {isCovered && <Check size={11} strokeWidth={3} aria-hidden="true" />}
+              </button>
               {issue.web_url ? (
                 <a
                   href={issue.web_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="issue-link"
+                  onClick={() => onOpenIssue(issue.id)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) onOpenIssue(issue.id);
+                  }}
                 >
-                  {linkText}
+                  {innerContent}
                 </a>
               ) : (
-                <span style={{ fontWeight: 600, color: "var(--heading)" }}>{linkText}</span>
+                <span
+                  className="issue-link"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onOpenIssue(issue.id)}
+                >
+                  {innerContent}
+                </span>
+              )}
+              {childCount > 0 && (
+                <span
+                  className="issue-children-badge"
+                  title={`${childCount} child task${childCount === 1 ? "" : "s"}`}
+                  aria-label={`${childCount} child task${childCount === 1 ? "" : "s"}`}
+                >
+                  <ListTree size={11} aria-hidden="true" />
+                  <span>{childCount}</span>
+                </span>
+              )}
+              {isActive && (
+                <span className="issue-viewing-tag" title="Currently viewing">
+                  Viewing
+                </span>
               )}
             </div>
           );
@@ -211,7 +286,19 @@ export function IssueTable({
     );
 
     return cols;
-  }, [facets.stage, hasAnyContexts, labelStyles, palette, priorityOrder, sorting.length, theme]);
+  }, [
+    activeIssueId,
+    coveredIds,
+    facets.stage,
+    hasAnyContexts,
+    labelStyles,
+    onOpenIssue,
+    onToggleCovered,
+    palette,
+    priorityOrder,
+    sorting.length,
+    theme,
+  ]);
 
   const table = useReactTable({
     data,
@@ -236,7 +323,7 @@ export function IssueTable({
 
   return (
     <div className="issue-table-wrap">
-      <table className="issue-table">
+      <table className="issue-table" style={{ ["--iid-col-w" as string]: iidColWidth }}>
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -268,16 +355,27 @@ export function IssueTable({
           ))}
         </thead>
         <tbody>
-          {pageRows.map((row) => (
-            <tr key={row.original.issue.id}>
-              {row.getVisibleCells().map((cell) => {
-                if (cell.column.id === "quality_hints" && !showQualityHints) {
-                  return null;
-                }
-                return <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>;
-              })}
-            </tr>
-          ))}
+          {pageRows.map((row) => {
+            const issueId = row.original.issue.id;
+            const isCovered = coveredIds.has(issueId);
+            const isActive = activeIssueId === issueId;
+            const rowClass = [
+              isCovered ? "issue-row-covered" : "",
+              isActive ? "issue-row-active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <tr key={issueId} className={rowClass || undefined}>
+                {row.getVisibleCells().map((cell) => {
+                  if (cell.column.id === "quality_hints" && !showQualityHints) {
+                    return null;
+                  }
+                  return <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>;
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
