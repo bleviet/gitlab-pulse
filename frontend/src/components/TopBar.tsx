@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { BarChart3, Moon, RefreshCw, Shield, Sun } from "lucide-react";
+import { IS_DEMO } from "../lib/api";
 import type { SyncStatus, ThemeMode, ValueMode } from "../lib/types";
 
 interface TopBarProps {
@@ -43,7 +44,7 @@ export function TopBar({
       <div className="pulse-topbar-left">
         <div className="pulse-brand">
           <img
-            src="/static/logo.svg"
+            src={`${import.meta.env.BASE_URL}static/logo.svg`}
             alt=""
             width={28}
             height={28}
@@ -58,7 +59,19 @@ export function TopBar({
       {scopeBar && <div className="pulse-topbar-center">{scopeBar}</div>}
 
       <div className="pulse-topbar-right">
-        {syncStatus && (
+        {IS_DEMO && (
+          <a
+            className="pulse-icon-btn"
+            href="https://github.com/bleviet/gitlab-pulse#quick-start-synthetic-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Run GitLab Pulse locally with synthetic data"
+          >
+            Demo · synthetic data
+          </a>
+        )}
+
+        {!IS_DEMO && syncStatus && (
           <button
             type="button"
             className="pulse-icon-btn"
@@ -115,16 +128,18 @@ export function TopBar({
           {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
         </button>
 
-        <button
-          type="button"
-          className="pulse-icon-btn"
-          aria-label="Open admin operations"
-          onClick={onOpenAdmin}
-          title="Admin operations"
-        >
-          <Shield size={15} color={isAdmin ? "var(--accent)" : undefined} />
-          <span>{isAdmin ? "Admin" : "Ops"}</span>
-        </button>
+        {!IS_DEMO && (
+          <button
+            type="button"
+            className="pulse-icon-btn"
+            aria-label="Open admin operations"
+            onClick={onOpenAdmin}
+            title="Admin operations"
+          >
+            <Shield size={15} color={isAdmin ? "var(--accent)" : undefined} />
+            <span>{isAdmin ? "Admin" : "Ops"}</span>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -26,7 +26,12 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export const IS_DEMO = import.meta.env.MODE === "demo";
+
 export function fetchDashboard(): Promise<DashboardPayload> {
+  if (IS_DEMO) {
+    return requestJson<DashboardPayload>(`${import.meta.env.BASE_URL}demo-data/dashboard.json`);
+  }
   return requestJson<DashboardPayload>("/api/dashboard");
 }
 

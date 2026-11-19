@@ -9,6 +9,8 @@ data/state/*.json
 # Frontend build & dependencies
 frontend/node_modules/
 frontend/dist/
+frontend/dist-demo/
+docs/demo/
 
 # Keep directory structure
 !data/*/.gitkeep

@@ -48,3 +48,14 @@ The legacy Streamlit UI, Plotly wrapper layer, and experimental Custom View buil
 ### 3.1 Rationale for Client-Side Filtering & SVG Charts
 
 Because GitLab Pulse typically operates on thousands of issues per workspace, shipping the collapsed issue payload once (~100 KB gzipped) lets every summary pill click, chart slice selection, search keystroke, column sort, and page switch complete in a few milliseconds on the client without network round-trips or server re-execution.
+
+### 3.2 Demo mode
+
+`npm run build:demo` runs Vite with `--mode demo`, `--base /gitlab-pulse/demo/` and `--outDir dist-demo`. `IS_DEMO` (`frontend/src/lib/api.ts`, `import.meta.env.MODE === "demo"`) changes the following:
+
+- `fetchDashboard()` reads `${import.meta.env.BASE_URL}demo-data/dashboard.json` instead of `/api/dashboard`.
+- `App` does not call `fetchAdminStatus` and does not render `AdminModal`.
+- `TopBar` hides the refresh/sync button and the Ops/admin button and shows a "Demo · synthetic data" chip linking to the README quick start.
+- Public assets use the Vite base: the logo path uses `BASE_URL`, and Vite rewrites the favicon links in `index.html` and the font URLs in `fonts.css`.
+
+The normal build (base `/`) is unaffected. The snapshot is produced by `tools/export_demo_payload.py`.

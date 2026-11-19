@@ -8,6 +8,8 @@ GitLab Pulse is a local-first analytics application for GitLab issue data. It ex
 - **Interactive Data Filtering**: Charts support drill-down filtering to inspect the underlying issue data.
 - **Customizable Workflows**: Uses YAML configuration to map existing GitLab labels to standardized semantic workflow stages.
 
+**Live demo:** <https://bleviet.github.io/gitlab-pulse/demo/> (read-only, synthetic data, rebuilt weekly). To build it locally, seed and process synthetic data first (see Quick Start), then run `cd frontend && npm run build:demo && cd ..`, write the payload from the repository root with `uv run python tools/export_demo_payload.py --output frontend/dist-demo/demo-data/dashboard.json`, and serve `frontend/dist-demo/` under the path `/gitlab-pulse/demo/` (for example, copy it to `site/gitlab-pulse/demo/` and run `python -m http.server` in `site/`).
+
 ---
 
 ## Visual Insights

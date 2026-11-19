@@ -10,6 +10,7 @@ import {
   adminLogout,
   fetchAdminStatus,
   fetchDashboard,
+  IS_DEMO,
 } from "./lib/api";
 import { getOverviewStages, getWorkflowStages } from "./lib/board";
 import {
@@ -139,6 +140,7 @@ export function App() {
 
   useEffect(() => {
     void loadData(false);
+    if (IS_DEMO) return;
     void fetchAdminStatus()
       .then((res) => setIsAdmin(res.authenticated))
       .catch(() => setIsAdmin(false));
@@ -372,14 +374,16 @@ export function App() {
         }
       />
 
-      <AdminModal
-        open={adminModalOpen}
-        isAdmin={isAdmin}
-        onClose={() => setAdminModalOpen(false)}
-        onLogin={handleAdminLogin}
-        onLogout={handleAdminLogout}
-        onReloadDashboard={() => loadData(true)}
-      />
+      {!IS_DEMO && (
+        <AdminModal
+          open={adminModalOpen}
+          isAdmin={isAdmin}
+          onClose={() => setAdminModalOpen(false)}
+          onLogin={handleAdminLogin}
+          onLogout={handleAdminLogout}
+          onReloadDashboard={() => loadData(true)}
+        />
+      )}
 
       <main className={hasCockpit ? "pulse-main analytics-cockpit" : "pulse-main"}>
         {loading ? (
