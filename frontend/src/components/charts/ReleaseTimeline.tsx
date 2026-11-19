@@ -24,6 +24,16 @@ const TRAY_WIDTH = 120;
 const TRAY_WIDTH_COMPACT = 56;
 const TRAY_GAP = 12;
 const TRAY_COMPACT_BELOW = 520;
+const CONTROL_CHAR_WIDTH = 5.6;
+const TICK_LABEL_HALF_WIDTH = 16;
+const CONTROL_GAP = 4;
+
+interface EdgeControl {
+  label: string;
+  ariaLabel: string;
+  side: "start" | "end";
+  onActivate: () => void;
+}
 
 interface UnscheduledTrayProps {
   count: number;
@@ -159,10 +169,11 @@ export function ReleaseTimeline({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(900);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const model = useMemo(
-    () => buildMilestoneTimelineData(issues, palette, highlightMilestone),
-    [issues, palette, highlightMilestone],
+    () => buildMilestoneTimelineData(issues, palette, highlightMilestone, undefined, showAll),
+    [issues, palette, highlightMilestone, showAll],
   );
   const hasModel = model !== null;
 
@@ -272,6 +283,40 @@ export function ReleaseTimeline({
   const nowColor = palette.now_marker ?? "#dd2476";
   const highlightRing = palette.ms_highlight ?? "#f4a44a";
 
+  const controls: EdgeControl[] = [];
+  if (showAll) {
+    if (model.outOfWindowCount > 0) {
+      controls.push({
+        label: "1 year ›",
+        ariaLabel: "Show one-year window",
+        side: "end",
+        onActivate: () => setShowAll(false),
+      });
+    }
+  } else {
+    if (model.hiddenEarlierCount > 0) {
+      controls.push({
+        label: `‹ ${model.hiddenEarlierCount} earlier`,
+        ariaLabel: `Show ${model.hiddenEarlierCount} earlier releases`,
+        side: "start",
+        onActivate: () => setShowAll(true),
+      });
+    }
+    if (model.hiddenLaterCount > 0) {
+      controls.push({
+        label: `${model.hiddenLaterCount} later ›`,
+        ariaLabel: `Show ${model.hiddenLaterCount} later releases`,
+        side: "end",
+        onActivate: () => setShowAll(true),
+      });
+    }
+  }
+  const collidesWithControl = (tx: number): boolean =>
+    controls.some((c) => {
+      const w = c.label.length * CONTROL_CHAR_WIDTH + CONTROL_GAP + TICK_LABEL_HALF_WIDTH;
+      return c.side === "start" ? tx < w : tx > scaleWidth - w;
+    });
+
   return (
     <div
       style={{
@@ -317,7 +362,7 @@ export function ReleaseTimeline({
           {/* Vertical month grid ticks */}
           {ticks.map((tick, idx) => {
             const tx = xFor(tick.ms);
-            const overlapsNow = Math.abs(tx - nowX) < 32;
+            const hideLabel = Math.abs(tx - nowX) < 32 || collidesWithControl(tx);
             return (
               <g key={idx}>
                 <line
@@ -328,7 +373,7 @@ export function ReleaseTimeline({
                   stroke="var(--chart-grid)"
                   strokeWidth={1}
                 />
-                {!overlapsNow && (
+                {!hideLabel && (
                   <text
                     x={tx}
                     y={height - 4}
@@ -374,6 +419,31 @@ export function ReleaseTimeline({
           >
             NOW
           </text>
+
+          {controls.map((c) => (
+            <text
+              key={c.side}
+              x={c.side === "start" ? 0 : scaleWidth}
+              y={height - 4}
+              textAnchor={c.side}
+              fill="var(--muted)"
+              fontSize={9}
+              fontFamily="var(--font-mono)"
+              tabIndex={0}
+              role="button"
+              aria-label={c.ariaLabel}
+              style={{ cursor: "pointer" }}
+              onClick={c.onActivate}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  c.onActivate();
+                }
+              }}
+            >
+              {c.label}
+            </text>
+          ))}
 
           {/* Milestone markers */}
           {model.points.map((pt) => {
