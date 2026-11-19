@@ -89,6 +89,7 @@ export interface AdminJobResponse {
 
 export type IssueViewMode = "table" | "board";
 export type ThemeMode = "dark" | "light";
+export type ValueMode = "count" | "percent";
 export type TimePreset = "30d" | "90d" | "1y" | "all" | "custom";
 
 export interface GlobalFilters {

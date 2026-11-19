@@ -42,7 +42,7 @@ The legacy Streamlit UI, Plotly wrapper layer, and experimental Custom View buil
 |---|---|
 | `styles/` | Self-hosted fonts (`fonts.css`), bahonavi dark/light CSS variables (`tokens.css`), layout and component styles (`global.css`) |
 | `lib/` | Pure TypeScript domain logic (`types.ts`, `colors.ts`, `search.ts`, `scopeSearch.ts`, `facets.ts`, `summary.ts`, `timeline.ts`, `board.ts`, `analytics.ts`, `api.ts`) |
-| `components/charts/` | Responsive SVG charts (`ReleaseTimeline`, `PriorityDonut`, `QualitySignalsChart`, `DailyVelocityChart`, `WorkflowStateRow`) |
+| `components/charts/` | Responsive SVG charts (`ReleaseTimeline`, `PriorityDonut`, `QualitySignalsChart`, `UnscheduledMilestonesChart`, `DailyVelocityChart`, `WorkflowStateRow`) |
 | `components/` | `TopBar`, `ScopeBar`, `OverviewWorkspace`, `SummaryBar`, `IssueSearchInput`, `IssuePanel`, `IssueTable`, `IssueBoard`, `AdminModal` |
 
 ### 3.1 Rationale for Client-Side Filtering & SVG Charts

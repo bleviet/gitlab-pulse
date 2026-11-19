@@ -1,16 +1,23 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildIssueTypeDonutData, buildPriorityDonutData } from "../lib/analytics";
+import { buildUnscheduledMilestonesData } from "../lib/timeline";
 import type {
   ActiveChartId,
   IssueFacets,
   IssueItem,
   IssueViewMode,
   ThemeMode,
+  ValueMode,
 } from "../lib/types";
 import { DailyVelocityChart } from "./charts/DailyVelocityChart";
 import { PriorityDonut } from "./charts/PriorityDonut";
 import { QualitySignalsChart } from "./charts/QualitySignalsChart";
 import { ReleaseTimeline } from "./charts/ReleaseTimeline";
+import {
+  UnscheduledMilestonesPanelBody,
+  type UnscheduledMode,
+} from "./charts/UnscheduledMilestonesChart";
 import { WorkflowStateRow } from "./charts/WorkflowStateRow";
 
 interface OverviewWorkspaceProps {
@@ -25,6 +32,7 @@ interface OverviewWorkspaceProps {
   palette: Record<string, string>;
   priorityOrder: string[];
   theme: ThemeMode;
+  valueMode: ValueMode;
   onSelectMilestone: (title: string) => void;
   onSetChartFilter: (chartId: ActiveChartId, nextFacets: IssueFacets) => void;
   issuePanel: ReactNode;
@@ -42,6 +50,7 @@ export function OverviewWorkspace({
   palette,
   priorityOrder,
   theme,
+  valueMode,
   onSelectMilestone,
   onSetChartFilter,
   issuePanel,
@@ -72,6 +81,16 @@ export function OverviewWorkspace({
     () => buildIssueTypeDonutData(issues, "opened", palette, theme),
     [issues, palette, theme],
   );
+
+  const unscheduledModel = useMemo(
+    () => buildUnscheduledMilestonesData(timelineIssues, palette, priorityOrder, theme),
+    [timelineIssues, palette, priorityOrder, theme],
+  );
+  const [unscheduledMode, setUnscheduledMode] = useState<UnscheduledMode>("priority");
+  const unscheduledPanelRef = useRef<HTMLDivElement | null>(null);
+  const [unscheduledPopoverOpen, setUnscheduledPopoverOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const trayRef = useRef<HTMLButtonElement | null>(null);
 
   const handlePrioritySlice = (priority: string) => {
     const isSame =
@@ -183,6 +202,62 @@ export function OverviewWorkspace({
   const createdLegendColor = palette.opened ?? "#4facfe";
   const closedLegendColor = palette.closed ?? "#56d4b0";
 
+  const hasUnscheduledRows = unscheduledModel.rows.length > 0;
+  const hasUnscheduledPanel = isWideSplit && hasUnscheduledRows;
+  const popoverOpen = unscheduledPopoverOpen && hasUnscheduledRows && !isWideSplit;
+
+  useEffect(() => {
+    if (!hasUnscheduledRows || isWideSplit) setUnscheduledPopoverOpen(false);
+  }, [hasUnscheduledRows, isWideSplit]);
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    popoverRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setUnscheduledPopoverOpen(false);
+        trayRef.current?.focus();
+      }
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target) || trayRef.current?.contains(target)) return;
+      setUnscheduledPopoverOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [popoverOpen]);
+
+  const renderUnscheduledBody = (headExtra?: ReactNode) => (
+    <UnscheduledMilestonesPanelBody
+      model={unscheduledModel}
+      mode={unscheduledMode}
+      valueMode={valueMode}
+      palette={palette}
+      activeMilestone={activeMilestone}
+      onChangeMode={setUnscheduledMode}
+      onSelectMilestone={onSelectMilestone}
+      headExtra={headExtra}
+    />
+  );
+
+  const handleSelectUnscheduled = () => {
+    if (!isWideSplit) {
+      setUnscheduledPopoverOpen((open) => !open);
+      return;
+    }
+    const el = unscheduledPanelRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  };
+
   const renderChartCards = () => (
     <>
       <div className="pulse-panel">
@@ -198,6 +273,7 @@ export function OverviewWorkspace({
             emptyMessage="No open issues."
             centerTooltipSubject="open"
             size={donutSize}
+            valueMode={valueMode}
             activeSlice={activeChart === "open_donut" ? (facets.priority ?? null) : null}
             isCenterSelected={
               activeChart === "open_donut" && facets.state === "opened" && !facets.priority
@@ -212,6 +288,7 @@ export function OverviewWorkspace({
             emptyMessage="No open issues."
             centerTooltipSubject="open"
             size={donutSize}
+            valueMode={valueMode}
             activeSlice={activeChart === "type_donut" ? (facets.issue_type ?? null) : null}
             isCenterSelected={
               activeChart === "type_donut" && facets.state === "opened" && !facets.issue_type
@@ -233,6 +310,7 @@ export function OverviewWorkspace({
           palette={palette}
           priorityOrder={priorityOrder}
           theme={theme}
+          valueMode={valueMode}
           activeStage={isStageBarActive ? (facets.stage ?? null) : null}
           activePriority={isStageBarActive ? (facets.priority ?? null) : null}
           isStageChartFilterActive={isStageBarActive}
@@ -295,10 +373,21 @@ export function OverviewWorkspace({
         <QualitySignalsChart
           issues={issues}
           palette={palette}
+          valueMode={valueMode}
           activeSignal={activeChart === "quality_signal_chart" ? (facets.signal ?? null) : null}
           onSelectSignal={handleQualitySignal}
         />
       </div>
+
+      {hasUnscheduledPanel && (
+        <div
+          className="pulse-panel"
+          ref={unscheduledPanelRef}
+          onAnimationEnd={(e) => e.currentTarget.classList.remove("flash")}
+        >
+          {renderUnscheduledBody()}
+        </div>
+      )}
     </>
   );
 
@@ -311,8 +400,40 @@ export function OverviewWorkspace({
           highlightMilestone={activeMilestone}
           variant="compact"
           height={78}
+          unscheduledCount={unscheduledModel.rows.length}
+          unscheduledOpenCount={unscheduledModel.openIssueCount}
+          isUnscheduledActive={unscheduledModel.rows.some((r) => r.title === activeMilestone)}
           onSelectMilestone={onSelectMilestone}
+          onSelectUnscheduled={hasUnscheduledRows ? handleSelectUnscheduled : undefined}
+          unscheduledExpanded={isWideSplit ? undefined : popoverOpen}
+          unscheduledControlsId={isWideSplit ? undefined : "unscheduled-popover"}
+          unscheduledTrayRef={trayRef}
         />
+        {popoverOpen && (
+          <div
+            id="unscheduled-popover"
+            ref={popoverRef}
+            className="pulse-panel unscheduled-popover"
+            role="dialog"
+            aria-label="Unscheduled milestones"
+            tabIndex={-1}
+          >
+            {renderUnscheduledBody(
+              <button
+                type="button"
+                className="pulse-icon-btn"
+                aria-label="Close"
+                onClick={() => {
+                  setUnscheduledPopoverOpen(false);
+                  trayRef.current?.focus();
+                }}
+                style={{ height: 22, width: 22, padding: 0 }}
+              >
+                <X size={12} />
+              </button>,
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`analytics-workspace ${isWideSplit ? "wide-split" : "top-strip"}`}>

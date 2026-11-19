@@ -1,6 +1,8 @@
-import type { IssueItem } from "./types";
+import { buildIssueTypeDonutData } from "./analytics";
+import { buildPriorityColorMap } from "./colors";
+import type { IssueItem, ThemeMode } from "./types";
 
-export type MilestoneStatus = "Complete" | "Incomplete" | "On Track" | "Overdue" | "Unscheduled";
+export type MilestoneStatus = "Complete" | "Incomplete" | "On Track" | "Overdue";
 
 export interface MilestonePoint {
   title: string;
@@ -21,12 +23,9 @@ export interface TimelineModel {
   minTimeMs: number;
   maxTimeMs: number;
   nowTimeMs: number;
-  separatorTimeMs: number | null;
 }
 
 const DAY_MS = 86_400_000;
-const UNDATED_GAP_MS = 30 * DAY_MS;
-const UNDATED_STEP_MS = 21 * DAY_MS;
 
 export function naturalCompare(a: string, b: string): number {
   const partsA = a.split(/(\d+)/).filter(Boolean);
@@ -104,7 +103,6 @@ export function buildMilestoneTimelineData(
     Incomplete: palette.ms_incomplete ?? "#f4a44a",
     "On Track": palette.ms_on_track ?? "#56d4b0",
     Overdue: palette.ms_overdue ?? "#f5576c",
-    Unscheduled: palette.neutral ?? "#7a8fa8",
   };
 
   interface RawPoint {
@@ -112,31 +110,27 @@ export function buildMilestoneTimelineData(
     status: MilestoneStatus;
     color: string;
     dueDateIso: string | null;
-    dueDateMs: number | null;
+    dueDateMs: number;
     closedCount: number;
     totalCount: number;
   }
 
   const dated: RawPoint[] = [];
-  const undated: RawPoint[] = [];
 
   for (const entry of grouped.values()) {
-    const isUndated = entry.dueDateMs === null;
-    if (isUndated && entry.allClosed) {
+    if (entry.dueDateMs === null) {
       continue;
     }
     let status: MilestoneStatus;
-    if (isUndated) {
-      status = "Unscheduled";
-    } else if (entry.allClosed) {
+    if (entry.allClosed) {
       status = entry.totalCount > 0 && entry.closedCount === entry.totalCount ? "Complete" : "Incomplete";
-    } else if ((entry.dueDateMs as number) < nowMs) {
+    } else if (entry.dueDateMs < nowMs) {
       status = "Overdue";
     } else {
       status = "On Track";
     }
 
-    const point: RawPoint = {
+    dated.push({
       title: entry.title,
       status,
       color: statusColor[status],
@@ -144,42 +138,19 @@ export function buildMilestoneTimelineData(
       dueDateMs: entry.dueDateMs,
       closedCount: entry.closedCount,
       totalCount: entry.totalCount,
-    };
-    if (isUndated) {
-      undated.push(point);
-    } else {
-      dated.push(point);
-    }
+    });
   }
 
-  if (dated.length === 0 && undated.length === 0) {
+  if (dated.length === 0) {
     return null;
   }
 
-  const latestDue = dated.reduce((max, p) => Math.max(max, p.dueDateMs ?? 0), nowMs + 90 * DAY_MS);
-  const windowEnd = Math.max(nowMs + 90 * DAY_MS, latestDue);
-  let separatorTimeMs: number | null = null;
-  let maxTimeMs = windowEnd;
+  const latestDue = dated.reduce((max, p) => Math.max(max, p.dueDateMs), nowMs + 90 * DAY_MS);
+  const maxTimeMs = Math.max(nowMs + 90 * DAY_MS, latestDue);
 
-  const combined: Array<RawPoint & { plotTimeMs: number }> = dated.map((p) => ({
-    ...p,
-    plotTimeMs: p.dueDateMs as number,
-  }));
-
-  if (undated.length > 0) {
-    undated.sort((a, b) => naturalCompare(a.title, b.title));
-    separatorTimeMs = windowEnd + UNDATED_GAP_MS / 2;
-    undated.forEach((p, idx) => {
-      const plotTimeMs = windowEnd + UNDATED_GAP_MS + idx * UNDATED_STEP_MS;
-      combined.push({ ...p, plotTimeMs });
-      if (plotTimeMs > maxTimeMs) {
-        maxTimeMs = plotTimeMs;
-      }
-    });
-    maxTimeMs += UNDATED_GAP_MS / 2;
-  }
-
-  combined.sort((a, b) => a.plotTimeMs - b.plotTimeMs);
+  const combined = dated
+    .map((p) => ({ ...p, plotTimeMs: p.dueDateMs }))
+    .sort((a, b) => a.plotTimeMs - b.plotTimeMs);
 
   const hasHighlight = Boolean(highlightMilestone && highlightMilestone !== "All");
   const points: MilestonePoint[] = combined.map((p, idx) => {
@@ -189,7 +160,7 @@ export function buildMilestoneTimelineData(
       status: p.status,
       color: p.color,
       dueDateIso: p.dueDateIso,
-      dueDateLabel: p.dueDateIso ?? "Not set",
+      dueDateLabel: p.dueDateIso ?? "",
       plotTimeMs: p.plotTimeMs,
       laneY: idx % 2 === 0 ? 1 : -1,
       closedCount: p.closedCount,
@@ -207,6 +178,206 @@ export function buildMilestoneTimelineData(
     minTimeMs,
     maxTimeMs,
     nowTimeMs: nowMs,
-    separatorTimeMs,
+  };
+}
+
+function formatMonthTick(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * Builds axis ticks on UTC month starts.
+ *
+ * Ticks step every k months, with the smallest k that keeps the count within
+ * maxCount.
+ *
+ * @param minMs Start of the visible range in epoch milliseconds.
+ * @param maxMs End of the visible range in epoch milliseconds.
+ * @param maxCount Maximum number of ticks to return.
+ * @returns Tick instants with short month labels.
+ */
+export function buildMonthTicks(
+  minMs: number,
+  maxMs: number,
+  maxCount: number,
+): Array<{ ms: number; label: string }> {
+  const start = new Date(minMs);
+  const year = start.getUTCFullYear();
+  let month = start.getUTCMonth();
+  if (Date.UTC(year, month, 1) < minMs) {
+    month += 1;
+  }
+  const starts: number[] = [];
+  for (let ms = Date.UTC(year, month, 1); ms <= maxMs; ms = Date.UTC(year, month, 1)) {
+    starts.push(ms);
+    month += 1;
+  }
+  const step = Math.max(1, Math.ceil(starts.length / Math.max(maxCount, 1)));
+  return starts
+    .filter((_, idx) => idx % step === 0)
+    .map((ms) => ({ ms, label: formatMonthTick(ms) }));
+}
+
+export interface UnscheduledSegment {
+  label: string;
+  count: number;
+  color: string;
+}
+
+export interface UnscheduledMilestoneRow {
+  title: string;
+  openCount: number;
+  totalCount: number;
+  oldestOpenDays: number;
+  byPriority: UnscheduledSegment[];
+  byType: UnscheduledSegment[];
+}
+
+export interface UnscheduledModel {
+  rows: UnscheduledMilestoneRow[];
+  openIssueCount: number;
+  hiddenClosedCount: number;
+  priorityLegend: UnscheduledSegment[];
+  typeLegend: UnscheduledSegment[];
+}
+
+/**
+ * Picks the rows to show, keeping the selected milestone visible.
+ *
+ * Takes the first maxRows rows. If the active milestone is a later row, it
+ * replaces the last visible row.
+ *
+ * @param rows Rows in display order.
+ * @param activeMilestone Title of the selected milestone, if any.
+ * @param maxRows Maximum number of rows to return.
+ * @returns The visible rows in display order.
+ */
+export function selectVisibleUnscheduledRows(
+  rows: UnscheduledMilestoneRow[],
+  activeMilestone: string | null,
+  maxRows: number,
+): UnscheduledMilestoneRow[] {
+  const visible = rows.slice(0, maxRows);
+  const active = rows.slice(maxRows).find((row) => row.title === activeMilestone);
+  if (active && visible.length > 0) {
+    visible[visible.length - 1] = active;
+  }
+  return visible;
+}
+
+function countSegments(
+  labels: string[],
+  order: string[],
+  colors: Record<string, string>,
+): UnscheduledSegment[] {
+  const counts = new Map<string, number>();
+  for (const label of labels) {
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return order
+    .filter((label) => (counts.get(label) ?? 0) > 0)
+    .map((label) => ({ label, count: counts.get(label) ?? 0, color: colors[label] }));
+}
+
+function sumSegments(rowSegments: UnscheduledSegment[][], order: string[]): UnscheduledSegment[] {
+  const totals = new Map<string, UnscheduledSegment>();
+  for (const segments of rowSegments) {
+    for (const seg of segments) {
+      const existing = totals.get(seg.label);
+      if (existing) {
+        existing.count += seg.count;
+      } else {
+        totals.set(seg.label, { ...seg });
+      }
+    }
+  }
+  return order.flatMap((label) => {
+    const seg = totals.get(label);
+    return seg ? [seg] : [];
+  });
+}
+
+/**
+ * Summarizes milestones that have no due date, using open issues only.
+ *
+ * A milestone is unscheduled when none of its issues carries a parseable due
+ * date. Unscheduled milestones without open issues are counted, not listed.
+ *
+ * @param issues Issues before the milestone filter is applied.
+ * @param palette Resolved palette used for priority and type colors.
+ * @param priorityOrder Priority labels in display order.
+ * @param theme Active theme, used for fallback colors.
+ * @returns Rows sorted by open issue count plus legends and totals.
+ */
+export function buildUnscheduledMilestonesData(
+  issues: IssueItem[],
+  palette: Record<string, string>,
+  priorityOrder: string[],
+  theme: ThemeMode,
+): UnscheduledModel {
+  const groups = new Map<string, { dated: boolean; issues: IssueItem[] }>();
+  for (const issue of issues) {
+    if (!issue.milestone) continue;
+    let group = groups.get(issue.milestone);
+    if (!group) {
+      group = { dated: false, issues: [] };
+      groups.set(issue.milestone, group);
+    }
+    group.issues.push(issue);
+    if (issue.milestone_due_date && !Number.isNaN(Date.parse(issue.milestone_due_date))) {
+      group.dated = true;
+    }
+  }
+
+  const priorityColors = buildPriorityColorMap(issues, palette, priorityOrder, theme);
+  const priorityKeys = Object.keys(priorityColors);
+  const priorityLabelOrder = [...priorityKeys.filter((k) => k !== "Unset"), "Unset"];
+
+  const openGroups: Array<{ title: string; all: IssueItem[]; open: IssueItem[] }> = [];
+  let hiddenClosedCount = 0;
+  for (const [title, group] of groups) {
+    if (group.dated) continue;
+    const open = group.issues.filter((issue) => issue.state === "opened");
+    if (open.length === 0) {
+      hiddenClosedCount += 1;
+    } else {
+      openGroups.push({ title, all: group.issues, open });
+    }
+  }
+
+  const allOpen = openGroups.flatMap((g) => g.open);
+  const typeSlices = buildIssueTypeDonutData(allOpen, "opened", palette, theme).slices;
+  const typeLabelOrder = typeSlices.map((s) => s.label);
+  const typeColors = Object.fromEntries(typeSlices.map((s) => [s.label, s.color]));
+
+  const rows: UnscheduledMilestoneRow[] = openGroups
+    .map((g) => ({
+      title: g.title,
+      openCount: g.open.length,
+      totalCount: g.all.length,
+      oldestOpenDays: g.open.reduce((max, issue) => Math.max(max, issue.age_days), 0),
+      byPriority: countSegments(
+        g.open.map((issue) => issue.priority || "Unset"),
+        priorityLabelOrder,
+        priorityColors,
+      ),
+      byType: countSegments(
+        g.open.map((issue) => (issue.issue_type || "Unset").trim() || "Unset"),
+        typeLabelOrder,
+        typeColors,
+      ),
+    }))
+    .sort((a, b) => b.openCount - a.openCount || naturalCompare(a.title, b.title));
+
+  return {
+    rows,
+    openIssueCount: rows.reduce((sum, row) => sum + row.openCount, 0),
+    hiddenClosedCount,
+    priorityLegend: sumSegments(rows.map((r) => r.byPriority), priorityLabelOrder),
+    typeLegend: sumSegments(rows.map((r) => r.byType), typeLabelOrder),
   };
 }

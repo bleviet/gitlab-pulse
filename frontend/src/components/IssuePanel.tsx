@@ -28,6 +28,7 @@ import type {
   IssueViewMode,
   LabelStyle,
   ThemeMode,
+  ValueMode,
 } from "../lib/types";
 import { IssueBoard } from "./IssueBoard";
 import { IssueSearchInput } from "./IssueSearchInput";
@@ -46,6 +47,7 @@ interface IssuePanelProps {
   palette: Record<string, string>;
   priorityOrder: string[];
   theme: ThemeMode;
+  valueMode: ValueMode;
   summaryBar?: ReactNode;
   onChangeViewMode: (mode: IssueViewMode) => void;
   onChangeFacets: (next: IssueFacets) => void;
@@ -69,6 +71,7 @@ export function IssuePanel({
   palette,
   priorityOrder,
   theme,
+  valueMode,
   summaryBar,
   onChangeViewMode,
   onChangeFacets,
@@ -421,6 +424,7 @@ export function IssuePanel({
             palette={palette}
             priorityOrder={priorityOrder}
             theme={theme}
+            valueMode={valueMode}
             pageStart={pageStart}
             pageSize={pageSize}
             coveredIds={coveredSet}

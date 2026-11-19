@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { buildQualitySignalsData } from "../../lib/analytics";
-import type { IssueItem } from "../../lib/types";
+import { buildQualitySignalsData, formatShare } from "../../lib/analytics";
+import type { IssueItem, ValueMode } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
 interface QualitySignalsChartProps {
   issues: IssueItem[];
   palette: Record<string, string>;
+  valueMode: ValueMode;
   activeSignal: string | null;
   onSelectSignal: (signalCode: string) => void;
 }
@@ -13,6 +14,7 @@ interface QualitySignalsChartProps {
 export function QualitySignalsChart({
   issues,
   palette,
+  valueMode,
   activeSignal,
   onSelectSignal,
 }: QualitySignalsChartProps) {
@@ -36,6 +38,7 @@ export function QualitySignalsChart({
     );
   }
 
+  const openTotal = issues.filter((issue) => issue.state === "opened").length;
   const maxCount = Math.max(...bars.map((b) => b.count), 1);
 
   return (
@@ -64,7 +67,7 @@ export function QualitySignalsChart({
                 y: e.clientY,
                 content: (
                   <div>
-                    <strong>{bar.label}</strong>: {bar.count} open issues
+                    <strong>{bar.label}</strong>: {bar.count} open issues ({formatShare(bar.count, openTotal)} of open)
                   </div>
                 ),
               })
@@ -127,7 +130,7 @@ export function QualitySignalsChart({
                 textAlign: "right",
               }}
             >
-              {bar.count}
+              {valueMode === "percent" ? formatShare(bar.count, openTotal) : bar.count}
             </span>
           </button>
         );

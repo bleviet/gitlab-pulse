@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildStagePriorityBars, type StageBarBucket } from "../../lib/analytics";
+import { buildStagePriorityBars, formatShare, type StageBarBucket } from "../../lib/analytics";
 import { contrastTextForHex } from "../../lib/colors";
-import type { IssueItem, ThemeMode } from "../../lib/types";
+import type { IssueItem, ThemeMode, ValueMode } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
 interface WorkflowStateRowProps {
@@ -10,6 +10,7 @@ interface WorkflowStateRowProps {
   palette: Record<string, string>;
   priorityOrder: string[];
   theme: ThemeMode;
+  valueMode: ValueMode;
   activeStage: string | null;
   activePriority: string | null;
   isStageChartFilterActive: boolean;
@@ -27,6 +28,7 @@ export function WorkflowStateRow({
   palette,
   priorityOrder,
   theme,
+  valueMode,
   activeStage,
   activePriority,
   isStageChartFilterActive,
@@ -72,9 +74,11 @@ export function WorkflowStateRow({
   const closedBuckets = buckets.filter((b) => b.isClosedOnly);
   const maxOpenTotal = Math.max(...openBuckets.map((b) => b.total), 1);
   const maxClosedTotal = Math.max(...closedBuckets.map((b) => b.total), 1);
+  const openTotal = openBuckets.reduce((sum, b) => sum + b.total, 0);
+  const closedTotal = closedBuckets.reduce((sum, b) => sum + b.total, 0);
   const trackPx = Math.max(containerWidth - 96 - 38 - 14, 80);
 
-  const renderRow = (bucket: StageBarBucket, scaleMax: number) => {
+  const renderRow = (bucket: StageBarBucket, scaleMax: number, groupTotal: number) => {
     const stageMatches = activeStage === bucket.stage;
     const stageDimmed = isStageChartFilterActive && !stageMatches;
 
@@ -126,7 +130,8 @@ export function WorkflowStateRow({
           {bucket.bars.map((bar) => {
             const widthPct = Math.max((bar.count / scaleMax) * 100, 2);
             const segmentPx = (widthPct / 100) * trackPx;
-            const countStr = String(bar.count);
+            const countStr =
+              valueMode === "percent" ? formatShare(bar.count, bucket.total) : String(bar.count);
             const showCount = segmentPx >= countStr.length * 6 + 8;
             const isSelected =
               stageMatches &&
@@ -156,7 +161,7 @@ export function WorkflowStateRow({
                     content: (
                       <div>
                         <strong>{bucket.stage}</strong>
-                        {bucket.isClosedOnly ? " (Closed)" : ""} · {bar.priority}: {bar.count}
+                        {bucket.isClosedOnly ? " (Closed)" : ""} · {bar.priority}: {bar.count} ({formatShare(bar.count, bucket.total)} of stage)
                       </div>
                     ),
                   })
@@ -206,7 +211,7 @@ export function WorkflowStateRow({
             textAlign: "right",
           }}
         >
-          {bucket.total}
+          {valueMode === "percent" ? formatShare(bucket.total, groupTotal) : bucket.total}
         </span>
       </div>
     );
@@ -222,14 +227,14 @@ export function WorkflowStateRow({
       }}
       aria-label="Issues by workflow state"
     >
-      {openBuckets.map((bucket) => renderRow(bucket, maxOpenTotal))}
+      {openBuckets.map((bucket) => renderRow(bucket, maxOpenTotal, openTotal))}
       {openBuckets.length > 0 && closedBuckets.length > 0 && (
         <div
           aria-hidden="true"
           style={{ borderTop: "1px dashed var(--line-strong)", margin: "0.12rem 0" }}
         />
       )}
-      {closedBuckets.map((bucket) => renderRow(bucket, maxClosedTotal))}
+      {closedBuckets.map((bucket) => renderRow(bucket, maxClosedTotal, closedTotal))}
       <ChartTooltip tooltip={tooltip} />
     </div>
   );

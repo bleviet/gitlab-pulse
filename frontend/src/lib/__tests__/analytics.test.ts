@@ -3,6 +3,7 @@ import {
   buildDailyVelocityData,
   buildIssueTypeDonutData,
   buildStagePriorityBars,
+  formatShare,
 } from "../analytics";
 import { getOverviewStages, getWorkflowStages } from "../board";
 import { contrastTextForHex } from "../colors";
@@ -163,5 +164,26 @@ describe("analytics helpers", () => {
     expect(historicalDays[6].isoDate).toBe("2026-08-10");
     expect(historicalDays.find((d) => d.isoDate === "2026-08-05")?.created).toBe(1);
     expect(historicalDays.find((d) => d.isoDate === "2026-08-10")?.closed).toBe(1);
+  });
+});
+
+describe("formatShare", () => {
+  it("returns 0% for an empty total", () => {
+    expect(formatShare(3, 0)).toBe("0%");
+  });
+
+  it("shows <1% for tiny nonzero shares", () => {
+    expect(formatShare(1, 1000)).toBe("<1%");
+    expect(formatShare(0, 10)).toBe("0%");
+  });
+
+  it("rounds to whole percents", () => {
+    expect(formatShare(1, 3)).toBe("33%");
+    expect(formatShare(2, 3)).toBe("67%");
+    expect(formatShare(1, 200)).toBe("1%");
+  });
+
+  it("returns 100% for the full total", () => {
+    expect(formatShare(7, 7)).toBe("100%");
   });
 });

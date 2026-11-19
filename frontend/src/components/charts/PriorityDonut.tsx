@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { DonutModel } from "../../lib/analytics";
+import { formatShare, type DonutModel } from "../../lib/analytics";
 import { contrastTextForHex } from "../../lib/colors";
+import type { ValueMode } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
 interface PriorityDonutProps {
@@ -10,6 +11,7 @@ interface PriorityDonutProps {
   emptyMessage: string;
   centerTooltipSubject: string;
   size?: number;
+  valueMode: ValueMode;
   activeSlice: string | null;
   isCenterSelected: boolean;
   showLegend?: boolean;
@@ -56,6 +58,7 @@ export function PriorityDonut({
   emptyMessage,
   centerTooltipSubject,
   size = 112,
+  valueMode,
   activeSlice,
   isCenterSelected,
   showLegend = true,
@@ -107,7 +110,9 @@ export function PriorityDonut({
     const shiftVec = polarToCartesian(0, 0, shift, midDeg);
     const labelPos = polarToCartesian(cx, cy, (outerR + innerR) / 2, midDeg);
     const arcPx = ((sweep * Math.PI) / 180) * ((outerR + innerR) / 2);
-    const labelWidth = String(slice.count).length * (sliceFont * 0.62) + 4;
+    const labelText =
+      valueMode === "percent" ? formatShare(slice.count, model.total) : String(slice.count);
+    const labelWidth = labelText.length * (sliceFont * 0.62) + 4;
     const showLabel =
       arcPx >= Math.max(16, labelWidth) && outerR - innerR - 3 >= labelWidth * 0.85;
 
@@ -118,6 +123,7 @@ export function PriorityDonut({
       shiftVec,
       labelPos,
       showLabel,
+      labelText,
       isSelected,
       isDimmed,
     };
@@ -205,7 +211,7 @@ export function PriorityDonut({
                 letterSpacing="-0.03em"
                 style={{ pointerEvents: "none" }}
               >
-                {seg.count}
+                {seg.labelText}
               </text>
             )}
           </g>
@@ -321,7 +327,10 @@ export function PriorityDonut({
                   flexShrink: 0,
                 }}
               />
-              <span>{seg.label}</span>
+              <span>
+                {seg.label}
+                {valueMode === "percent" ? ` ${formatShare(seg.count, model.total)}` : ""}
+              </span>
             </button>
           ))}
         </div>

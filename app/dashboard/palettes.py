@@ -32,6 +32,7 @@ _SEMANTIC_LIGHT: dict[str, str] = {
     "ms_on_track": "#1a7a62",
     "ms_overdue": "#b51c3c",
     "ms_highlight": "#b06000",
+    "ms_unscheduled": "#4f6585",
     "now_marker": "#dd2476",
 }
 
@@ -62,6 +63,7 @@ _SEMANTIC_DARK: dict[str, str] = {
     "ms_on_track": "#56d4b0",
     "ms_overdue": "#f5576c",
     "ms_highlight": "#f4a44a",
+    "ms_unscheduled": "#9fb2cc",
     "now_marker": "#dd2476",
 }
 

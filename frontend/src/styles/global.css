@@ -603,6 +603,27 @@ select {
   transition: all 0.15s var(--ease);
 }
 
+.pulse-segmented.compact button {
+  height: 20px;
+  padding: 0 0.5rem;
+  font-size: 0.68rem;
+}
+
+.unscheduled-head {
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
+}
+
+.unscheduled-head .pulse-panel-title {
+  white-space: nowrap;
+}
+
+.unscheduled-head-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .pulse-segmented button:hover {
   color: var(--heading);
 }
@@ -725,8 +746,21 @@ select {
 }
 
 .release-rail-panel {
+  position: relative;
   padding: 0.35rem 0.75rem;
   flex-shrink: 0;
+}
+
+.unscheduled-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0.75rem;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 40;
+  box-shadow: var(--shadow);
+  outline: none;
 }
 
 .analytics-workspace.wide-split {
@@ -752,6 +786,28 @@ select {
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+.pulse-panel.flash {
+  animation: pulse-panel-flash 0.9s var(--ease);
+}
+
+@keyframes pulse-panel-flash {
+  0%,
+  100% {
+    box-shadow: var(--shadow-card);
+  }
+  30% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      var(--shadow-card);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-panel.flash {
+    animation: none;
+  }
 }
 
 .analytics-bento-strip {

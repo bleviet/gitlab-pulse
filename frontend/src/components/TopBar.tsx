@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { BarChart3, Moon, RefreshCw, Shield, Sun } from "lucide-react";
-import type { SyncStatus, ThemeMode } from "../lib/types";
+import type { SyncStatus, ThemeMode, ValueMode } from "../lib/types";
 
 interface TopBarProps {
   chartsVisible: boolean;
   theme: ThemeMode;
+  valueMode: ValueMode;
   isAdmin: boolean;
   scopeBar?: ReactNode;
   syncStatus?: SyncStatus;
@@ -12,6 +13,7 @@ interface TopBarProps {
   refreshing: boolean;
   onRefreshData: () => void;
   onToggleCharts: () => void;
+  onChangeValueMode: (mode: ValueMode) => void;
   onToggleTheme: () => void;
   onOpenAdmin: () => void;
 }
@@ -19,6 +21,7 @@ interface TopBarProps {
 export function TopBar({
   chartsVisible,
   theme,
+  valueMode,
   isAdmin,
   scopeBar,
   syncStatus,
@@ -26,6 +29,7 @@ export function TopBar({
   refreshing,
   onRefreshData,
   onToggleCharts,
+  onChangeValueMode,
   onToggleTheme,
   onOpenAdmin,
 }: TopBarProps) {
@@ -81,6 +85,25 @@ export function TopBar({
           <BarChart3 size={14} />
           <span>Charts</span>
         </button>
+
+        <div className="pulse-segmented" role="group" aria-label="Show numbers as">
+          <button
+            type="button"
+            aria-pressed={valueMode === "count"}
+            title="Show counts"
+            onClick={() => onChangeValueMode("count")}
+          >
+            #
+          </button>
+          <button
+            type="button"
+            aria-pressed={valueMode === "percent"}
+            title="Show percentages"
+            onClick={() => onChangeValueMode("percent")}
+          >
+            %
+          </button>
+        </div>
 
         <button
           type="button"

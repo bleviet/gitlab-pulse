@@ -32,7 +32,7 @@ The Overview uses one `100vh` workspace (`OverviewWorkspace` in `frontend/src/co
 
 ### 3.1 Release rail
 
-`ReleaseTimeline` (`frontend/src/components/charts/ReleaseTimeline.tsx`) with `variant="compact"`: a soft band with a centre rail, round markers coloured by status (complete, incomplete, on track, overdue) that alternate above and below the rail in date order, their names next to them, and a pink line labelled "NOW" for today. Active milestones without a due date are drawn as neutral "Unscheduled" markers in a "No due date" section after the latest dated milestone (at least 90 days ahead), in natural version order (`v2.4.9` before `v2.4.10`); their hover shows "Due: Not set". Closed milestones without a due date are hidden. Clicking a milestone sets the milestone filter (4.2).
+`ReleaseTimeline` (`frontend/src/components/charts/ReleaseTimeline.tsx`) with `variant="compact"`: a soft band with a centre rail, round markers coloured by status (complete, incomplete, on track, overdue) that alternate above and below the rail in date order, their names next to them, and a pink line labelled "NOW" for today. The rail shows only milestones with a due date (a milestone counts as dated when any of its issues carries one); hover shows "Due:" with the ISO date. Month ticks sit on UTC month starts and step every k months so they fit the width. Milestones without a due date are not placed on the date scale. When any exist, a tray at the right end of the rail, outside the date scale, shows "{N} unscheduled" and "{M} open issues" (`120 px`; below `520 px` chart width a compact `56 px` tray shows only the ring and N). The tray is a button whenever unscheduled milestones exist, with Charts on or off. In the wide split it scrolls the Unscheduled Milestones panel (3.4) into view and briefly highlights it. In the top strip and with Charts off it toggles a popover under the rail with the same panel content; the popover closes on Escape (focus returns to the tray), on a click outside it, or with its close button, and row clicks keep it open. The tray border turns solid while the popover is open or an unscheduled milestone is the active milestone filter. If no milestone has a due date, the rail shows "No milestones with a due date." next to the tray. Clicking a milestone sets the milestone filter (4.2).
 
 ### 3.2 Summary pills
 
@@ -65,10 +65,26 @@ The header counts ignore the stage and priority filters, so every lane keeps its
 When **Charts** is ON, `OverviewWorkspace` (`frontend/src/components/OverviewWorkspace.tsx`) renders a single-viewport (`100vh`) responsive hybrid cockpit:
 
 - **Top strip (full width):** `ReleaseTimeline` in compact rail style (`78 px` height, always visible whether Charts is ON or OFF).
-- **Wide desktop (`>= 1360px` in Table view):** two-column split with a `380 px` left analytics rail (`Open Mix` with side-by-side Open Priority and Open Type donuts plus clickable color legends, horizontal stacked `Workflow State` bars across open stages and closed terminal stages with inline priority counts, `Daily New vs. Closed`, and `Issue Quality Signals`) beside the full-height `IssuePanel`.
-- **Narrower viewports (`< 1360px`) or Kanban Board view:** collapses to a single 4-card bento strip above `IssuePanel` so the board or table uses full horizontal width.
+- **Wide desktop (`>= 1360px` in Table view):** two-column split with a `380 px` left analytics rail (`Open Mix` with side-by-side Open Priority and Open Type donuts plus clickable color legends, horizontal stacked `Workflow State` bars across open stages and closed terminal stages with inline priority counts, `Daily New vs. Closed`, and `Issue Quality Signals`, and the `Unscheduled Milestones` panel) beside the full-height `IssuePanel`.
+- **Narrower viewports (`< 1360px`) or Kanban Board view:** collapses to a single 4-cell bento strip above `IssuePanel` so the board or table uses full horizontal width.
+- **Unscheduled Milestones panel:** `UnscheduledMilestonesChart` lists milestones that have no due date and at least one open issue, sorted by open issue count and then by natural title order. Each row shows the open count and a bar scaled to the largest row. A `Total` / `Priority` / `Type` toggle switches the bar between one segment and open issues stacked by priority or issue type (colours match `Open Mix`; a legend appears in the stacked modes). At most 6 rows are shown, followed by "+k more without a due date"; a selected milestone beyond the cap replaces the last visible row. A footnote counts milestones without a due date whose issues are all closed, which are hidden. Hover shows the open/total counts, the age of the oldest open issue, and the breakdown. Clicking a row sets the global milestone filter, like a timeline marker (4.2). The panel is only rendered when at least one such milestone exists. It sits in the left rail under `Issue Quality Signals` in the wide split only; in the top strip and with Charts off the same content opens as a popover from the release rail tray (3.1), so the strip keeps its four cards.
 - **Unified toolbar:** `IssuePanel` displays the issue count and named removable filter chips (`Clear all` when filtered) on the left, with search (`Ctrl/Cmd+K`), Table/Board switch, and `Fit`/10/20/30 paging on the right. `Fit` computes row counts from the panel body height so the table fills the remaining viewport without page scrolling.
-- Clicking any chart segment (`PriorityDonut` slice, legend item, or center, `WorkflowStateRow` stage label / priority segment, `DailyVelocityChart` point, or `QualitySignalsChart` bar) updates `facets` and sets `activeChart`, dimming sibling elements cleanly. Clicking the active target again or removing its named chip clears the filter while preserving search text.
+- Clicking any chart segment (`PriorityDonut` slice, legend item, or center, `WorkflowStateRow` stage label / priority segment, `DailyVelocityChart` point, or `QualitySignalsChart` bar; `UnscheduledMilestonesChart` rows set the milestone filter instead of `facets`) updates `facets` and sets `activeChart`, dimming sibling elements cleanly. Clicking the active target again or removing its named chip clears the filter while preserving search text.
+
+### 3.5 Count / percent switch
+
+A segmented control next to the Charts toggle in `TopBar` (`#` and `%`, group label "Show numbers as") sets `valueMode` (`"count"` or `"percent"`). It is always visible, because the board lanes use it with Charts off. The choice is kept in `localStorage` (`pulse_value_mode`, default `count`) and is not a URL parameter, so it is not part of the shared-link contract. Percentages are whole numbers from `formatShare` (`frontend/src/lib/analytics.ts`): `<1%` for a nonzero share under 0.5%, `0%` for an empty total.
+
+| Chart | Percent mode shows |
+|---|---|
+| `Open Mix` donuts | slice labels and legend items as a share of the donut total; the center stays the absolute count |
+| `Workflow State` | segment labels as a share of the stage; the right-hand number as the stage's share of the issues in all rows above the divider (closed-only rows below it: of all closed-only rows); bar geometry is unchanged |
+| `Issue Quality Signals` | the right-hand number as a share of open issues |
+| `Unscheduled Milestones` | the right-hand number as a share of all open issues in unscheduled milestones; legend items as the same share |
+| Board lane priority pills | the priority's share of the lane's issues; the lane title keeps the count |
+| `DailyVelocityChart` | unchanged |
+
+Tooltips show both the count and the share in either mode (the release rail tooltip always shows "Issues: closed/total closed (share)").
 
 ## 4. Interactions
 

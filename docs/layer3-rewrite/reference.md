@@ -64,7 +64,7 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 | `scopeSearch.ts` | Fuzzy scoring and multi-dimension combined quick-apply matching for `ScopeBar` | `scoreScopeCandidate`, `buildScopeSuggestions` |
 | `facets.ts` | Global/facet filtering, cascading options, chip construction, URL state serialization | `applyPreMilestoneFilters`, `applyGlobalFilters`, `applyFacets`, `buildFacetChips`, `deriveScopedFilterOptions`, `resolvePresetDates`, `withoutFacet`, `parseGlobalFiltersUrl`, `parseUrlState`, `buildUrlSearch` |
 | `summary.ts` | Compact summary pill groups (`Flow`, `Open by priority`, `Hints`) | `buildSummaryGroups` |
-| `timeline.ts` | Milestone status grouping, natural version sort, rail geometry | `naturalCompare`, `buildMilestoneTimelineData` |
+| `timeline.ts` | Milestone status grouping for dated milestones, natural version sort, month ticks, unscheduled-milestone summary | `naturalCompare`, `buildMilestoneTimelineData`, `buildMonthTicks`, `buildUnscheduledMilestonesData` |
 | `board.ts` | Workflow stage ordering, lane mapping, default/hierarchy sorting, lane priority mix | `getOverviewStages`, `getWorkflowStages`, `getBoardLanes`, `sortIssuesDefault`, `sortIssuesHierarchy`, `computeLanePriorityCounts` |
 | `analytics.ts` | Client-side aggregations for Analytics charts | `buildPriorityDonutData`, `buildIssueTypeDonutData`, `buildQualitySignalsData`, `buildDailyVelocityData`, `buildStagePriorityBars` |
 | `api.ts` | Typed `fetch` wrappers with `credentials: "include"` | `fetchDashboard`, `fetchAdminStatus`, `adminLogin`, `adminLogout`, `runCollector`, `runProcessor`, `clearDashboardCache` |
@@ -73,9 +73,10 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 
 | File | Responsibility |
 |---|---|
-| `charts/ChartTooltip.tsx` | Viewport-clamped floating tooltip shared by SVG charts |
-| `charts/ReleaseTimeline.tsx` | Responsive SVG milestone rail (`compact` and `analytics` variants, `NOW` marker, `No due date` divider, clickable milestone pins) |
+| `charts/ChartTooltip.tsx` | Floating tooltip shared by all charts; rendered into `document.body` via a portal so scrolling chart containers cannot clip it, placed below and right of the cursor and flipped (`placeTooltip`) when it would leave the viewport |
+| `charts/ReleaseTimeline.tsx` | Responsive SVG milestone rail (`compact` and `analytics` variants, `NOW` marker, month ticks on UTC month starts, clickable milestone pins for dated milestones, fixed-width tray with the unscheduled milestone count) |
 | `charts/PriorityDonut.tsx` | Responsive SVG donut with clickable slices, clickable center total, and compact clickable legend (used for Open Priority and Open Issue Type) |
+| `charts/UnscheduledMilestonesChart.tsx` | Horizontal bars of open issues per milestone without a due date (`Total`, `Priority`, or `Type` breakdown, at most 6 rows, hidden-closed footnote); rows set the milestone filter; rendered in the wide rail or in a popover from the release rail tray |
 | `charts/QualitySignalsChart.tsx` | Horizontal bar chart for `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, and `MIXED_CLASSIFICATION` (`Open Hints`) |
 | `charts/DailyVelocityChart.tsx` | 7-day dual-line SVG chart (`New` vs. `Closed`) with historical anchoring and clickable date markers |
 | `charts/WorkflowStateRow.tsx` | Horizontal stacked priority bars with inline counts across open stages and closed terminal stages (`Done`) |
@@ -116,7 +117,7 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 
 ### 4.2 Keyboard Shortcuts
 - `Ctrl+K` (or `Cmd+K` on macOS): focus and select the inline issue search box.
-- `Escape`: blur search input, close open `ScopeBar` popovers, or close `AdminModal`.
+- `Escape`: blur search input, close open `ScopeBar` popovers, close the unscheduled milestones popover (focus returns to the release rail tray), or close `AdminModal`.
 
 ### 4.3 Server Environment Variables
 - `HOST`: bind address for `python -m app.dashboard` (default `127.0.0.1`).

@@ -7,7 +7,8 @@ import {
   sortIssuesDefault,
 } from "../lib/board";
 import { getPriorityColor, hexWithAlpha } from "../lib/colors";
-import type { IssueFacets, IssueItem, ThemeMode } from "../lib/types";
+import { formatShare } from "../lib/analytics";
+import type { IssueFacets, IssueItem, ThemeMode, ValueMode } from "../lib/types";
 
 interface IssueBoardProps {
   issues: IssueItem[];
@@ -18,6 +19,7 @@ interface IssueBoardProps {
   palette: Record<string, string>;
   priorityOrder: string[];
   theme: ThemeMode;
+  valueMode: ValueMode;
   pageStart: number;
   pageSize: number;
   coveredIds: ReadonlySet<number>;
@@ -36,6 +38,7 @@ export function IssueBoard({
   palette,
   priorityOrder,
   theme,
+  valueMode,
   pageStart,
   pageSize,
   coveredIds,
@@ -134,7 +137,9 @@ export function IssueBoard({
                             aria-hidden="true"
                           />
                           <span>{entry.priority}</span>
-                          <strong style={{ fontFamily: "var(--font-mono)" }}>{entry.count}</strong>
+                          <strong style={{ fontFamily: "var(--font-mono)" }}>
+                            {valueMode === "percent" ? formatShare(entry.count, mixTotal) : entry.count}
+                          </strong>
                         </button>
                       );
                     })}

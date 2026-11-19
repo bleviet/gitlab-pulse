@@ -293,3 +293,17 @@ export function buildStagePriorityBars(
   const closedOnly = buckets.filter((b) => b.isClosedOnly);
   return [...openOrMixed, ...closedOnly];
 }
+
+/**
+ * Formats a count as a whole-percent share of a total.
+ *
+ * @param count Part of the total.
+ * @param total Total the share is measured against.
+ * @returns "0%" for an empty total, "<1%" for tiny nonzero shares, else a rounded percent.
+ */
+export function formatShare(count: number, total: number): string {
+  if (total <= 0) return "0%";
+  const pct = (count / total) * 100;
+  if (pct > 0 && pct < 0.5) return "<1%";
+  return `${Math.round(pct)}%`;
+}

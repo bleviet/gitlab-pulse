@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { buildMilestoneTimelineData } from "../../lib/timeline";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { formatShare } from "../../lib/analytics";
+import { buildMilestoneTimelineData, buildMonthTicks } from "../../lib/timeline";
 import type { IssueItem } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
@@ -9,16 +10,135 @@ interface ReleaseTimelineProps {
   highlightMilestone: string | null;
   variant: "compact" | "analytics";
   height?: number;
+  unscheduledCount: number;
+  unscheduledOpenCount: number;
+  isUnscheduledActive: boolean;
   onSelectMilestone: (title: string) => void;
+  onSelectUnscheduled?: () => void;
+  unscheduledExpanded?: boolean;
+  unscheduledControlsId?: string;
+  unscheduledTrayRef?: RefObject<HTMLButtonElement | null>;
 }
 
-function formatMonthTick(ms: number): string {
-  const dt = new Date(ms);
-  return dt.toLocaleDateString("en-US", {
-    month: "short",
-    year: "2-digit",
-    timeZone: "UTC",
-  });
+const TRAY_WIDTH = 120;
+const TRAY_WIDTH_COMPACT = 56;
+const TRAY_GAP = 12;
+const TRAY_COMPACT_BELOW = 520;
+
+interface UnscheduledTrayProps {
+  count: number;
+  openCount: number;
+  color: string;
+  isActive: boolean;
+  compact: boolean;
+  top: number;
+  height: number;
+  onSelect?: () => void;
+  expanded?: boolean;
+  controlsId?: string;
+  buttonRef?: RefObject<HTMLButtonElement | null>;
+}
+
+function UnscheduledTray({
+  count,
+  openCount,
+  color,
+  isActive,
+  compact,
+  top,
+  height,
+  onSelect,
+  expanded,
+  controlsId,
+  buttonRef,
+}: UnscheduledTrayProps) {
+  const style: CSSProperties = {
+    position: "absolute",
+    top,
+    right: 0,
+    width: compact ? TRAY_WIDTH_COMPACT : TRAY_WIDTH,
+    height,
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: compact ? "center" : "flex-start",
+    gap: compact ? "0.3rem" : "0.45rem",
+    padding: compact ? "0 0.3rem" : "0 0.5rem",
+    border: isActive ? `1px solid ${color}` : "1px dashed var(--line-strong)",
+    borderRadius: 10,
+    background: "var(--surface)",
+    textAlign: "left",
+    font: "inherit",
+    cursor: onSelect ? "pointer" : "default",
+  };
+  const openLabel = `${openCount} open ${openCount === 1 ? "issue" : "issues"}`;
+  const content = (
+    <>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 14,
+          height: 14,
+          flexShrink: 0,
+          boxSizing: "border-box",
+          borderRadius: "50%",
+          border: `1.5px dashed ${color}`,
+        }}
+      />
+      {compact ? (
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.74rem",
+            fontWeight: 600,
+            color: "var(--heading)",
+          }}
+        >
+          {count}
+        </span>
+      ) : (
+        <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              color: "var(--heading)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {count} unscheduled
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.64rem",
+              color: "var(--muted)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {openLabel}
+          </span>
+        </span>
+      )}
+    </>
+  );
+  if (onSelect) {
+    return (
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Show ${count} unscheduled milestones, ${openLabel}`}
+        aria-haspopup={controlsId ? "dialog" : undefined}
+        aria-expanded={controlsId ? Boolean(expanded) : undefined}
+        aria-controls={controlsId}
+        onClick={onSelect}
+        style={style}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div style={style}>{content}</div>;
 }
 
 export function ReleaseTimeline({
@@ -27,11 +147,24 @@ export function ReleaseTimeline({
   highlightMilestone,
   variant,
   height: heightProp,
+  unscheduledCount,
+  unscheduledOpenCount,
+  isUnscheduledActive,
   onSelectMilestone,
+  onSelectUnscheduled,
+  unscheduledExpanded,
+  unscheduledControlsId,
+  unscheduledTrayRef,
 }: ReleaseTimelineProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(900);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const model = useMemo(
+    () => buildMilestoneTimelineData(issues, palette, highlightMilestone),
+    [issues, palette, highlightMilestone],
+  );
+  const hasModel = model !== null;
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -46,12 +179,7 @@ export function ReleaseTimeline({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-
-  const model = useMemo(
-    () => buildMilestoneTimelineData(issues, palette, highlightMilestone),
-    [issues, palette, highlightMilestone],
-  );
+  }, [hasModel]);
 
   const height = heightProp ?? (variant === "compact" ? 76 : 136);
   const isSlim = height <= 90;
@@ -61,17 +189,18 @@ export function ReleaseTimeline({
   const railY = (bandTop + bandBottom) / 2;
   const offsetDelta = (bandBottom - bandTop) * 0.21;
 
+  const showTray = unscheduledCount > 0;
+  const trayCompact = width < TRAY_COMPACT_BELOW;
+  const trayWidth = trayCompact ? TRAY_WIDTH_COMPACT : TRAY_WIDTH;
+  const scaleWidth = showTray ? width - trayWidth - TRAY_GAP : width;
+  const trayActive = isUnscheduledActive || Boolean(unscheduledExpanded);
+  const unscheduledColor = palette.ms_unscheduled ?? palette.neutral ?? "#7a8fa8";
+
   const ticks = useMemo(() => {
     if (!model) return [];
-    const span = Math.max(model.maxTimeMs - model.minTimeMs, 1);
-    const count = Math.max(3, Math.min(7, Math.floor(width / 145)));
-    const result: Array<{ ms: number; label: string }> = [];
-    for (let i = 0; i <= count; i += 1) {
-      const ms = model.minTimeMs + (span * i) / count;
-      result.push({ ms, label: formatMonthTick(ms) });
-    }
-    return result;
-  }, [model, width]);
+    const count = Math.max(3, Math.min(7, Math.floor(scaleWidth / 145)));
+    return buildMonthTicks(model.minTimeMs, model.maxTimeMs, count);
+  }, [model, scaleWidth]);
 
   if (!model) {
     return (
@@ -112,7 +241,24 @@ export function ReleaseTimeline({
             fontSize: "0.82rem",
           }}
         >
-          No milestones to display.
+          <span style={{ paddingRight: unscheduledCount > 0 ? trayWidth + TRAY_GAP : 0 }}>
+            {unscheduledCount > 0 ? "No milestones with a due date." : "No milestones to display."}
+          </span>
+          {unscheduledCount > 0 && (
+            <UnscheduledTray
+              count={unscheduledCount}
+              openCount={unscheduledOpenCount}
+              color={unscheduledColor}
+              isActive={trayActive}
+            compact={trayCompact}
+            expanded={unscheduledExpanded}
+            controlsId={unscheduledControlsId}
+            buttonRef={unscheduledTrayRef}
+              top={bandTop}
+              height={bandBottom - bandTop}
+              onSelect={onSelectUnscheduled}
+            />
+          )}
         </div>
       </div>
     );
@@ -120,10 +266,9 @@ export function ReleaseTimeline({
 
   const span = Math.max(model.maxTimeMs - model.minTimeMs, 1);
   const xFor = (ms: number): number =>
-    padX + ((ms - model.minTimeMs) / span) * Math.max(width - padX * 2, 40);
+    padX + ((ms - model.minTimeMs) / span) * Math.max(scaleWidth - padX * 2, 40);
 
   const nowX = xFor(model.nowTimeMs);
-  const sepX = model.separatorTimeMs !== null ? xFor(model.separatorTimeMs) : null;
   const nowColor = palette.now_marker ?? "#dd2476";
   const highlightRing = palette.ms_highlight ?? "#f4a44a";
 
@@ -164,7 +309,7 @@ export function ReleaseTimeline({
           <rect
             x={0}
             y={bandTop}
-            width={width}
+            width={scaleWidth}
             height={bandBottom - bandTop}
             rx={8}
             fill="var(--chart-grid)"
@@ -203,37 +348,11 @@ export function ReleaseTimeline({
           <line
             x1={0}
             y1={railY}
-            x2={width}
+            x2={scaleWidth}
             y2={railY}
             stroke="var(--chart-axis)"
             strokeWidth={3}
           />
-
-          {/* Separator for undated milestones */}
-          {sepX !== null && (
-            <g>
-              <line
-                x1={sepX}
-                y1={bandTop}
-                x2={sepX}
-                y2={bandBottom}
-                stroke="var(--muted)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                opacity={0.7}
-              />
-              <text
-                x={sepX}
-                y={bandTop - 4}
-                textAnchor="middle"
-                fill="var(--muted)"
-                fontSize={9}
-                fontFamily="var(--font-mono)"
-              >
-                No due date
-              </text>
-            </g>
-          )}
 
           {/* NOW vertical line */}
           <line
@@ -291,7 +410,7 @@ export function ReleaseTimeline({
                         <strong>{pt.title}</strong>
                         <div>Due: {pt.dueDateLabel}</div>
                         <div>
-                          Issues: {pt.closedCount}/{pt.totalCount}
+                          Issues: {pt.closedCount}/{pt.totalCount} closed ({formatShare(pt.closedCount, pt.totalCount)})
                         </div>
                         <div>Status: {pt.status}</div>
                       </div>
@@ -331,6 +450,21 @@ export function ReleaseTimeline({
             );
           })}
         </svg>
+        {showTray && (
+          <UnscheduledTray
+            count={unscheduledCount}
+            openCount={unscheduledOpenCount}
+            color={unscheduledColor}
+            isActive={trayActive}
+              compact={trayCompact}
+              expanded={unscheduledExpanded}
+              controlsId={unscheduledControlsId}
+              buttonRef={unscheduledTrayRef}
+            top={bandTop}
+            height={bandBottom - bandTop}
+            onSelect={onSelectUnscheduled}
+          />
+        )}
         <ChartTooltip tooltip={tooltip} />
       </div>
     </div>

@@ -29,6 +29,7 @@ import type {
   IssueFacets,
   IssueViewMode,
   ThemeMode,
+  ValueMode,
 } from "./lib/types";
 
 function getInitialTheme(): ThemeMode {
@@ -39,6 +40,16 @@ function getInitialTheme(): ThemeMode {
     // ignore storage restriction
   }
   return "dark";
+}
+
+function getInitialValueMode(): ValueMode {
+  try {
+    const saved = localStorage.getItem("pulse_value_mode");
+    if (saved === "count" || saved === "percent") return saved;
+  } catch {
+    // ignore storage restriction
+  }
+  return "count";
 }
 
 export function App() {
@@ -54,6 +65,7 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [valueMode, setValueMode] = useState<ValueMode>(getInitialValueMode);
   const [chartsVisible, setChartsVisible] = useState(initialUrl.chartsVisible);
   const [viewMode, setViewMode] = useState<IssueViewMode>("table");
   const [summaryId, setSummaryId] = useState<string | null>(initialUrl.summaryId);
@@ -140,6 +152,14 @@ export function App() {
       // ignore
     }
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pulse_value_mode", valueMode);
+    } catch {
+      // ignore
+    }
+  }, [valueMode]);
 
   useEffect(() => {
     if (!payload) return;
@@ -325,12 +345,14 @@ export function App() {
       <TopBar
         chartsVisible={chartsVisible}
         theme={theme}
+        valueMode={valueMode}
         isAdmin={isAdmin}
         syncStatus={payload?.sync_status}
         version={payload?.version}
         refreshing={refreshing}
         onRefreshData={() => void loadData(true)}
         onToggleCharts={() => setChartsVisible((v) => !v)}
+        onChangeValueMode={setValueMode}
         onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
         onOpenAdmin={() => setAdminModalOpen(true)}
         scopeBar={
@@ -407,6 +429,7 @@ export function App() {
             palette={activePalette}
             priorityOrder={priorityOrder}
             theme={theme}
+            valueMode={valueMode}
             onSelectMilestone={handleToggleMilestone}
             onSetChartFilter={(chartId, nextFacets) => {
               setSummaryId(null);
@@ -427,6 +450,7 @@ export function App() {
                 palette={activePalette}
                 priorityOrder={priorityOrder}
                 theme={theme}
+                valueMode={valueMode}
                 summaryBar={
                   <SummaryBar
                     groups={summaryGroups}
