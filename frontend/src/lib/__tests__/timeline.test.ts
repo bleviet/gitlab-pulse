@@ -80,6 +80,63 @@ describe("timeline", () => {
     expect(buildMilestoneTimelineData(issues, {}, null)).toBeNull();
   });
 
+  describe("one-year window", () => {
+    const DAY = 86_400_000;
+    const now = new Date("2026-11-18T00:00:00Z");
+    const nowMs = now.getTime();
+    const issues: IssueItem[] = [
+      makeMsIssue({ id: 1, milestone: "v0.1", state: "closed", milestone_due_date: "2024-03-01T00:00:00Z" }),
+      makeMsIssue({ id: 2, milestone: "v0.5", state: "closed", milestone_due_date: "2025-02-01T00:00:00Z" }),
+      makeMsIssue({ id: 3, milestone: "v1.0", state: "closed", milestone_due_date: "2026-08-01T00:00:00Z" }),
+      makeMsIssue({ id: 4, milestone: "v1.1", milestone_due_date: "2026-12-15T00:00:00Z" }),
+      makeMsIssue({ id: 5, milestone: "v2.0", milestone_due_date: "2027-04-01T00:00:00Z" }),
+      makeMsIssue({ id: 6, milestone: "backlog", milestone_due_date: "2100-01-01T00:00:00Z" }),
+    ];
+
+    it("spans today - 182 days to today + 183 days and lists only in-window releases", () => {
+      const model = buildMilestoneTimelineData(issues, {}, null, now)!;
+      expect(model.minTimeMs).toBe(nowMs - 182 * DAY);
+      expect(model.maxTimeMs).toBe(nowMs + 183 * DAY);
+      expect(model.points.map((p) => p.title)).toEqual(["v1.0", "v1.1", "v2.0"]);
+      expect(model.points.map((p) => p.laneY)).toEqual([1, -1, 1]);
+    });
+
+    it("counts hidden releases on each end, including a far-future placeholder", () => {
+      const model = buildMilestoneTimelineData(issues, {}, null, now)!;
+      expect(model.hiddenEarlierCount).toBe(2);
+      expect(model.hiddenLaterCount).toBe(1);
+      expect(model.outOfWindowCount).toBe(3);
+    });
+
+    it("fits every dated release in show-all mode", () => {
+      const model = buildMilestoneTimelineData(issues, {}, null, now, true)!;
+      expect(model.points).toHaveLength(6);
+      expect(model.hiddenEarlierCount).toBe(0);
+      expect(model.hiddenLaterCount).toBe(0);
+      expect(model.outOfWindowCount).toBe(3);
+      expect(model.minTimeMs).toBe(Date.parse("2024-03-01T00:00:00Z") - 14 * DAY);
+      expect(model.maxTimeMs).toBe(Date.parse("2100-01-01T00:00:00Z"));
+    });
+
+    it("keeps a selected out-of-window milestone and widens the scale to it", () => {
+      const model = buildMilestoneTimelineData(issues, {}, "v0.5", now)!;
+      expect(model.points.map((p) => p.title)).toEqual(["v0.5", "v1.0", "v1.1", "v2.0"]);
+      expect(model.points[0].isHighlighted).toBe(true);
+      expect(model.minTimeMs).toBe(Date.parse("2025-02-01T00:00:00Z"));
+      expect(model.maxTimeMs).toBe(nowMs + 183 * DAY);
+      expect(model.hiddenEarlierCount).toBe(1);
+      expect(model.hiddenLaterCount).toBe(1);
+      expect(model.outOfWindowCount).toBe(3);
+    });
+
+    it("returns an empty rail with counts when every release is outside the window", () => {
+      const model = buildMilestoneTimelineData([issues[0], issues[5]], {}, null, now)!;
+      expect(model.points).toEqual([]);
+      expect(model.hiddenEarlierCount).toBe(1);
+      expect(model.hiddenLaterCount).toBe(1);
+    });
+  });
+
   it("builds month ticks on UTC month starts within range and under maxCount", () => {
     const minMs = Date.UTC(2026, 0, 15);
     const maxMs = Date.UTC(2026, 11, 20);

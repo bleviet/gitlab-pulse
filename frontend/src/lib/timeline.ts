@@ -23,9 +23,17 @@ export interface TimelineModel {
   minTimeMs: number;
   maxTimeMs: number;
   nowTimeMs: number;
+  /** Dated milestones hidden before the one-year window. */
+  hiddenEarlierCount: number;
+  /** Dated milestones hidden after the one-year window. */
+  hiddenLaterCount: number;
+  /** Dated milestones outside the one-year window, in either mode. */
+  outOfWindowCount: number;
 }
 
 const DAY_MS = 86_400_000;
+const WINDOW_BEFORE_MS = 182 * DAY_MS;
+const WINDOW_AFTER_MS = 183 * DAY_MS;
 
 export function naturalCompare(a: string, b: string): number {
   const partsA = a.split(/(\d+)/).filter(Boolean);
@@ -50,11 +58,27 @@ export function naturalCompare(a: string, b: string): number {
   return 0;
 }
 
+/**
+ * Builds the release rail model for milestones with a due date.
+ *
+ * By default the scale covers a one-year window around now and milestones
+ * outside it are counted instead of placed. The highlighted milestone always
+ * stays visible and widens the window if needed. With showAll the scale fits
+ * every dated milestone.
+ *
+ * @param issues Issues before the milestone filter is applied.
+ * @param palette Resolved palette used for status colors.
+ * @param highlightMilestone Title of the selected milestone, if any.
+ * @param now Reference instant for status and the window.
+ * @param showAll Fit the scale to every dated milestone.
+ * @returns The rail model, or null when no milestone has a due date.
+ */
 export function buildMilestoneTimelineData(
   issues: IssueItem[],
   palette: Record<string, string>,
   highlightMilestone: string | null,
   now: Date = new Date(),
+  showAll = false,
 ): TimelineModel | null {
   const grouped = new Map<
     string,
@@ -145,14 +169,36 @@ export function buildMilestoneTimelineData(
     return null;
   }
 
-  const latestDue = dated.reduce((max, p) => Math.max(max, p.dueDateMs), nowMs + 90 * DAY_MS);
-  const maxTimeMs = Math.max(nowMs + 90 * DAY_MS, latestDue);
+  const hasHighlight = Boolean(highlightMilestone && highlightMilestone !== "All");
+  const windowMin = nowMs - WINDOW_BEFORE_MS;
+  const windowMax = nowMs + WINDOW_AFTER_MS;
+  const isEarlier = (p: RawPoint): boolean => p.dueDateMs < windowMin;
+  const isLater = (p: RawPoint): boolean => p.dueDateMs > windowMax;
+  const outOfWindowCount = dated.filter((p) => isEarlier(p) || isLater(p)).length;
 
-  const combined = dated
+  let visible = dated;
+  let minTimeMs: number;
+  let maxTimeMs: number;
+  let hiddenEarlierCount = 0;
+  let hiddenLaterCount = 0;
+  if (showAll) {
+    const latestDue = dated.reduce((max, p) => Math.max(max, p.dueDateMs), nowMs + 90 * DAY_MS);
+    maxTimeMs = Math.max(nowMs + 90 * DAY_MS, latestDue);
+    const earliestDated = dated.reduce((min, p) => Math.min(min, p.dueDateMs), nowMs - 270 * DAY_MS);
+    minTimeMs = Math.min(nowMs - 270 * DAY_MS, earliestDated - 14 * DAY_MS);
+  } else {
+    const isPinned = (p: RawPoint): boolean => hasHighlight && p.title === highlightMilestone;
+    visible = dated.filter((p) => isPinned(p) || (!isEarlier(p) && !isLater(p)));
+    hiddenEarlierCount = dated.filter((p) => !isPinned(p) && isEarlier(p)).length;
+    hiddenLaterCount = dated.filter((p) => !isPinned(p) && isLater(p)).length;
+    minTimeMs = visible.reduce((min, p) => Math.min(min, p.dueDateMs), windowMin);
+    maxTimeMs = visible.reduce((max, p) => Math.max(max, p.dueDateMs), windowMax);
+  }
+
+  const combined = visible
     .map((p) => ({ ...p, plotTimeMs: p.dueDateMs }))
     .sort((a, b) => a.plotTimeMs - b.plotTimeMs);
 
-  const hasHighlight = Boolean(highlightMilestone && highlightMilestone !== "All");
   const points: MilestonePoint[] = combined.map((p, idx) => {
     const isHighlighted = hasHighlight && p.title === highlightMilestone;
     return {
@@ -170,14 +216,14 @@ export function buildMilestoneTimelineData(
     };
   });
 
-  const earliestDated = dated.reduce((min, p) => Math.min(min, p.dueDateMs ?? min), nowMs - 270 * DAY_MS);
-  const minTimeMs = Math.min(nowMs - 270 * DAY_MS, earliestDated - 14 * DAY_MS);
-
   return {
     points,
     minTimeMs,
     maxTimeMs,
     nowTimeMs: nowMs,
+    hiddenEarlierCount,
+    hiddenLaterCount,
+    outOfWindowCount,
   };
 }
 
