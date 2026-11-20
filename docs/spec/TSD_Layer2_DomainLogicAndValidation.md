@@ -20,6 +20,16 @@
 - `dump_rule()` serialises a `DomainRule` without the deprecated keys (`label_mappings`, `title_patterns`, `contexts.method`, `contexts.patterns`) and without sorting keys, because the key order of `classification` decides which value wins and how priorities rank.
 - `validate_rule_set()` returns plain-language problems with a field path for conditions the lenient `DomainRule` model accepts: empty names, duplicate stage or context names, unknown stage types, empty patterns, regular expressions that do not compile, thresholds below 1, a project claimed by two rule sets, and more than one default rule set.
 
+### 1.3 Dry run
+
+`app/processor/preview.py` answers "what would these rules change?" without writing anything. `summarize_impact()` runs `process_issues()` (the per-project pipeline shared with `Processor.process_project`) twice on the projects a draft rule set governs: once with the rules the processor uses today and once with the draft. It returns an `ImpactSummary`:
+
+- before/after counts of distinct issues per type, severity, priority, stage, context, and quality code, plus a `STALE` row for open stale issues
+- for every pattern in the draft, how many issues it matches (`label_pattern_counts`, `title_pattern_counts`)
+- the labels found on issues that no pattern of the draft matches (`unmapped_labels`, at most 100, with the full number in `unmapped_label_total`)
+
+A draft with an empty `project_ids` list governs every project that has processed data and is not claimed by another rule set. If several rule files have an empty `project_ids` list, only the one whose file name sorts first is the effective default (`RuleLoader` reads files in sorted order and keeps the first); a draft of any other such file governs no project, so its preview is empty, which matches what saving it would change. Counts are per distinct issue `id`, because context explosion duplicates rows.
+
 ## 2. Enrichment Pipeline
 
 `app/processor/main.py` currently applies the following steps per project:
@@ -70,6 +80,7 @@ This preserves reporting completeness while still surfacing the data quality pro
 - **Modular YAML rules:** different teams can tailor interpretation without changing processor code
 - **User rules in `data/rules/`, template in `app/config/rules/`:** rules saved from the dashboard must survive a Docker image rebuild and must not modify tracked files in a git checkout. `data/` is already the mounted, gitignored volume, so user rules live there and the shipped file stays an untouched template.
 - **Rule store in Layer 2, not in the dashboard:** the processor owns the rule file format (`DomainRule`), so reading, validating, and writing it sit next to the loader; the dashboard only translates between HTTP and the store.
+- **Dry run through the real pipeline:** the preview calls the same `process_issues()` as a processor run instead of re-implementing matching in the browser. Python and JavaScript regular expressions differ, and a second implementation of first-match-wins, stage fallback, and context explosion would drift from the processor.
 - **Regenerated files instead of comment-preserving edits:** the Settings screen is the primary editor, so saved files are written from the model with PyYAML. Keeping comments would need a round-trip YAML library for a file users are no longer expected to open.
 - **Split analytics vs. quality output:** analytics stays usable while quality issues remain actionable
 - **Context explosion in Layer 2:** avoids repeated label parsing in the UI layer

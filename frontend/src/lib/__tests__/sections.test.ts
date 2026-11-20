@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  addLabelToRow,
   describeUnplacedProblem,
+  rowNamesForSection,
   sectionForPath,
   splitProblems,
 } from "../../components/settings/sections";
@@ -35,5 +37,26 @@ describe("describeUnplacedProblem", () => {
 
   it("leaves other messages as they are", () => {
     expect(describeUnplacedProblem({ path: "project_ids", message: "Bad." }, rule)).toBe("Bad.");
+  });
+});
+
+describe("addLabelToRow", () => {
+  const full = {
+    classification: [{ name: "type", values: [{ name: "Bug", labels: ["a"], title: [] }] }],
+    workflow: { stages: [{ name: "Doing", labels: [], type: "active", description: "" }] },
+    contexts: { rules: [{ name: "Web", labels: [], title: [] }], require_assignment: false },
+  } as unknown as RuleSetBody;
+
+  it("appends the bare label once to the chosen row", () => {
+    const next = addLabelToRow(full, "type", 0, "regex:odd");
+    expect(next.classification[0].values[0].labels).toEqual(["a", "exact:regex:odd"]);
+    expect(addLabelToRow(next, "type", 0, "regex:odd")).toEqual(next);
+    expect(addLabelToRow(full, "stages", 0, "x").workflow.stages[0].labels).toEqual(["x"]);
+    expect(addLabelToRow(full, "contexts", 0, "y").contexts.rules[0].labels).toEqual(["y"]);
+  });
+
+  it("lists row names per section", () => {
+    expect(rowNamesForSection(full, "stages")).toEqual(["Doing"]);
+    expect(rowNamesForSection(full, "quality")).toEqual([]);
   });
 });

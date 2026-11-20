@@ -1,6 +1,8 @@
-import type { RuleProblem, RuleSetBody } from "../../lib/types";
+import { getCategory, setCategoryValues } from "../../lib/ruleDraft";
+import { serializePattern } from "../../lib/rulePatterns";
+import type { RuleProblem, RuleSetBody, SectionId } from "../../lib/types";
 
-export type SectionId = "type" | "severity" | "priority" | "stages" | "contexts" | "quality";
+export type { SectionId };
 
 export interface SectionInfo {
   id: SectionId;
@@ -80,4 +82,46 @@ export function describeUnplacedProblem(problem: RuleProblem, rule: RuleSetBody)
   const value = rule.classification.find((c) => c.name === category)?.values[Number(index)];
   const subject = value?.name ? `${category} "${value.name}"` : category;
   return `${subject}: ${problem.message}`;
+}
+
+export function rowNamesForSection(rule: RuleSetBody, section: SectionId): string[] {
+  switch (section) {
+    case "type":
+    case "severity":
+    case "priority":
+      return getCategory(rule, section).map((row) => row.name);
+    case "stages":
+      return rule.workflow.stages.map((stage) => stage.name);
+    case "contexts":
+      return rule.contexts.rules.map((row) => row.name);
+    case "quality":
+      return [];
+  }
+}
+
+export function addLabelToRow(
+  rule: RuleSetBody,
+  section: SectionId,
+  index: number,
+  label: string,
+): RuleSetBody {
+  const pattern = serializePattern({ mode: "exact", value: label });
+  const withLabel = <T extends { labels: string[] }>(rows: T[]): T[] =>
+    rows.map((row, i) =>
+      i === index && !row.labels.includes(pattern)
+        ? { ...row, labels: [...row.labels, pattern] }
+        : row,
+    );
+  switch (section) {
+    case "type":
+    case "severity":
+    case "priority":
+      return setCategoryValues(rule, section, withLabel(getCategory(rule, section)));
+    case "stages":
+      return { ...rule, workflow: { ...rule.workflow, stages: withLabel(rule.workflow.stages) } };
+    case "contexts":
+      return { ...rule, contexts: { ...rule.contexts, rules: withLabel(rule.contexts.rules) } };
+    case "quality":
+      return rule;
+  }
 }

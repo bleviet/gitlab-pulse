@@ -17,6 +17,7 @@ interface MatcherInputProps {
   disabled?: boolean;
   problems?: Record<number, string>;
   ariaLabel: string;
+  matchCounts?: Record<string, number>;
 }
 
 type MatcherOption =
@@ -49,6 +50,7 @@ export function MatcherInput({
   disabled,
   problems,
   ariaLabel,
+  matchCounts,
 }: MatcherInputProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -162,13 +164,18 @@ export function MatcherInput({
         {value.map((raw, i) => {
           const problem = problems?.[i];
           const style = chipStyle(raw, byName);
+          const unmatched = matchCounts?.[raw] === 0;
           return (
             <span
               key={`${raw}:${i}`}
-              className={`settings-chip${style ? " styled" : ""}${problem ? " error" : ""}`}
+              className={`settings-chip${style ? " styled" : ""}${problem ? " error" : ""}${unmatched ? " unmatched" : ""}`}
               style={style}
+              title={unmatched ? "No issue matches this right now" : undefined}
             >
               <span className="settings-chip-text">{describePattern(raw)}</span>
+              {unmatched && (
+                <span className="settings-visually-hidden">No issue matches this right now</span>
+              )}
               {!disabled && (
                 <button
                   type="button"
@@ -268,6 +275,10 @@ export function MatcherInput({
           </button>
         )}
       </div>
+
+      {value.some((raw) => matchCounts?.[raw] === 0) && (
+        <p className="settings-hint">Entries outlined in amber match no issue right now.</p>
+      )}
 
       {problemEntries.map(([index, message]) => (
         <p key={index} id={`${id}-problem-${index}`} className="settings-error-text" role="alert">

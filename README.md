@@ -151,7 +151,7 @@ Ensure you provide a Personal Access Token with the `read_api` scope, and specif
 ### 2. Configure Your Rules
 Rules determine how issues are classified (Bug, Feature, etc.), which labels place an issue in which workflow stage, how issues are grouped into contexts, and which quality checks apply.
 
-**In the dashboard (no file editing):** click **Settings** in the top bar. Each section (Issue types, Severity, Priority, Workflow stages, Contexts, Quality checks) lets you pick from the GitLab labels found in your data. Viewing is open; to change anything, click **Unlock editing** and enter the admin password (`ADMIN_PASSWORD`, default `admin`). **Save & apply** writes the rules, re-runs the processor, and reloads the dashboard.
+**In the dashboard (no file editing):** click **Settings** in the top bar. Each section (Issue types, Severity, Priority, Workflow stages, Contexts, Quality checks) lets you pick from the GitLab labels found in your data. Viewing is open; to change anything, click **Unlock editing** and enter the admin password (`ADMIN_PASSWORD`, default `admin`). While you edit, the **Effect on your data** panel shows how many issues each type, stage, or check covers before and after your change, and lists labels that none of your rules use. **Save & apply** writes the rules, re-runs the processor, and reloads the dashboard.
 
 **Where rules are stored:** `app/config/rules/default.yaml` is a read-only template. The first save from the Settings screen copies the template rules to `data/rules/` and writes there from then on. `data/rules/` is gitignored and sits on the Docker data volume, so saved rules survive image rebuilds. The previous version of a file is kept in `data/rules/.history/` on every save.
 

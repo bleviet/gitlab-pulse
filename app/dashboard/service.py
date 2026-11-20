@@ -185,6 +185,11 @@ class DashboardService:
         self._cache_key: tuple[tuple[str, int], ...] | None = None
         self._cached_payload: DashboardPayload | None = None
 
+    @property
+    def processed_path(self) -> Path:
+        """Directory holding the Layer 1 processed Parquet files."""
+        return self._processed_path
+
     def clear_cache(self) -> None:
         """Invalidate the cached dashboard payload."""
         with self._lock:

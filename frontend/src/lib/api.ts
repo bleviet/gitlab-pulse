@@ -3,6 +3,7 @@ import type {
   AdminStatusResponse,
   DashboardPayload,
   RuleProblem,
+  RulePreviewResponse,
   RuleSaveResponse,
   RuleSetBody,
   RuleSetsResponse,
@@ -107,4 +108,15 @@ export function saveRuleSet(
     method: "PUT",
     body: JSON.stringify({ revision, rule }),
   });
+}
+
+export function previewRuleSet(
+  name: string,
+  rule: RuleSetBody,
+  signal?: AbortSignal,
+): Promise<RulePreviewResponse> {
+  return requestJson<RulePreviewResponse>(
+    `/api/admin/rules/${encodeURIComponent(name)}/preview`,
+    { method: "POST", body: JSON.stringify({ rule }), signal },
+  );
 }

@@ -17,6 +17,7 @@ interface QualityEditorProps {
   onChange: (next: ValidationConfig) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  labelCounts?: Record<string, number>;
 }
 
 function withKey<T>(record: Record<string, T[]>, key: string, list: T[]): Record<string, T[]> {
@@ -26,7 +27,7 @@ function withKey<T>(record: Record<string, T[]>, key: string, list: T[]): Record
   return next;
 }
 
-export function QualityEditor({ rule, onChange, inventory, problems }: QualityEditorProps) {
+export function QualityEditor({ rule, onChange, inventory, problems, labelCounts }: QualityEditorProps) {
   const validation = rule.validation;
 
   const typeNames = useMemo(() => {
@@ -124,6 +125,7 @@ export function QualityEditor({ rule, onChange, inventory, problems }: QualityEd
                 kind="label"
                 value={validation.required_labels[type] ?? []}
                 inventory={inventory}
+                matchCounts={labelCounts}
                 ariaLabel={`Required labels for ${type}`}
                 problems={problemsWithPrefix(problems, `validation.required_labels.${type}`)}
                 onChange={(next) =>

@@ -17,13 +17,14 @@ interface StagesEditorProps {
   onChange: (next: WorkflowStage[]) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  labelCounts?: Record<string, number>;
 }
 
-export function StagesEditor({ stages, onChange, inventory, problems }: StagesEditorProps) {
+export function StagesEditor({ stages, onChange, inventory, problems, labelCounts }: StagesEditorProps) {
   return (
     <div className="settings-rows">
       {stages.length === 0 && (
-        <p className="settings-hint">No stages yet. Every open issue will show as Backlog.</p>
+        <p className="settings-hint">With no stages, every issue shows as Backlog, including closed ones.</p>
       )}
       {stages.map((stage, i) => {
         const id = `settings-stage-${i}`;
@@ -92,6 +93,7 @@ export function StagesEditor({ stages, onChange, inventory, problems }: StagesEd
                 kind="label"
                 value={stage.labels}
                 inventory={inventory}
+                matchCounts={labelCounts}
                 ariaLabel={`Labels for stage ${stage.name || i + 1}`}
                 problems={problemsWithPrefix(problems, `workflow.stages.${i}.labels`)}
                 onChange={(labels) => onChange(updateAt(stages, i, { labels }))}

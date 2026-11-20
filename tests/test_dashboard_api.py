@@ -4,6 +4,7 @@ import struct
 import subprocess
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -427,3 +428,110 @@ def test_get_rules_reports_malformed_file(
 
     assert [i["name"] for i in body["rule_sets"]] == ["default"]
     assert list(body["load_errors"]) == ["broken.yaml"]
+
+
+def test_preview_requires_login_and_known_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _ = _rules_client(tmp_path, monkeypatch)
+    item = client.get("/api/rules").json()["rule_sets"][0]
+    payload = {"rule": item["rule"]}
+
+    assert client.post("/api/admin/rules/default/preview", json=payload).status_code == 401
+    _login(client)
+    assert client.post("/api/admin/rules/nope/preview", json=payload).status_code == 404
+    assert client.post("/api/admin/rules/..%5Cx/preview", json=payload).status_code in (404, 422)
+
+
+def test_preview_invalid_draft_returns_problems_without_impact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _ = _rules_client(tmp_path, monkeypatch)
+    _login(client)
+    rule = client.get("/api/rules").json()["rule_sets"][0]["rule"]
+    rule["classification"][0]["values"][0]["labels"] = ["regex:("]
+
+    res = client.post("/api/admin/rules/default/preview", json={"rule": rule})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert [p["path"] for p in body["problems"]] == ["classification.priority.0.labels.0"]
+    assert body["impact"] is None
+
+
+def test_preview_valid_draft_returns_impact_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret-pass")
+    template = tmp_path / "template"
+    user = tmp_path / "user"
+    template.mkdir()
+    template.joinpath("default.yaml").write_text(
+        "team: default\nworkflow:\n  stages:\n    - name: Review\n", encoding="utf-8"
+    )
+    before = template.joinpath("default.yaml").read_bytes()
+    service = DashboardService(
+        analytics_path=tmp_path / "analytics",
+        processed_path=tmp_path / "processed",
+        state_path=tmp_path / "state.json",
+        rules_path=template,
+    )
+    client = TestClient(
+        create_app(
+            service=service,
+            frontend_dist=tmp_path / "missing_dist",
+            rule_store=RuleStore(user_path=user, template_path=template),
+        )
+    )
+    _login(client)
+    rule = client.get("/api/rules").json()["rule_sets"][0]["rule"]
+
+    res = client.post("/api/admin/rules/default/preview", json={"rule": rule})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["problems"] == []
+    assert body["impact"]["total_issues"] == 0
+    assert body["impact"]["project_ids"] == []
+    assert template.joinpath("default.yaml").read_bytes() == before
+    assert not user.exists()
+
+
+def test_preview_conflicting_rule_files_return_409(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+    for file_name in ("p_a.yaml", "p_b.yaml"):
+        rules_dir.joinpath(file_name).write_text("project_ids: [5]\n", encoding="utf-8")
+    pd.DataFrame({"id": [1]}).to_parquet(tmp_path / "processed" / "issues_101.parquet")
+    _login(client)
+    rule = next(
+        i for i in client.get("/api/rules").json()["rule_sets"] if i["name"] == "default"
+    )["rule"]
+
+    res = client.post("/api/admin/rules/default/preview", json={"rule": rule})
+
+    assert res.status_code == 409
+    assert "Two rule files claim the same project" in res.json()["detail"]
+
+
+def test_preview_skips_work_when_client_disconnected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _ = _rules_client(tmp_path, monkeypatch)
+    _login(client)
+    rule = client.get("/api/rules").json()["rule_sets"][0]["rule"]
+
+    async def disconnected(_self: object) -> bool:
+        return True
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("summarize_impact must not run")
+
+    monkeypatch.setattr("starlette.requests.Request.is_disconnected", disconnected)
+    monkeypatch.setattr("app.dashboard.rules_api.summarize_impact", fail)
+
+    res = client.post("/api/admin/rules/default/preview", json={"rule": rule})
+
+    assert res.status_code == 200
+    assert res.json()["impact"] is None

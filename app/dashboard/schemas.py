@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.processor.preview import ImpactSummary
+
 
 class IssueItem(BaseModel):
     """Single deduplicated issue prepared for the Layer 3 SPA."""
@@ -253,3 +255,18 @@ class RuleSaveResponse(BaseModel):
 
     rule_set: RuleSetItem
     job: AdminJobResponse
+
+
+class RulePreviewRequest(BaseModel):
+    """Draft rule set to preview without saving."""
+
+    rule: RuleSetBody
+
+
+class RulePreviewResponse(BaseModel):
+    """Problems with the draft, or its impact when the draft is valid."""
+
+    model_config = ConfigDict(frozen=True)
+
+    problems: list[RuleProblemModel] = Field(default_factory=list)
+    impact: ImpactSummary | None = None

@@ -121,6 +121,8 @@ export type ActiveChartId =
   | `stage_bar_${number}`
   | null;
 
+export type SectionId = "type" | "severity" | "priority" | "stages" | "contexts" | "quality";
+
 export interface MatcherRule {
   name: string;
   labels: string[];
@@ -181,4 +183,35 @@ export interface RuleProblem {
 export interface RuleSaveResponse {
   rule_set: RuleSetItem;
   job: AdminJobResponse;
+}
+
+export interface CountChange {
+  name: string | null;
+  before: number;
+  after: number;
+}
+
+export interface UnmappedLabel {
+  name: string;
+  count: number;
+}
+
+export interface ImpactSummary {
+  total_issues: number;
+  project_ids: number[];
+  types: CountChange[];
+  severities: CountChange[];
+  priorities: CountChange[];
+  stages: CountChange[];
+  contexts: CountChange[];
+  quality: CountChange[];
+  unmapped_labels: UnmappedLabel[];
+  unmapped_label_total: number;
+  label_pattern_counts: Record<string, number>;
+  title_pattern_counts: Record<string, number>;
+}
+
+export interface RulePreviewResponse {
+  problems: RuleProblem[];
+  impact: ImpactSummary | null;
 }

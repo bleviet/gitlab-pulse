@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, X } from "lucide-react";
 import { ApiError, fetchRules, saveRuleSet } from "../../lib/api";
 import { buildLabelInventory } from "../../lib/labelInventory";
 import { isDirty, problemsByPath, validateRuleSet } from "../../lib/ruleDraft";
+import { mergeProblems } from "../../lib/ruleImpact";
 import type {
-  AdminJobResponse,
   IssueItem,
   LabelStyle,
   RuleProblem,
@@ -12,10 +11,21 @@ import type {
   RuleSetItem,
   RuleSetsResponse,
 } from "../../lib/types";
+import { ImpactPanel } from "./ImpactPanel";
 import { SaveBar } from "./SaveBar";
 import { SectionEditor } from "./SectionEditor";
-import { describeUnplacedProblem, SECTIONS, sectionForPath, splitProblems, type SectionId } from "./sections";
-import { UnlockForm } from "./UnlockForm";
+import {
+  addLabelToRow,
+  describeUnplacedProblem,
+  rowNamesForSection,
+  SECTIONS,
+  sectionForPath,
+  splitProblems,
+  type SectionId,
+} from "./sections";
+import { SettingsHeader } from "./SettingsHeader";
+import { SettingsNotices, type Notice } from "./SettingsNotices";
+import { useRulePreview } from "./useRulePreview";
 
 interface SettingsWorkspaceProps {
   open: boolean;
@@ -27,19 +37,7 @@ interface SettingsWorkspaceProps {
   onReloadDashboard: () => Promise<void>;
 }
 
-interface Notice {
-  kind: "success" | "warning" | "error" | "conflict";
-  text: string;
-  job?: AdminJobResponse;
-}
-
 type LoadState = "loading" | "error" | "ready";
-
-function scopeText(rule: RuleSetBody): string {
-  const count = rule.project_ids.length;
-  if (count === 0) return "Applies to all projects";
-  return `Applies to ${count} ${count === 1 ? "project" : "projects"}`;
-}
 
 export function SettingsWorkspace({
   open,
@@ -72,10 +70,23 @@ export function SettingsWorkspace({
 
   const inventory = useMemo(() => buildLabelInventory(issues, labelStyles), [issues, labelStyles]);
 
+  const canEdit = isAdmin && !sessionExpired;
   const clientProblems = useMemo(() => (draft ? validateRuleSet(draft) : []), [draft]);
+  const preview = useRulePreview({
+    enabled: canEdit && loadState === "ready" && !!selected && clientProblems.length === 0,
+    name: selectedName,
+    draft,
+  });
+
+  useEffect(() => {
+    if (!preview.unauthorized) return;
+    setSessionExpired(true);
+    setUnlockOpen(true);
+  }, [preview.unauthorized]);
+
   const allProblems = useMemo(
-    () => [...clientProblems, ...serverProblems],
-    [clientProblems, serverProblems],
+    () => mergeProblems(clientProblems, serverProblems, preview.problems),
+    [clientProblems, serverProblems, preview.problems],
   );
   const problems = useMemo(() => problemsByPath(allProblems), [allProblems]);
 
@@ -221,9 +232,14 @@ export function SettingsWorkspace({
 
   const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
   const loadErrorNames = Object.keys(response?.load_errors ?? {});
-  const canEdit = isAdmin && !sessionExpired;
-  const showUnlockBanner = !canEdit;
-  const loadErrorNotice = `${loadErrorNames.length} rule ${loadErrorNames.length === 1 ? "file" : "files"} could not be read and ${loadErrorNames.length === 1 ? "is" : "are"} ignored: ${loadErrorNames.join(", ")}`;
+  const loadErrorNotice =
+    loadErrorNames.length === 0
+      ? null
+      : `${loadErrorNames.length} rule ${loadErrorNames.length === 1 ? "file" : "files"} could not be read and ${loadErrorNames.length === 1 ? "is" : "are"} ignored: ${loadErrorNames.join(", ")}`;
+
+  const handleQuickAdd = (label: string, rowIndex: number) => {
+    if (draft) updateDraft(addLabelToRow(draft, section, rowIndex, label));
+  };
 
   return (
     <div className="settings-overlay">
@@ -235,45 +251,12 @@ export function SettingsWorkspace({
         aria-labelledby="settings-title"
         tabIndex={-1}
       >
-        <header className="settings-header">
-          <h2 id="settings-title" className="settings-title">
-            Settings
-          </h2>
-          {selected && (
-            <div className="settings-header-meta">
-              {response && response.rule_sets.length > 1 && (
-                <>
-                  <label htmlFor="settings-rule-set" className="settings-visually-hidden">
-                    Rule set
-                  </label>
-                  <select
-                    id="settings-rule-set"
-                    className="settings-select"
-                    value={selected.name}
-                    onChange={(e) => handleSelectRuleSet(e.target.value)}
-                  >
-                    {response.rule_sets.map((r) => (
-                      <option key={r.name} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-              <span className="settings-meta-text">
-                Team: {selected.rule.team || "Not set"} · {scopeText(selected.rule)}
-              </span>
-            </div>
-          )}
-          <button
-            type="button"
-            className="pulse-icon-btn"
-            aria-label="Close settings"
-            onClick={requestClose}
-          >
-            <X size={15} />
-          </button>
-        </header>
+        <SettingsHeader
+          selected={selected}
+          ruleSets={response?.rule_sets ?? []}
+          onSelectRuleSet={handleSelectRuleSet}
+          onClose={requestClose}
+        />
 
         {loadState === "loading" && <div className="settings-state">Loading rules…</div>}
 
@@ -287,9 +270,7 @@ export function SettingsWorkspace({
         )}
 
         {loadState === "ready" && !draft && (
-          <div className="settings-state">
-            {loadErrorNames.length > 0 ? loadErrorNotice : "No rules were found."}
-          </div>
+          <div className="settings-state">{loadErrorNotice ?? "No rules were found."}</div>
         )}
 
         {loadState === "ready" && draft && (
@@ -317,80 +298,40 @@ export function SettingsWorkspace({
                 })}
               </nav>
 
-              <div className="settings-editor">
-                {loadErrorNames.length > 0 && (
-                  <div className="settings-notice warning" role="status">
-                    {loadErrorNotice}
-                  </div>
-                )}
+              <div className="settings-main">
+                <div className="settings-editor-head">
+                  <SettingsNotices
+                    loadErrorNotice={loadErrorNotice}
+                    showUnlockBanner={!canEdit}
+                    unlockOpen={unlockOpen}
+                    onOpenUnlock={() => setUnlockOpen(true)}
+                    onLogin={onLogin}
+                    onUnlocked={() => {
+                      setUnlockOpen(false);
+                      setSessionExpired(false);
+                    }}
+                    notice={notice}
+                    onReloadLatest={() => {
+                      setNotice(null);
+                      void load(selectedName);
+                    }}
+                    unplacedProblems={unplacedProblems}
+                  />
 
-                {showUnlockBanner && (
-                  <div className="settings-notice info">
-                    <div className="settings-notice-row">
-                      <Lock size={14} aria-hidden="true" />
-                      <strong>View only</strong>
-                      <span>You can look at the rules, but editing needs the admin password.</span>
-                      {!unlockOpen && (
-                        <button
-                          type="button"
-                          className="pulse-btn-secondary"
-                          onClick={() => setUnlockOpen(true)}
-                        >
-                          Unlock editing
-                        </button>
-                      )}
-                    </div>
-                    {unlockOpen && (
-                      <UnlockForm
-                        onLogin={onLogin}
-                        onDone={() => {
-                          setUnlockOpen(false);
-                          setSessionExpired(false);
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
+                  <h3 className="settings-section-title">{current.title}</h3>
+                  <p className="settings-intro">{current.intro}</p>
+                </div>
 
-                {notice && (
-                  <div
-                    className={`settings-notice ${notice.kind === "success" ? "success" : notice.kind === "error" ? "error" : "warning"}`}
-                    role={notice.kind === "success" ? "status" : "alert"}
-                  >
-                    <div className="settings-notice-row">
-                      <span>{notice.text}</span>
-                      {notice.kind === "conflict" && (
-                        <button
-                          type="button"
-                          className="pulse-btn-secondary"
-                          onClick={() => {
-                            setNotice(null);
-                            void load(selectedName);
-                          }}
-                        >
-                          Reload latest
-                        </button>
-                      )}
-                    </div>
-                    {notice.job?.stdout && <pre className="admin-log">{notice.job.stdout}</pre>}
-                    {notice.job?.stderr && <pre className="admin-log">{notice.job.stderr}</pre>}
-                  </div>
-                )}
-
-                {unplacedProblems.length > 0 && (
-                  <div className="settings-notice error" role="alert">
-                    <strong>These rules have problems that cannot be fixed on this screen:</strong>
-                    <ul className="settings-problem-list">
-                      {unplacedProblems.map((text, i) => (
-                        <li key={i}>{text}</li>
-                      ))}
-                    </ul>
-                    <span>Ask the person who maintains the rule files to correct them.</span>
-                  </div>
-                )}
-
-                <h3 className="settings-section-title">{current.title}</h3>
-                <p className="settings-intro">{current.intro}</p>
+                <ImpactPanel
+                  section={section}
+                  canEdit={canEdit}
+                  saving={saving}
+                  hasClientProblems={clientProblems.length > 0}
+                  preview={preview}
+                  inventory={inventory}
+                  rowNames={rowNamesForSection(draft, section)}
+                  onQuickAdd={handleQuickAdd}
+                />
 
                 <fieldset className="settings-fieldset" disabled={!canEdit || saving}>
                   <legend className="settings-visually-hidden">{current.title}</legend>
@@ -399,6 +340,8 @@ export function SettingsWorkspace({
                     rule={draft}
                     inventory={inventory}
                     problems={problems}
+                    labelCounts={preview.impact?.label_pattern_counts}
+                    titleCounts={preview.impact?.title_pattern_counts}
                     onChange={updateDraft}
                   />
                 </fieldset>

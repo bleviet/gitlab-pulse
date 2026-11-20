@@ -32,6 +32,8 @@ interface ClassificationEditorProps {
   onChange: (next: MatcherRule[]) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  labelCounts?: Record<string, number>;
+  titleCounts?: Record<string, number>;
 }
 
 export function ClassificationEditor({
@@ -40,6 +42,8 @@ export function ClassificationEditor({
   onChange,
   inventory,
   problems,
+  labelCounts,
+  titleCounts,
 }: ClassificationEditorProps) {
   const copy = COPY[category];
   const base = `classification.${category}`;
@@ -77,6 +81,7 @@ export function ClassificationEditor({
                 kind="label"
                 value={row.labels}
                 inventory={inventory}
+                matchCounts={labelCounts}
                 ariaLabel={`Labels for ${row.name || `${copy.noun} ${i + 1}`}`}
                 problems={problemsWithPrefix(problems, `${base}.${i}.labels`)}
                 onChange={(labels) => onChange(updateAt(rows, i, { labels }))}
@@ -90,6 +95,7 @@ export function ClassificationEditor({
                   kind="title"
                   value={row.title}
                   inventory={inventory}
+                  matchCounts={titleCounts}
                   ariaLabel={`Title words for ${row.name || `${copy.noun} ${i + 1}`}`}
                   problems={problemsWithPrefix(problems, `${base}.${i}.title`)}
                   onChange={(title) => onChange(updateAt(rows, i, { title }))}

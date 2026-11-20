@@ -35,7 +35,7 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 - **Manual Refresh:** Click the ambient refresh button (status dot + arrows icon) in the top-right navigation bar to reload `/api/dashboard` immediately without reloading the browser page.
 
 ### **Q: How do I change the rules without editing a file?**
-**A:** Open **Settings** in the top-right navigation bar, unlock editing with the admin password, change the rules, and click **Save & apply**. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
+**A:** Open **Settings** in the top-right navigation bar, unlock editing with the admin password, change the rules, and click **Save & apply**. Before saving, the **Effect on your data** panel shows the issue counts with the saved rules and with your changes. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
 
 ### **Q: Where are the rule files?**
 **A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.

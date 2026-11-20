@@ -12,6 +12,8 @@ interface SectionEditorProps {
   rule: RuleSetBody;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  labelCounts?: Record<string, number>;
+  titleCounts?: Record<string, number>;
   onChange: (next: RuleSetBody) => void;
 }
 
@@ -20,6 +22,8 @@ export function SectionEditor({
   rule,
   inventory,
   problems,
+  labelCounts,
+  titleCounts,
   onChange,
 }: SectionEditorProps) {
   switch (section) {
@@ -33,6 +37,8 @@ export function SectionEditor({
           rows={getCategory(rule, section)}
           inventory={inventory}
           problems={problems}
+          labelCounts={labelCounts}
+          titleCounts={titleCounts}
           onChange={(values) => onChange(setCategoryValues(rule, section, values))}
         />
       );
@@ -42,6 +48,7 @@ export function SectionEditor({
           stages={rule.workflow.stages}
           inventory={inventory}
           problems={problems}
+          labelCounts={labelCounts}
           onChange={(stages) => onChange({ ...rule, workflow: { ...rule.workflow, stages } })}
         />
       );
@@ -51,6 +58,8 @@ export function SectionEditor({
           contexts={rule.contexts}
           inventory={inventory}
           problems={problems}
+          labelCounts={labelCounts}
+          titleCounts={titleCounts}
           onChange={(contexts) => onChange({ ...rule, contexts })}
         />
       );
@@ -60,6 +69,7 @@ export function SectionEditor({
           rule={rule}
           inventory={inventory}
           problems={problems}
+          labelCounts={labelCounts}
           onChange={(validation) => onChange({ ...rule, validation })}
         />
       );

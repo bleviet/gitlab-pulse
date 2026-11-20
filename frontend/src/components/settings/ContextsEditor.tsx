@@ -11,9 +11,11 @@ interface ContextsEditorProps {
   onChange: (next: ContextsConfig) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  labelCounts?: Record<string, number>;
+  titleCounts?: Record<string, number>;
 }
 
-export function ContextsEditor({ contexts, onChange, inventory, problems }: ContextsEditorProps) {
+export function ContextsEditor({ contexts, onChange, inventory, problems, labelCounts, titleCounts }: ContextsEditorProps) {
   const rows = contexts.rules;
   const setRows = (next: typeof rows) => onChange({ ...contexts, rules: next });
 
@@ -58,6 +60,7 @@ export function ContextsEditor({ contexts, onChange, inventory, problems }: Cont
                 kind="label"
                 value={row.labels}
                 inventory={inventory}
+                matchCounts={labelCounts}
                 ariaLabel={`Labels for context ${row.name || i + 1}`}
                 problems={problemsWithPrefix(problems, `contexts.rules.${i}.labels`)}
                 onChange={(labels) => setRows(updateAt(rows, i, { labels }))}
@@ -70,6 +73,7 @@ export function ContextsEditor({ contexts, onChange, inventory, problems }: Cont
                 kind="title"
                 value={row.title}
                 inventory={inventory}
+                matchCounts={titleCounts}
                 ariaLabel={`Title words for context ${row.name || i + 1}`}
                 problems={problemsWithPrefix(problems, `contexts.rules.${i}.title`)}
                 onChange={(title) => setRows(updateAt(rows, i, { title }))}

@@ -1,6 +1,8 @@
 """Rule set viewing and saving endpoints for the in-dashboard rule editor."""
 
-from fastapi import APIRouter, Cookie, HTTPException, status
+import asyncio
+
+from fastapi import APIRouter, Cookie, HTTPException, Request, status
 
 from app.dashboard.admin import ADMIN_COOKIE_NAME, AdminSessions, run_pipeline_step
 from app.dashboard.schemas import (
@@ -8,6 +10,8 @@ from app.dashboard.schemas import (
     ClassificationValueModel,
     ContextRuleModel,
     ContextsModel,
+    RulePreviewRequest,
+    RulePreviewResponse,
     RuleProblemModel,
     RuleSaveRequest,
     RuleSaveResponse,
@@ -19,8 +23,10 @@ from app.dashboard.schemas import (
     WorkflowStageModel,
 )
 from app.dashboard.service import DashboardService
+from app.processor.preview import summarize_impact
 from app.processor.rule_loader import (
     ClassificationMatch,
+    ConfigurationConflictError,
     ContextConfig,
     ContextRule,
     DomainRule,
@@ -37,6 +43,8 @@ from app.processor.rule_store import (
     StoredRuleSet,
     validate_rule_set,
 )
+
+_preview_lock = asyncio.Lock()
 
 
 def rule_to_body(rule: DomainRule) -> RuleSetBody:
@@ -170,6 +178,44 @@ def _duplicate_classification_problems(body: RuleSetBody) -> list[RuleProblem]:
     return problems
 
 
+def _check_draft(
+    store: RuleStore, name: str, body: RuleSetBody
+) -> tuple[DomainRule | None, dict[str, DomainRule], list[RuleProblem]]:
+    """Validate a draft rule set for saving or previewing.
+
+    Returns:
+        The converted rule (None when duplicate classification names make the
+        conversion unreliable), the other stored rule sets by name, and the
+        problems found.
+
+    Raises:
+        HTTPException: 422 for an invalid name, 404 for an unknown rule set.
+    """
+    try:
+        store.check_exists(name)
+    except InvalidRuleSetNameError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except RuleSetNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+
+    duplicates = _duplicate_classification_problems(body)
+    if duplicates:
+        return None, {}, duplicates
+
+    rule = body_to_rule(body)
+    stored_sets = store.list_rule_sets()[0]
+    others = {s.name: s.rule for s in stored_sets if s.name != name}
+    problems = validate_rule_set(rule, others)
+    current = next((s for s in stored_sets if s.name == name), None)
+    if current is not None and set(rule.project_ids) == set(current.rule.project_ids):
+        problems = [p for p in problems if p.path != "project_ids"]
+    return rule, others, problems
+
+
 def create_rules_router(
     service: DashboardService, store: RuleStore, sessions: AdminSessions
 ) -> APIRouter:
@@ -192,29 +238,8 @@ def create_rules_router(
         pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
     ) -> RuleSaveResponse:
         sessions.require(pulse_admin_session)
-        try:
-            store.check_exists(name)
-        except InvalidRuleSetNameError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-            ) from exc
-        except RuleSetNotFoundError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-            ) from exc
-
-        problems = _duplicate_classification_problems(payload.rule)
-        rule = body_to_rule(payload.rule)
-        if not problems:
-            stored_sets = store.list_rule_sets()[0]
-            others = {s.name: s.rule for s in stored_sets if s.name != name}
-            problems = validate_rule_set(rule, others)
-            current = next((s for s in stored_sets if s.name == name), None)
-            if current is not None and set(rule.project_ids) == set(
-                current.rule.project_ids
-            ):
-                problems = [p for p in problems if p.path != "project_ids"]
-        if problems:
+        rule, _others, problems = _check_draft(store, name, payload.rule)
+        if problems or rule is None:
             summary = (
                 "1 problem needs"
                 if len(problems) == 1
@@ -257,5 +282,44 @@ def create_rules_router(
         job = await run_pipeline_step("app/processor/main.py", "Processor (L2)", service)
         service.clear_cache()
         return RuleSaveResponse(rule_set=_to_item(stored), job=job)
+
+    @router.post("/api/admin/rules/{name}/preview", response_model=RulePreviewResponse)
+    async def preview_rule(
+        name: str,
+        payload: RulePreviewRequest,
+        request: Request,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RulePreviewResponse:
+        sessions.require(pulse_admin_session)
+        rule, others, problems = _check_draft(store, name, payload.rule)
+        if problems or rule is None:
+            return RulePreviewResponse(
+                problems=[
+                    RuleProblemModel(path=problem.path, message=problem.message)
+                    for problem in problems
+                ]
+            )
+        async with _preview_lock:
+            if await request.is_disconnected():
+                return RulePreviewResponse()
+            try:
+                impact = await asyncio.to_thread(
+                    summarize_impact,
+                    service.processed_path,
+                    store.active_path,
+                    name,
+                    rule,
+                    others,
+                )
+            except ConfigurationConflictError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Two rule files claim the same project, so the effect cannot "
+                        "be calculated. Ask the person who maintains the rule files "
+                        "to fix this."
+                    ),
+                ) from exc
+        return RulePreviewResponse(impact=impact)
 
     return router

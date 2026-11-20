@@ -15,10 +15,50 @@ from app.processor.enricher import (
     enrich_workflow_stage,
     explode_contexts,
 )
-from app.processor.rule_loader import RuleLoader, resolve_rules_path
+from app.processor.rule_loader import DomainRule, RuleLoader, resolve_rules_path
 from app.processor.validator import validate_issues
 
 logger = logging.getLogger(__name__)
+
+
+def process_issues(
+    df: pd.DataFrame, rule: DomainRule
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the enrich, classify, explode, and validate pipeline for one project.
+
+    Args:
+        df: Layer 1 issues of a single project
+        rule: Rule set governing the project
+
+    Returns:
+        Tuple of (valid_df, quality_df)
+    """
+    # Enrich with metrics
+    df = enrich_metrics(df, rule)
+    df = apply_classification(df, rule)
+    df = enrich_priority_rank(df, rule)
+    df = enrich_workflow_stage(df, rule)
+
+    # Context explosion (Data Explosion pattern)
+    df, orphan_df = explode_contexts(df, rule)
+
+    # Validate
+    result = validate_issues(df, rule)
+
+    # Add orphan issues as MISSING_CONTEXT quality hints while keeping them
+    # in the main analytics dataset.
+    if not orphan_df.empty:
+        orphan_valid_df = orphan_df.copy()
+        orphan_valid_df["context"] = None
+        orphan_valid_df["context_group"] = None
+        result.valid_df = pd.concat([result.valid_df, orphan_valid_df], ignore_index=True)
+
+        orphan_quality_df = orphan_valid_df.copy()
+        orphan_quality_df["error_code"] = "MISSING_CONTEXT"
+        orphan_quality_df["error_message"] = "Issue not assigned to any context/project"
+        result.quality_df = pd.concat([result.quality_df, orphan_quality_df], ignore_index=True)
+
+    return result.valid_df, result.quality_df
 
 
 class Processor:
@@ -112,32 +152,7 @@ class Processor:
             rule = self.rule_loader.get_default_rule()
             logger.debug(f"Using default rule for project {project_id}")
 
-        # Enrich with metrics
-        df = enrich_metrics(df, rule)
-        df = apply_classification(df, rule)
-        df = enrich_priority_rank(df, rule)
-        df = enrich_workflow_stage(df, rule)
-
-        # Context explosion (Data Explosion pattern)
-        df, orphan_df = explode_contexts(df, rule)
-
-        # Validate
-        result = validate_issues(df, rule)
-
-        # Add orphan issues as MISSING_CONTEXT quality hints while keeping them
-        # in the main analytics dataset.
-        if not orphan_df.empty:
-            orphan_valid_df = orphan_df.copy()
-            orphan_valid_df["context"] = None
-            orphan_valid_df["context_group"] = None
-            result.valid_df = pd.concat([result.valid_df, orphan_valid_df], ignore_index=True)
-
-            orphan_quality_df = orphan_valid_df.copy()
-            orphan_quality_df["error_code"] = "MISSING_CONTEXT"
-            orphan_quality_df["error_message"] = "Issue not assigned to any context/project"
-            result.quality_df = pd.concat([result.quality_df, orphan_quality_df], ignore_index=True)
-
-        return result.valid_df, result.quality_df
+        return process_issues(df, rule)
 
     def _extract_project_id(self, filepath: Path) -> int | None:
         """Extract project ID from filename (issues_{project_id}.parquet)."""

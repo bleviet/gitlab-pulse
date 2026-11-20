@@ -97,6 +97,7 @@ Rules are edited in the dashboard Settings screen instead of by hand. We added t
 - **User rules live in `data/rules/`; `app/config/rules/` is a template.** Rules saved from the UI must survive a Docker image rebuild and must not leave a git checkout modified. The template is used until the first save, which copies it.
 - **Viewing is open, saving needs the admin session.** Rules contain no secrets, and letting everyone read them explains why the dashboard shows what it shows. Changing them alters every chart, so it uses the existing admin password rather than a second role system.
 - **Saving applies.** A save validates, writes atomically, keeps the replaced file in `data/rules/.history/`, runs the processor, and invalidates the payload cache, so the user never has to know that a separate processing step exists.
+- **Consequences are shown before saving.** The Settings screen asks the backend for a dry run of the draft shortly after each change and shows issue counts before and after, labels that no rule uses, and entries that match no issue. Someone who does not know the rule format cannot predict what an edit does; the numbers come from the same pipeline code as a real processor run, so what is previewed is what a save produces.
 - **Label choices come from the data.** The editor offers the labels already present in the dashboard payload (`label_styles`, `issues[].labels`) instead of asking the user to type label names from memory.
 
 ## 5. Local Data Tooling
