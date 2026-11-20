@@ -78,7 +78,7 @@ Used for **Data Validation**.
 
 Used for **Data Loading** in `DashboardService` (`app/dashboard/service.py`).
 
-* **Implementation:** `DashboardService` acts as an mtime-keyed cache over `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`. It collapses multi-context rows into unique issues and resolves YAML palettes once per file modification timestamp (`st_mtime_ns`), with explicit invalidation via `clear_cache()`.
+* **Implementation:** `DashboardService` acts as an mtime-keyed cache over `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and the active rule files (`data/rules/*.yaml`, or `app/config/rules/*.yaml` until the first save from the Settings screen). It collapses multi-context rows into unique issues and resolves YAML palettes once per file modification timestamp (`st_mtime_ns`), with explicit invalidation via `clear_cache()`.
 
 ## **4\. Extensibility & OCP (Open/Closed Principle)**
 

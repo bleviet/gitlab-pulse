@@ -19,7 +19,7 @@ RUN useradd -m -U -s /bin/bash appuser
 
 WORKDIR /app
 
-RUN mkdir -p data/raw data/processed data/analytics data/state && \
+RUN mkdir -p data/raw data/processed data/analytics data/state data/rules && \
     chown -R appuser:appuser /app
 
 USER appuser

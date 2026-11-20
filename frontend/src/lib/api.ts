@@ -2,7 +2,23 @@ import type {
   AdminJobResponse,
   AdminStatusResponse,
   DashboardPayload,
+  RuleProblem,
+  RuleSaveResponse,
+  RuleSetBody,
+  RuleSetsResponse,
 } from "./types";
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly problems: RuleProblem[];
+
+  constructor(message: string, status: number, problems: RuleProblem[] = []) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.problems = problems;
+  }
+}
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -14,14 +30,22 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!response.ok) {
-    let detail = `Request failed (${response.status})`;
+    let message = `Request failed (${response.status})`;
+    let problems: RuleProblem[] = [];
     try {
-      const body = (await response.json()) as { detail?: string };
-      if (body.detail) detail = body.detail;
+      const body = (await response.json()) as {
+        detail?: string | { message?: string; problems?: RuleProblem[] };
+      };
+      if (typeof body.detail === "string" && body.detail) {
+        message = body.detail;
+      } else if (body.detail && typeof body.detail === "object") {
+        if (body.detail.message) message = body.detail.message;
+        if (Array.isArray(body.detail.problems)) problems = body.detail.problems;
+      }
     } catch {
       // ignore non-json error body
     }
-    throw new Error(detail);
+    throw new ApiError(message, response.status, problems);
   }
   return (await response.json()) as T;
 }
@@ -67,5 +91,20 @@ export function runProcessor(): Promise<AdminJobResponse> {
 export function clearDashboardCache(): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>("/api/admin/clear-cache", {
     method: "POST",
+  });
+}
+
+export function fetchRules(): Promise<RuleSetsResponse> {
+  return requestJson<RuleSetsResponse>("/api/rules");
+}
+
+export function saveRuleSet(
+  name: string,
+  revision: string,
+  rule: RuleSetBody,
+): Promise<RuleSaveResponse> {
+  return requestJson<RuleSaveResponse>(`/api/admin/rules/${encodeURIComponent(name)}`, {
+    method: "PUT",
+    body: JSON.stringify({ revision, rule }),
   });
 }

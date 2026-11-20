@@ -3,6 +3,7 @@ import { AdminModal } from "./components/AdminModal";
 import { IssuePanel } from "./components/IssuePanel";
 import { OverviewWorkspace } from "./components/OverviewWorkspace";
 import { ScopeBar } from "./components/ScopeBar";
+import { SettingsWorkspace } from "./components/settings/SettingsWorkspace";
 import { SummaryBar } from "./components/SummaryBar";
 import { TopBar } from "./components/TopBar";
 import {
@@ -74,6 +75,7 @@ export function App() {
   const [activeChart, setActiveChart] = useState<ActiveChartId>(null);
 
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [globalFilters, setGlobalFilters] = useState<GlobalFilters>(() => ({
@@ -357,6 +359,7 @@ export function App() {
         onChangeValueMode={setValueMode}
         onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
         onOpenAdmin={() => setAdminModalOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         scopeBar={
           payload && (
             <ScopeBar
@@ -381,6 +384,18 @@ export function App() {
           onClose={() => setAdminModalOpen(false)}
           onLogin={handleAdminLogin}
           onLogout={handleAdminLogout}
+          onReloadDashboard={() => loadData(true)}
+        />
+      )}
+
+      {!IS_DEMO && (
+        <SettingsWorkspace
+          open={settingsOpen}
+          isAdmin={isAdmin}
+          issues={payload?.issues ?? []}
+          labelStyles={payload?.label_styles ?? {}}
+          onClose={() => setSettingsOpen(false)}
+          onLogin={handleAdminLogin}
           onReloadDashboard={() => loadData(true)}
         />
       )}

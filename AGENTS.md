@@ -47,11 +47,14 @@ per-layer specs are in `docs/spec/TSD_*.md`):
 | 0 Raw | `app/collector/` | `data/raw/*.json` (audit copy of API payloads) |
 | 1 Processed | `app/collector/` (`orchestrator.py`, `rest_client.py`, `gql_client.py`, `state.py`) | `data/processed/{issues,milestones,labels}_<project_id>.parquet`, `data/state/sync_state.json` |
 | 2 Analytics | `app/processor/` (`enricher.py`, `validator.py`, `rule_loader.py`) | `data/analytics/issues_valid.parquet`, `data/analytics/data_quality.parquet` |
-| 3 Presentation | `app/dashboard/` (FastAPI API) + `frontend/` (React/TS SPA) | `/api/dashboard`, `/api/admin/*`, static SPA in `frontend/dist/` |
+| 3 Presentation | `app/dashboard/` (FastAPI API) + `frontend/` (React/TS SPA) | `/api/dashboard`, `/api/rules`, `/api/admin/*`, static SPA in `frontend/dist/` |
 
-Shared Pydantic schemas live in `app/shared/schemas.py`. Rules are YAML files in
-`app/config/rules/` (`default.yaml` is the template); `RuleLoader` discovers
-them, and a rule file may restrict itself to `project_ids`.
+Shared Pydantic schemas live in `app/shared/schemas.py`. Rules are YAML files:
+`app/config/rules/` holds the shipped template (`default.yaml`), and
+`data/rules/` holds the rules saved from the dashboard Settings screen and takes
+over as soon as it contains a `*.yaml` file (`resolve_rules_path`). `RuleLoader`
+discovers them, `RuleStore` (`app/processor/rule_store.py`) writes them, and a
+rule file may restrict itself to `project_ids`.
 
 ### Architecture rules (binding)
 

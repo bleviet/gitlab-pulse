@@ -31,12 +31,18 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 
 ### **Q: When does the dashboard reflect newly processed data?**
 **A:** On the very next request after Parquet or YAML files change on disk.
-- **Automatic Mtime Check:** `DashboardService` tracks modification timestamps (`st_mtime_ns`) on `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`, rebuilding its in-memory payload automatically when files change.
+- **Automatic Mtime Check:** `DashboardService` tracks modification timestamps (`st_mtime_ns`) on `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and the active rule files (`data/rules/*.yaml`, or `app/config/rules/*.yaml` while `data/rules/` has no rule files), rebuilding its in-memory payload automatically when files change.
 - **Manual Refresh:** Click the ambient refresh button (status dot + arrows icon) in the top-right navigation bar to reload `/api/dashboard` immediately without reloading the browser page.
 
-### **Q: I updated `default.yaml`. How do I see the changes?**
+### **Q: How do I change the rules without editing a file?**
+**A:** Open **Settings** in the top-right navigation bar, unlock editing with the admin password, change the rules, and click **Save & apply**. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
+
+### **Q: Where are the rule files?**
+**A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.
+
+### **Q: I edited a rule file by hand. How do I see the changes?**
 **A:** Color overrides under `colors.light` / `colors.dark` are resolved at read time via `DashboardService` mtime detection. Changes to classification rules, workflow stages, or quality rules take effect during **Layer 2 Processing**:
-1. **Edit:** Modify `app/config/rules/default.yaml`.
+1. **Edit:** Modify the file in `data/rules/` (or in `app/config/rules/` if `data/rules/` has no rule files yet).
 2. **Apply:** Run the Processor:
    ```bash
    uv run python app/processor/main.py

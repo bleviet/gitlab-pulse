@@ -1,6 +1,8 @@
 """Modular YAML rule loader for Layer 2 validation.
 
-Dynamically discovers and loads rule files from app/config/rules/*.yaml.
+Dynamically discovers and loads rule files (*.yaml) from the given rules
+directory: data/rules/ once it has rule files, otherwise the app/config/rules/
+template.
 """
 
 import logging
@@ -11,6 +13,28 @@ import yaml
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_USER_RULES_PATH = Path("data/rules")
+DEFAULT_TEMPLATE_RULES_PATH = Path("app/config/rules")
+
+
+def resolve_rules_path(
+    user_path: Path = DEFAULT_USER_RULES_PATH,
+    template_path: Path = DEFAULT_TEMPLATE_RULES_PATH,
+) -> Path:
+    """Choose the active rules directory.
+
+    Args:
+        user_path: Directory holding rules saved from the UI
+        template_path: Read-only template rules shipped with the app
+
+    Returns:
+        ``user_path`` when it contains at least one ``*.yaml`` file, otherwise
+        ``template_path``.
+    """
+    if user_path.is_dir() and any(user_path.glob("*.yaml")):
+        return user_path
+    return template_path
 
 
 class LabelMappings(BaseModel):
@@ -165,6 +189,24 @@ class DomainRule(BaseModel):
 
 
 
+def load_rule_file(filepath: Path) -> DomainRule:
+    """Load and validate a single rule file.
+
+    Args:
+        filepath: Path to a rule YAML file
+
+    Returns:
+        The validated DomainRule (an empty file yields default rules)
+    """
+    with filepath.open("r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    if not data:
+        return DomainRule()
+
+    return DomainRule.model_validate(data)
+
+
 class ConfigurationConflictError(Exception):
     """Raised when multiple rule files claim the same project_id."""
 
@@ -174,7 +216,9 @@ class ConfigurationConflictError(Exception):
 class RuleLoader:
     """Loads and manages modular YAML rule configurations.
 
-    Scans app/config/rules/*.yaml for rule files and validates them.
+    Scans the given rules directory (data/rules/ once it has rule files,
+    otherwise the app/config/rules/ template) for *.yaml files and validates
+    them.
     """
 
     def __init__(self, rules_path: Path = Path("app/config/rules")) -> None:
@@ -185,6 +229,7 @@ class RuleLoader:
         """
         self.rules_path = rules_path
         self._rules: Optional[dict[int, DomainRule]] = None
+        self.load_errors: dict[str, str] = {}
 
     @property
     def rules(self) -> dict[int, DomainRule]:
@@ -227,7 +272,7 @@ class RuleLoader:
             logger.warning(f"Rules path does not exist: {self.rules_path}")
             return rules
 
-        for yaml_file in self.rules_path.glob("*.yaml"):
+        for yaml_file in sorted(self.rules_path.glob("*.yaml")):
             try:
                 rule = self._load_file(yaml_file)
 
@@ -249,19 +294,14 @@ class RuleLoader:
                 raise
             except Exception as e:
                 logger.error(f"Failed to load rule file {yaml_file}: {e}")
+                self.load_errors[yaml_file.name] = str(e)
 
         logger.info(f"Loaded {len(rules)} project rules from {len(seen_projects)} files")
         return rules
 
     def _load_file(self, filepath: Path) -> DomainRule:
         """Load and validate a single rule file."""
-        with filepath.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if not data:
-            return DomainRule()
-
-        return DomainRule.model_validate(data)
+        return load_rule_file(filepath)
 
     def reload(self) -> None:
         """Force reload of all rule files."""

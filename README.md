@@ -149,10 +149,13 @@ cp .env.example .env
 Ensure you provide a Personal Access Token with the `read_api` scope, and specify the `PROJECT_IDS` (comma-separated) you want to sync.
 
 ### 2. Configure Your Rules
-The `app/config/rules/default.yaml` file is a **template and example configuration**. It determines how issues are classified (Bug, Feature, etc.), validated, and grouped.
+Rules determine how issues are classified (Bug, Feature, etc.), which labels place an issue in which workflow stage, how issues are grouped into contexts, and which quality checks apply.
 
-*   **Action**: Create your own YAML file (e.g., `my_project.yaml`) in `app/config/rules/`.
-*   **Guidance**: Map your team's specific GitLab labels to the workflow stages. You can restrict rules to specific projects by defining `project_ids` inside the YAML file.
+**In the dashboard (no file editing):** click **Settings** in the top bar. Each section (Issue types, Severity, Priority, Workflow stages, Contexts, Quality checks) lets you pick from the GitLab labels found in your data. Viewing is open; to change anything, click **Unlock editing** and enter the admin password (`ADMIN_PASSWORD`, default `admin`). **Save & apply** writes the rules, re-runs the processor, and reloads the dashboard.
+
+**Where rules are stored:** `app/config/rules/default.yaml` is a read-only template. The first save from the Settings screen copies the template rules to `data/rules/` and writes there from then on. `data/rules/` is gitignored and sits on the Docker data volume, so saved rules survive image rebuilds. The previous version of a file is kept in `data/rules/.history/` on every save.
+
+**By hand (optional):** the files are plain YAML and can still be edited directly, in `data/rules/` once it exists, otherwise in `app/config/rules/`. Create additional files (e.g., `my_project.yaml`) and restrict them to specific projects with `project_ids`. Comments in a file are dropped the next time that file is saved from the Settings screen. Run the processor after a manual edit.
 
 ### 3. Run the Pipeline
 Fetch the data, process it into analytics, and launch the dashboard:

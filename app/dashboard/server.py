@@ -9,9 +9,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.dashboard.admin import create_admin_router
+from app.dashboard.admin import AdminSessions, create_admin_router
+from app.dashboard.rules_api import create_rules_router
 from app.dashboard.schemas import DashboardPayload, HealthResponse
 from app.dashboard.service import DashboardService
+from app.processor.rule_store import RuleStore
 
 load_dotenv()
 
@@ -26,6 +28,7 @@ _ASSET_SUFFIXES = frozenset(
 def create_app(
     service: DashboardService | None = None,
     frontend_dist: Path | None = None,
+    rule_store: RuleStore | None = None,
 ) -> FastAPI:
     """Create the FastAPI application with API routes and SPA static serving."""
     dashboard_service = service or DashboardService()
@@ -49,7 +52,11 @@ def create_app(
     def get_dashboard() -> DashboardPayload:
         return dashboard_service.get_dashboard_payload()
 
-    application.include_router(create_admin_router(dashboard_service))
+    sessions = AdminSessions()
+    application.include_router(create_admin_router(dashboard_service, sessions))
+    application.include_router(
+        create_rules_router(dashboard_service, rule_store or RuleStore(), sessions)
+    )
 
     index_file = dist_dir / "index.html"
     if index_file.exists():

@@ -22,7 +22,7 @@ This document catalogs every backend module, API endpoint, frontend module, URL 
 - `data/analytics/issues_valid.parquet`
 - `data/state/sync_state.json`
 - `data/processed/labels_*.parquet`
-- `app/config/rules/*.yaml`
+- the active rule files: `data/rules/*.yaml`, or `app/config/rules/*.yaml` while `data/rules/` has no rule files
 
 Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `DashboardPayload`. Exploded context rows sharing the same `id` are collapsed into a single `IssueItem` with a deduplicated `contexts: list[str]`.
 

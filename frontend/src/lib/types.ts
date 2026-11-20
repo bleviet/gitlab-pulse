@@ -120,3 +120,65 @@ export type ActiveChartId =
   | "velocity_chart"
   | `stage_bar_${number}`
   | null;
+
+export interface MatcherRule {
+  name: string;
+  labels: string[];
+  title: string[];
+}
+
+export interface ClassificationCategory {
+  name: string;
+  values: MatcherRule[];
+}
+
+export interface ContextsConfig {
+  rules: MatcherRule[];
+  require_assignment: boolean;
+}
+
+export interface WorkflowStage {
+  name: string;
+  labels: string[];
+  type: string;
+  description: string;
+}
+
+export interface ValidationConfig {
+  required_labels: Record<string, string[]>;
+  required_fields: Record<string, string[]>;
+  stale_threshold_days: number;
+  max_cycle_time_days: number;
+}
+
+export interface RuleSetBody {
+  project_ids: number[];
+  team: string;
+  classification: ClassificationCategory[];
+  contexts: ContextsConfig;
+  workflow: { stages: WorkflowStage[] };
+  validation: ValidationConfig;
+  colors: Record<string, unknown>;
+}
+
+export interface RuleSetItem {
+  name: string;
+  revision: string;
+  rule: RuleSetBody;
+}
+
+export interface RuleSetsResponse {
+  rule_sets: RuleSetItem[];
+  load_errors: Record<string, string>;
+  source: "template" | "user";
+}
+
+export interface RuleProblem {
+  path: string;
+  message: string;
+}
+
+export interface RuleSaveResponse {
+  rule_set: RuleSetItem;
+  job: AdminJobResponse;
+}

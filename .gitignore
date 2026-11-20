@@ -5,6 +5,7 @@ data/raw/*.json
 data/processed/*.parquet
 data/analytics/*.parquet
 data/state/*.json
+data/rules/
 
 # Frontend build & dependencies
 frontend/node_modules/

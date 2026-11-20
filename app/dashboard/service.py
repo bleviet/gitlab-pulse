@@ -32,9 +32,7 @@ from app.dashboard.utils import (
     normalize_assignee_labels,
     normalize_issue_labels,
 )
-from app.processor.rule_loader import DomainRule, RuleLoader
-
-_DEFAULT_RULES_PATH = Path("app/config/rules")
+from app.processor.rule_loader import DomainRule, RuleLoader, resolve_rules_path
 
 
 def _app_version() -> str:
@@ -182,7 +180,7 @@ class DashboardService:
         self._analytics_path = analytics_path or DEFAULT_ANALYTICS_PATH
         self._processed_path = processed_path or DEFAULT_PROCESSED_PATH
         self._state_path = state_path or DEFAULT_STATE_PATH
-        self._rules_path = rules_path or _DEFAULT_RULES_PATH
+        self._rules_path = rules_path
         self._lock = Lock()
         self._cache_key: tuple[tuple[str, int], ...] | None = None
         self._cached_payload: DashboardPayload | None = None
@@ -193,6 +191,9 @@ class DashboardService:
             self._cache_key = None
             self._cached_payload = None
 
+    def _active_rules_path(self) -> Path:
+        return self._rules_path or resolve_rules_path()
+
     def _compute_mtime_key(self) -> tuple[tuple[str, int], ...]:
         paths: list[Path] = [
             self._analytics_path / "issues_valid.parquet",
@@ -200,8 +201,9 @@ class DashboardService:
         ]
         if self._processed_path.exists():
             paths.extend(sorted(self._processed_path.glob("labels_*.parquet")))
-        if self._rules_path.exists():
-            paths.extend(sorted(self._rules_path.glob("*.yaml")))
+        rules_path = self._active_rules_path()
+        if rules_path.exists():
+            paths.extend(sorted(rules_path.glob("*.yaml")))
 
         entries: list[tuple[str, int]] = []
         for path in paths:
@@ -229,7 +231,7 @@ class DashboardService:
         df = load_valid_issues(self._analytics_path)
         raw_labels = load_labels(self._processed_path)
         sync_raw = get_sync_status(self._state_path)
-        rules = RuleLoader(self._rules_path).rules
+        rules = RuleLoader(self._active_rules_path()).rules
 
         palettes = resolve_palettes(rules)
         stages = _extract_stages(rules)

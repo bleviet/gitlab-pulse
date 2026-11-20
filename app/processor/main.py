@@ -15,7 +15,7 @@ from app.processor.enricher import (
     enrich_workflow_stage,
     explode_contexts,
 )
-from app.processor.rule_loader import RuleLoader
+from app.processor.rule_loader import RuleLoader, resolve_rules_path
 from app.processor.validator import validate_issues
 
 logger = logging.getLogger(__name__)
@@ -30,19 +30,20 @@ class Processor:
     def __init__(
         self,
         data_path: Path = Path("data"),
-        rules_path: Path = Path("app/config/rules"),
+        rules_path: Path | None = None,
     ) -> None:
         """Initialize the processor.
 
         Args:
             data_path: Base path for data storage
-            rules_path: Path to rules configuration
+            rules_path: Path to rules configuration; defaults to the active
+                rules directory (data/rules or app/config/rules)
         """
         self.processed_path = data_path / "processed"
         self.analytics_path = data_path / "analytics"
         self.analytics_path.mkdir(parents=True, exist_ok=True)
 
-        self.rule_loader = RuleLoader(rules_path)
+        self.rule_loader = RuleLoader(rules_path or resolve_rules_path())
 
     def process_all(self) -> dict[str, int]:
         """Process all projects from Layer 1 output.
@@ -165,12 +166,18 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="GitLab Pulse Layer 2 Processor")
     parser.add_argument("--data-path", type=str, default="data", help="Data directory path")
-    parser.add_argument("--rules-path", type=str, default="app/config/rules", help="Rules directory")
+    parser.add_argument(
+        "--rules-path",
+        type=str,
+        default=None,
+        help="Rules directory (defaults to data/rules when it has rule files, "
+        "otherwise app/config/rules)",
+    )
     args = parser.parse_args()
 
     processor = Processor(
         data_path=Path(args.data_path),
-        rules_path=Path(args.rules_path),
+        rules_path=Path(args.rules_path) if args.rules_path else None,
     )
 
     results = processor.process_all()

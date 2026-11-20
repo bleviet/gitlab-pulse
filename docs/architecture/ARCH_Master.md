@@ -87,7 +87,17 @@ The legacy experimental Custom View layout builder has been removed.
 
 ### 4.3 Caching
 
-`DashboardService` caches the prepared `DashboardPayload` in memory keyed on the modification timestamps (`st_mtime_ns`) of `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and `app/config/rules/*.yaml`, and supports explicit invalidation after admin runs.
+`DashboardService` caches the prepared `DashboardPayload` in memory keyed on the modification timestamps (`st_mtime_ns`) of `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and the active rule files, and supports explicit invalidation after admin runs.
+
+### 4.4 Rule editing
+
+Rules are edited in the dashboard Settings screen instead of by hand. We added the editor because the people who decide how labels map to types and workflow stages (managers, team leads) are usually not the people who can edit a YAML file and run the processor from a terminal, and because a hand-edited file fails silently: a syntax error skips the file and an invalid pattern never matches.
+
+- **YAML stays the storage format.** New teams are still new rule files (architecture rule "extend, don't modify"), and the processor is unchanged. The editor is a second way to produce the same files.
+- **User rules live in `data/rules/`; `app/config/rules/` is a template.** Rules saved from the UI must survive a Docker image rebuild and must not leave a git checkout modified. The template is used until the first save, which copies it.
+- **Viewing is open, saving needs the admin session.** Rules contain no secrets, and letting everyone read them explains why the dashboard shows what it shows. Changing them alters every chart, so it uses the existing admin password rather than a second role system.
+- **Saving applies.** A save validates, writes atomically, keeps the replaced file in `data/rules/.history/`, runs the processor, and invalidates the payload cache, so the user never has to know that a separate processing step exists.
+- **Label choices come from the data.** The editor offers the labels already present in the dashboard payload (`label_styles`, `issues[].labels`) instead of asking the user to type label names from memory.
 
 ## 5. Local Data Tooling
 

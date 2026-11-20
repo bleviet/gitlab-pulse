@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BarChart3, Moon, RefreshCw, Shield, Sun } from "lucide-react";
+import { BarChart3, Moon, RefreshCw, Settings, Shield, Sun } from "lucide-react";
 import { IS_DEMO } from "../lib/api";
 import type { SyncStatus, ThemeMode, ValueMode } from "../lib/types";
 
@@ -17,6 +17,7 @@ interface TopBarProps {
   onChangeValueMode: (mode: ValueMode) => void;
   onToggleTheme: () => void;
   onOpenAdmin: () => void;
+  onOpenSettings: () => void;
 }
 
 export function TopBar({
@@ -33,6 +34,7 @@ export function TopBar({
   onChangeValueMode,
   onToggleTheme,
   onOpenAdmin,
+  onOpenSettings,
 }: TopBarProps) {
   const isSyncError = Boolean(syncStatus && /error|fail/i.test(syncStatus.status));
   const syncTitle = syncStatus
@@ -127,6 +129,18 @@ export function TopBar({
         >
           {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
         </button>
+
+        {!IS_DEMO && (
+          <button
+            type="button"
+            className="pulse-icon-btn"
+            aria-label="Open settings"
+            onClick={onOpenSettings}
+            title="Settings"
+          >
+            <Settings size={15} />
+          </button>
+        )}
 
         {!IS_DEMO && (
           <button

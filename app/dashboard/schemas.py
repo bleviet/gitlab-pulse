@@ -1,6 +1,6 @@
 """Pydantic v2 response and request schemas for the dashboard API."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -142,3 +142,114 @@ class HealthResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     status: str = "ok"
+
+
+class ClassificationValueModel(BaseModel):
+    """One classification value with its label and title match patterns."""
+
+    name: str
+    labels: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+
+
+class ClassificationCategoryModel(BaseModel):
+    """A classification category holding its values in match order."""
+
+    name: str
+    values: list[ClassificationValueModel] = Field(default_factory=list)
+
+
+class ContextRuleModel(BaseModel):
+    """A context rule matching issues by label or title patterns."""
+
+    name: str
+    labels: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+
+
+class ContextsModel(BaseModel):
+    """Context slicing configuration."""
+
+    rules: list[ContextRuleModel] = Field(default_factory=list)
+    require_assignment: bool = False
+
+
+class WorkflowStageModel(BaseModel):
+    """A workflow stage with its label patterns."""
+
+    name: str
+    labels: list[str] = Field(default_factory=list)
+    type: str = "waiting"
+    description: str = ""
+
+
+class WorkflowModel(BaseModel):
+    """Workflow stages in board order."""
+
+    stages: list[WorkflowStageModel] = Field(default_factory=list)
+
+
+class ValidationModel(BaseModel):
+    """Data quality thresholds and required labels or fields."""
+
+    required_labels: dict[str, list[str]] = Field(default_factory=dict)
+    required_fields: dict[str, list[str]] = Field(default_factory=dict)
+    stale_threshold_days: int = 30
+    max_cycle_time_days: int = 90
+
+
+class RuleSetBody(BaseModel):
+    """Editable content of one rule set; classification order is significant."""
+
+    project_ids: list[int] = Field(default_factory=list)
+    team: str = "default"
+    classification: list[ClassificationCategoryModel] = Field(default_factory=list)
+    contexts: ContextsModel
+    workflow: WorkflowModel
+    validation: ValidationModel
+    colors: dict[str, Any] = Field(default_factory=dict)
+
+
+class RuleSetItem(BaseModel):
+    """A stored rule set with its name and content revision."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    revision: str
+    rule: RuleSetBody
+
+
+class RuleSetsResponse(BaseModel):
+    """All rule sets, files that failed to load, and where they came from."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rule_sets: list[RuleSetItem]
+    load_errors: dict[str, str] = Field(default_factory=dict)
+    source: Literal["template", "user"]
+
+
+class RuleProblemModel(BaseModel):
+    """A fixable problem in a submitted rule set."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: str
+    message: str
+
+
+class RuleSaveRequest(BaseModel):
+    """Rule set edit based on a previously loaded revision."""
+
+    revision: str
+    rule: RuleSetBody
+
+
+class RuleSaveResponse(BaseModel):
+    """Saved rule set and the result of the processor re-run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rule_set: RuleSetItem
+    job: AdminJobResponse

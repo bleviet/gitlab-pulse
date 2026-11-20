@@ -108,7 +108,7 @@ def delete_local_projects(
 
 def rebuild_analytics(
     data_path: Path = Path("data"),
-    rules_path: Path = Path("app/config/rules"),
+    rules_path: Path | None = None,
 ) -> dict[str, int]:
     """Rebuild Layer 2 analytics from local processed files."""
     processor = Processor(data_path=data_path, rules_path=rules_path)
@@ -168,7 +168,7 @@ def run_reset_action(
     max_team_members: int,
     dashboard_url_base: str,
     data_path: Path = Path("data"),
-    rules_path: Path = Path("app/config/rules"),
+    rules_path: Path | None = None,
 ) -> dict[str, int]:
     """Delete selected project data, reseed it, and rebuild analytics."""
     delete_local_projects(
@@ -222,13 +222,13 @@ def main() -> None:
         help="Base dashboard URL used for synthetic issue links",
     )
     parser.add_argument("--data-path", type=str, default="data", help="Base data directory")
-    parser.add_argument("--rules-path", type=str, default="app/config/rules", help="Rules directory")
+    parser.add_argument("--rules-path", type=str, default=None, help="Rules directory")
     parser.add_argument("--clear-analytics", action="store_true", help="Also remove analytics parquet output")
     parser.add_argument("--clear-state", action="store_true", help="Also remove collector sync state")
     args = parser.parse_args()
 
     data_path = Path(args.data_path)
-    rules_path = Path(args.rules_path)
+    rules_path = Path(args.rules_path) if args.rules_path else None
 
     if args.action == "menu":
         run_interactive_menu(data_path=data_path, rules_path=rules_path)
@@ -301,7 +301,7 @@ def main() -> None:
 
 def run_interactive_menu(
     data_path: Path = Path("data"),
-    rules_path: Path = Path("app/config/rules"),
+    rules_path: Path | None = None,
 ) -> None:
     """Run the interactive terminal menu for local data management."""
     while True:

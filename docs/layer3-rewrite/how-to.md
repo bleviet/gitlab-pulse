@@ -65,7 +65,7 @@ npm run build
 
 ## Override Semantic Data Colors via YAML Rules
 
-1. Edit or create a team YAML file under `app/config/rules/` (see `app/config/rules/default.yaml` for the schema).
+1. Edit or create a team YAML file in the active rules directory: `data/rules/` once it contains rule files (after the first save from the Settings screen), otherwise `app/config/rules/` (see `app/config/rules/default.yaml` for the schema).
 2. Add hex overrides under `colors.light` and `colors.dark` for keys such as `p1`, `p2`, `p3`, `bug`, `feature`, `ms_on_track`, or `ms_overdue`.
 3. Reload the dashboard (or click `Clear Cache & Reload` in Admin Operations); `DashboardService` detects the YAML `st_mtime_ns` change automatically.
 
