@@ -7,6 +7,7 @@ import type {
   IssueItem,
   LabelStyle,
   PaletteDefaults,
+  RuleSaveResponse,
   RuleSetBody,
   SectionId,
 } from "../../lib/types";
@@ -298,6 +299,42 @@ export function useRuleEditor({
     [actions],
   );
 
+  const handleYamlSaved = useCallback(
+    async (res: RuleSaveResponse) => {
+      setResponse((prev) =>
+        prev
+          ? {
+              ...prev,
+              rule_sets: prev.rule_sets.map((r) =>
+                r.name === res.rule_set.name ? res.rule_set : r,
+              ),
+            }
+          : prev,
+      );
+      setDraft(res.rule_set.rule);
+      setServerProblems([]);
+      setSessionExpired(false);
+      if (res.job.success) {
+        try {
+          await onReloadDashboard();
+          setNotice({ kind: "success", text: "YAML saved. The dashboard has been recalculated." });
+        } catch {
+          setNotice({
+            kind: "warning",
+            text: "YAML saved and recalculated, but the dashboard could not be refreshed. Use the refresh button in the top bar.",
+          });
+        }
+      } else {
+        setNotice({
+          kind: "warning",
+          text: "YAML was saved, but recalculating the dashboard failed.",
+          job: res.job,
+        });
+      }
+    },
+    [setResponse, setDraft, setServerProblems, onReloadDashboard],
+  );
+
   const openNewRuleSet = useCallback(() => {
     actions.resetCreate();
     setActivePopover(null);
@@ -345,10 +382,12 @@ export function useRuleEditor({
     toggleEditMode,
     exitEditMode,
     handleUnlocked,
+    handleSessionExpired,
     updateDraft,
     handleSelectRuleSet,
     handleDiscard,
     handleSave,
+    handleYamlSaved,
     handleLoadVersion,
     handleCreateRuleSet,
   };

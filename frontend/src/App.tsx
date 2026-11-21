@@ -27,6 +27,12 @@ import {
   resolvePresetDates,
 } from "./lib/facets";
 import { buildSummaryGroups, type SummaryItem } from "./lib/summary";
+import {
+  parseUiTheme,
+  resolveUserPalette,
+  UI_THEME_STORAGE_KEY,
+  type UiThemeId,
+} from "./lib/uiThemes";
 import type {
   ActiveChartId,
   DashboardPayload,
@@ -57,6 +63,14 @@ function getInitialValueMode(): ValueMode {
   return "count";
 }
 
+function getInitialColorTheme(): UiThemeId {
+  try {
+    return parseUiTheme(localStorage.getItem(UI_THEME_STORAGE_KEY));
+  } catch {
+    return "bahonavi";
+  }
+}
+
 export function App() {
   const initialUrl = useMemo(() => parseUrlState(window.location.search), []);
   const initialGlobal = useMemo(() => parseGlobalFiltersUrl(window.location.search), []);
@@ -70,6 +84,7 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [colorTheme, setColorTheme] = useState<UiThemeId>(getInitialColorTheme);
   const [valueMode, setValueMode] = useState<ValueMode>(getInitialValueMode);
   const [chartsVisible, setChartsVisible] = useState(initialUrl.chartsVisible);
   const [viewMode, setViewMode] = useState<IssueViewMode>("table");
@@ -160,6 +175,19 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (colorTheme === "bahonavi") {
+      delete document.documentElement.dataset.colorTheme;
+    } else {
+      document.documentElement.dataset.colorTheme = colorTheme;
+    }
+    try {
+      localStorage.setItem(UI_THEME_STORAGE_KEY, colorTheme);
+    } catch {
+      // ignore
+    }
+  }, [colorTheme]);
+
+  useEffect(() => {
     try {
       localStorage.setItem("pulse_value_mode", valueMode);
     } catch {
@@ -212,8 +240,9 @@ export function App() {
 
   const activePalette = useMemo(() => {
     if (!payload) return {};
-    return theme === "dark" ? payload.palettes.dark : payload.palettes.light;
-  }, [payload, theme]);
+    const base = theme === "dark" ? payload.palettes.dark : payload.palettes.light;
+    return resolveUserPalette(base, colorTheme, theme);
+  }, [payload, theme, colorTheme]);
 
   const priorityOrder = payload?.palettes.priority_order ?? [];
 
@@ -366,6 +395,7 @@ export function App() {
       <TopBar
         chartsVisible={chartsVisible}
         theme={theme}
+        colorTheme={colorTheme}
         valueMode={valueMode}
         isAdmin={isAdmin}
         editMode={ruleEditor.editMode}
@@ -376,7 +406,8 @@ export function App() {
         onRefreshData={() => void loadData(true)}
         onToggleCharts={() => setChartsVisible((v) => !v)}
         onChangeValueMode={setValueMode}
-        onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
+        onChangeTheme={setTheme}
+        onChangeColorTheme={setColorTheme}
         onOpenAdmin={() => setAdminModalOpen(true)}
         onToggleEditMode={ruleEditor.toggleEditMode}
         onCloseUnlockPopover={() => ruleEditor.setUnlockPopoverOpen(false)}
@@ -474,6 +505,12 @@ export function App() {
             }
             onDelete={() => void ruleEditor.actions.remove()}
             onLoadVersion={ruleEditor.handleLoadVersion}
+            onYamlSaved={ruleEditor.handleYamlSaved}
+            onSessionExpired={ruleEditor.handleSessionExpired}
+            onReloadLatest={() => {
+              ruleEditor.setNotice(null);
+              void ruleEditor.load(ruleEditor.selectedName);
+            }}
             onClose={ruleEditor.closePopover}
           />
         )}

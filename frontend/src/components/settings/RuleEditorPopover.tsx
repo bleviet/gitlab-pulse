@@ -5,6 +5,7 @@ import type { SuggestSection } from "../../lib/ruleSuggestions";
 import type {
   ImpactSummary,
   PaletteDefaults,
+  RuleSaveResponse,
   RuleSetBody,
   RuleSetItem,
   ThemeMode,
@@ -44,6 +45,9 @@ interface RuleEditorPopoverProps {
   onGoToDefault: () => void;
   onDelete: () => void;
   onLoadVersion: (rule: RuleSetBody, text: string) => void;
+  onYamlSaved: (res: RuleSaveResponse) => Promise<void>;
+  onSessionExpired: () => void;
+  onReloadLatest: () => void;
   onClose: () => void;
 }
 
@@ -54,9 +58,9 @@ const TITLES: Record<RulePopoverId, string> = {
   contexts: "Contexts",
   impact: "Impact",
   projects: "Team & Projects",
-  colors: "All Colours",
+  colors: "Rule Colours",
   history: "Earlier Versions",
-  text: "Stored YAML",
+  text: "Edit YAML",
 };
 
 const SUBTITLES: Partial<Record<RulePopoverId, string>> = {
@@ -89,6 +93,9 @@ export function RuleEditorPopover({
   onGoToDefault,
   onDelete,
   onLoadVersion,
+  onYamlSaved,
+  onSessionExpired,
+  onReloadLatest,
   onClose,
 }: RuleEditorPopoverProps) {
   const mixTab: MixSubTab = active.subTab ?? "priority";
@@ -257,7 +264,15 @@ export function RuleEditorPopover({
         )}
 
         {active.id === "text" && (
-          <TextView name={selected.name} refreshKey={selected.revision} dirty={dirty} />
+          <TextView
+            name={selected.name}
+            revision={selected.revision}
+            canEdit={canEdit}
+            dirty={dirty}
+            onSaved={onYamlSaved}
+            onSessionExpired={onSessionExpired}
+            onReloadLatest={onReloadLatest}
+          />
         )}
       </fieldset>
     </RulePopover>

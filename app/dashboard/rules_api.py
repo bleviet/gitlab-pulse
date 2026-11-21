@@ -25,6 +25,7 @@ from app.dashboard.schemas import (
     RuleSetItem,
     RuleSetsResponse,
     RuleTextResponse,
+    RuleTextSaveRequest,
     RuleVersionModel,
     RuleVersionResponse,
     RuleVersionsResponse,
@@ -52,8 +53,10 @@ from app.processor.rule_store import (
     RuleSetNotFoundError,
     RuleStore,
     RuleVersionNotFoundError,
+    RuleYamlParseError,
     StoredRuleSet,
     effective_default_name,
+    parse_rule_yaml,
     unique_name,
     validate_rule_set,
 )
@@ -298,6 +301,60 @@ def create_rules_router(
         _check_name(store, name)
         path, text = store.read_text(name)
         return RuleTextResponse(path=path, text=text)
+
+    @router.put("/api/admin/rules/{name}/text", response_model=RuleSaveResponse)
+    async def save_rule_text(
+        name: str,
+        payload: RuleTextSaveRequest,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RuleSaveResponse:
+        sessions.require(pulse_admin_session)
+        _check_name(store, name)
+        try:
+            rule = parse_rule_yaml(payload.text)
+        except RuleYamlParseError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
+
+        stored_sets = store.list_rule_sets()[0]
+        others = {s.name: s.rule for s in stored_sets if s.name != name}
+        current = next((s for s in stored_sets if s.name == name), None)
+        saved = current.rule if current is not None else None
+        problems = validate_rule_set(rule, others)
+        if saved is not None and rule.colors == saved.colors:
+            problems = [
+                p
+                for p in problems
+                if p.path != "colors" and not p.path.startswith("colors.")
+            ]
+        if saved is not None and set(rule.project_ids) == set(saved.project_ids):
+            problems = [p for p in problems if p.path != "project_ids"]
+        if problems:
+            raise _problems_error(problems)
+
+        try:
+            stored = store.write_text(name, payload.text, payload.revision)
+        except InvalidRuleSetNameError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
+        except RuleSetNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+        except RevisionConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "These rules were changed by someone else. "
+                    "Reload to see the latest version."
+                ),
+            ) from exc
+
+        job = await run_pipeline_step("app/processor/main.py", "Processor (L2)", service)
+        service.clear_cache()
+        return RuleSaveResponse(rule_set=_to_item(stored), job=job)
 
     @router.put("/api/admin/rules/{name}", response_model=RuleSaveResponse)
     async def save_rule(

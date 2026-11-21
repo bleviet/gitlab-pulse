@@ -43,14 +43,14 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 ### **Q: I saved a mistake. How do I go back?**
 **A:** While unlocked, open **More -> Earlier versions**, pick the version that was in use before the mistake, and click **Load into editor**. Nothing changes yet: the version appears as unsaved changes, row counts show what it would change, and **Save & apply** makes it current. The list also offers the version shipped with GitLab Pulse. Team name and project assignment are not taken from the old version; everything else, including colours, is.
 
-### **Q: How do I change the colours of types, impacts, priorities, or stages?**
-**A:** While unlocked on the default rule set, click the colour dot on any Type, Priority, or Impact row to change its colour for the active theme, or open **More -> All colours** to edit both light and dark themes and milestone/status colours. **Reset** goes back to the brand colour. Colours are shared by all teams.
+### **Q: How do I change the visual theme or rule colours?**
+**A:** For your own visual theme (no admin required), click the **Appearance** palette button in the top bar to switch between **Dark / Light** and personal themes (*Bahonavi Pulse*, *Catppuccin*, *Dracula*, *GitHub*, *Nord*, *Tokyo Night*, *Gruvbox*) — saved locally in your browser only. For shared default rule colours (visible under the default *Bahonavi Pulse* theme), unlock editing and click the inline colour dot on any Type, Priority, or Impact row, or open **More -> Rule colours**.
 
 ### **Q: We already use labels like `type::bug` and `workflow::review`. Do I have to enter them one by one?**
 **A:** No. In the **Open Mix** (Priority / Types), **Impact**, and **Workflow Stages** popovers, click **Suggest**. It lists scoped labels found on your issues (including both `impact::` and `severity::` for Impact), proposes a row for each, and adds the ones you leave ticked to your unsaved changes.
 
-### **Q: I want to see the rule file itself.**
-**A:** While unlocked, open **More -> View YAML** to view the stored YAML and its location, read-only, with a copy button.
+### **Q: I want to view or edit the YAML file directly.**
+**A:** While unlocked, click **YAML** in the edit bar (or **More -> Edit YAML**) to view, copy, or edit the stored YAML directly. Saving from the YAML editor validates syntax and rule constraints, archives the previous version, preserves your comments and formatting, and recalculates the dashboard.
 
 ### **Q: Where are the rule files?**
 **A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.processor.rule_loader import (
     DEFAULT_TEMPLATE_RULES_PATH,
@@ -94,6 +94,45 @@ class RevisionConflictError(Exception):
 
 class InvalidRuleSetNameError(Exception):
     """Raised when a rule set name is not a safe file stem."""
+
+
+class RuleYamlParseError(Exception):
+    """Raised when user-edited YAML text cannot be parsed into a DomainRule."""
+
+
+def parse_rule_yaml(text: str) -> DomainRule:
+    """Parse and validate raw YAML text into a DomainRule.
+
+    Args:
+        text: Raw YAML file contents
+
+    Returns:
+        The parsed DomainRule
+
+    Raises:
+        RuleYamlParseError: If YAML syntax is invalid, root is not a mapping,
+            or Pydantic validation fails
+    """
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise RuleYamlParseError(f"YAML syntax error: {exc}") from exc
+
+    if data is None:
+        return DomainRule()
+    if not isinstance(data, Mapping):
+        raise RuleYamlParseError(
+            "YAML root must be a mapping (key: value pairs), not a list or scalar."
+        )
+
+    try:
+        return DomainRule.model_validate(data)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        loc = ".".join(str(part) for part in first.get("loc", ()))
+        msg = first.get("msg", "Invalid rule structure")
+        prefix = f"{loc}: " if loc else ""
+        raise RuleYamlParseError(f"Invalid rule structure ({prefix}{msg}).") from exc
 
 
 def unique_name(team: str, existing: Collection[str]) -> str:
@@ -449,6 +488,43 @@ class RuleStore:
         self._archive(target, name)
 
         content = dump_rule(rule).encode("utf-8")
+        _write_atomic(target, content)
+        return StoredRuleSet(name=name, revision=_revision(content), rule=rule)
+
+    def write_text(
+        self, name: str, text: str, expected_revision: str
+    ) -> StoredRuleSet:
+        """Replace an existing rule set with raw YAML text, preserving comments.
+
+        Args:
+            name: Rule set name (file stem)
+            text: Raw YAML file content (already validated)
+            expected_revision: Revision the caller based its edit on
+
+        Returns:
+            The stored rule set with its new revision and parsed rule
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetNotFoundError: If no rule file has this name
+            RevisionConflictError: If the file changed since it was read
+            RuleYamlParseError: If the YAML text cannot be parsed
+        """
+        self.check_exists(name)
+        current = self.active_path / f"{name}.yaml"
+        if _revision(current.read_bytes()) != expected_revision:
+            raise RevisionConflictError(
+                f"Rule set '{name}' changed since it was loaded."
+            )
+
+        rule = parse_rule_yaml(text)
+        self._seed_from_template()
+
+        target = self.user_path / f"{name}.yaml"
+        self._archive(target, name)
+
+        normalized = text if text.endswith("\n") else f"{text}\n"
+        content = normalized.encode("utf-8")
         _write_atomic(target, content)
         return StoredRuleSet(name=name, revision=_revision(content), rule=rule)
 

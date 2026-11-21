@@ -107,7 +107,7 @@ export function EditModeBar({
 
   const mixProblems =
     (problemCountBySection.priority ?? 0) + (problemCountBySection.type ?? 0);
-  const moreProblems = problemCountBySection.colors ?? 0;
+  const colorProblems = problemCountBySection.colors ?? 0;
 
   const chip = (
     id: RulePopoverId,
@@ -190,19 +190,20 @@ export function EditModeBar({
                 {chip("impact", "Impact", problemCountBySection.impact ?? 0)}
                 {chip("contexts", "Contexts", problemCountBySection.contexts ?? 0)}
                 {chip("projects", "Projects", problemCountBySection.projects ?? 0)}
+                {chip("text", "YAML")}
 
                 <div ref={moreRef} className="edit-bar-more">
                   <button
                     ref={moreBtnRef}
                     type="button"
                     data-rule-trigger="more"
-                    className={`edit-bar-chip${moreOpen || activePopover?.id === "colors" || activePopover?.id === "history" || activePopover?.id === "text" ? " active" : ""}${moreProblems > 0 ? " has-error" : ""}`}
+                    className={`edit-bar-chip${moreOpen || activePopover?.id === "colors" || activePopover?.id === "history" ? " active" : ""}${colorProblems > 0 ? " has-error" : ""}`}
                     aria-expanded={moreOpen}
                     aria-haspopup="menu"
                     onClick={() => setMoreOpen((v) => !v)}
                   >
                     <span>More</span>
-                    {moreProblems > 0 && <span className="edit-bar-badge">{moreProblems}</span>}
+                    {colorProblems > 0 && <span className="edit-bar-badge">{colorProblems}</span>}
                     <ChevronDown size={12} aria-hidden="true" />
                   </button>
 
@@ -218,8 +219,10 @@ export function EditModeBar({
                         }}
                       >
                         <Palette size={13} aria-hidden="true" />
-                        <span>All colours</span>
-                        {moreProblems > 0 && <span className="edit-bar-badge">{moreProblems}</span>}
+                        <span>Rule colours</span>
+                        {colorProblems > 0 && (
+                          <span className="edit-bar-badge">{colorProblems}</span>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -258,7 +261,7 @@ export function EditModeBar({
                         }}
                       >
                         <Code2 size={13} aria-hidden="true" />
-                        <span>View YAML</span>
+                        <span>Edit YAML</span>
                       </button>
                     </div>
                   )}

@@ -120,8 +120,11 @@ describe("EditModeBar", () => {
     fireEvent.click(screen.getByRole("button", { name: /Impact/i }));
     expect(onOpenPopover).toHaveBeenCalledWith("impact", expect.any(HTMLElement), "bottom", undefined);
 
+    fireEvent.click(screen.getByRole("button", { name: /^YAML$/i }));
+    expect(onOpenPopover).toHaveBeenCalledWith("text", expect.any(HTMLElement), "bottom", undefined);
+
     fireEvent.click(screen.getByRole("button", { name: /More/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /View YAML/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Edit YAML/i }));
     expect(onOpenPopover).toHaveBeenCalledWith("text", expect.any(HTMLElement), "bottom");
 
     fireEvent.click(screen.getByRole("button", { name: /Save & apply/i }));

@@ -80,12 +80,12 @@ export function ColorsEditor({
         {problemList}
         <div className="settings-row">
           <p className="settings-intro-text">
-            Colours are shared by all teams. They are edited in the default rule set.
+            Default rule colours are shared by all teams. Edit them in the default rule set.
           </p>
           {canGoToDefault && (
             <button
               type="button"
-              className="pulse-btn-secondary settings-add-btn"
+              className="pulse-btn-secondary settings-add-btn settings-btn-small"
               disabled={switchLocked}
               onClick={onGoToDefault}
             >

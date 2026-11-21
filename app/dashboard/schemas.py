@@ -330,3 +330,10 @@ class RuleTextResponse(BaseModel):
 
     path: str
     text: str
+
+
+class RuleTextSaveRequest(BaseModel):
+    """Request body for saving raw YAML text for an existing rule set."""
+
+    revision: str
+    text: str

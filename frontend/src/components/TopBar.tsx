@@ -1,12 +1,15 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { BarChart3, Lock, LockOpen, Moon, RefreshCw, Shield, Sun, X } from "lucide-react";
+import { BarChart3, Lock, LockOpen, RefreshCw, Shield, X } from "lucide-react";
 import { IS_DEMO } from "../lib/api";
+import type { UiThemeId } from "../lib/uiThemes";
 import type { SyncStatus, ThemeMode, ValueMode } from "../lib/types";
+import { ThemePicker } from "./ThemePicker";
 import { UnlockForm } from "./settings/UnlockForm";
 
 interface TopBarProps {
   chartsVisible: boolean;
   theme: ThemeMode;
+  colorTheme: UiThemeId;
   valueMode: ValueMode;
   isAdmin: boolean;
   editMode: boolean;
@@ -18,7 +21,8 @@ interface TopBarProps {
   onRefreshData: () => void;
   onToggleCharts: () => void;
   onChangeValueMode: (mode: ValueMode) => void;
-  onToggleTheme: () => void;
+  onChangeTheme: (mode: ThemeMode) => void;
+  onChangeColorTheme: (themeId: UiThemeId) => void;
   onOpenAdmin: () => void;
   onToggleEditMode: () => void;
   onCloseUnlockPopover: () => void;
@@ -29,6 +33,7 @@ interface TopBarProps {
 export function TopBar({
   chartsVisible,
   theme,
+  colorTheme,
   valueMode,
   isAdmin,
   editMode,
@@ -40,7 +45,8 @@ export function TopBar({
   onRefreshData,
   onToggleCharts,
   onChangeValueMode,
-  onToggleTheme,
+  onChangeTheme,
+  onChangeColorTheme,
   onOpenAdmin,
   onToggleEditMode,
   onCloseUnlockPopover,
@@ -151,15 +157,12 @@ export function TopBar({
           </button>
         </div>
 
-        <button
-          type="button"
-          className="pulse-icon-btn"
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-          onClick={onToggleTheme}
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-        >
-          {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-        </button>
+        <ThemePicker
+          mode={theme}
+          colorTheme={colorTheme}
+          onChangeMode={onChangeTheme}
+          onChangeColorTheme={onChangeColorTheme}
+        />
 
         {!IS_DEMO && (
           <div ref={unlockAnchorRef} className="topbar-unlock-anchor">

@@ -154,3 +154,14 @@ export function fetchRuleVersion(name: string, id: string): Promise<RuleVersionR
 export function fetchRuleText(name: string): Promise<RuleTextResponse> {
   return requestJson<RuleTextResponse>(`/api/rules/${encodeURIComponent(name)}/text`);
 }
+
+export function saveRuleText(
+  name: string,
+  revision: string,
+  text: string,
+): Promise<RuleSaveResponse> {
+  return requestJson<RuleSaveResponse>(`/api/admin/rules/${encodeURIComponent(name)}/text`, {
+    method: "PUT",
+    body: JSON.stringify({ revision, text }),
+  });
+}

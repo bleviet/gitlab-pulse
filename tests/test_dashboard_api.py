@@ -791,3 +791,58 @@ def test_rule_text_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         "/api/admin/rules/default", json={"revision": item["revision"], "rule": item["rule"]}
     ).status_code == 200
     assert "Fresh text" in client.get("/api/rules/default/text").json()["text"]
+
+
+def test_put_rule_text_saves_valid_yaml_and_preserves_comments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+    item = client.get("/api/rules").json()["rule_sets"][0]
+
+    unauth = client.put(
+        "/api/admin/rules/default/text",
+        json={"revision": item["revision"], "text": "team: x\n"},
+    )
+    assert unauth.status_code == 401
+
+    _login(client)
+
+    syntax_err = client.put(
+        "/api/admin/rules/default/text",
+        json={"revision": item["revision"], "text": "team: [unclosed\n"},
+    )
+    assert syntax_err.status_code == 422
+    assert "YAML syntax error" in syntax_err.json()["detail"]
+
+    invalid_rule = client.put(
+        "/api/admin/rules/default/text",
+        json={"revision": item["revision"], "text": "team: ''\n"},
+    )
+    assert invalid_rule.status_code == 422
+    assert invalid_rule.json()["detail"]["problems"][0]["path"] == "team"
+
+    stale = client.put(
+        "/api/admin/rules/default/text",
+        json={"revision": "wrong-rev", "text": "team: updated\n"},
+    )
+    assert stale.status_code == 409
+
+    yaml_text = (
+        "# Custom team comment\n"
+        "team: platform\n"
+        "workflow:\n"
+        "  stages:\n"
+        "    - name: Coding\n"
+        "      labels: ['workflow::coding']\n"
+        "      type: active\n"
+    )
+    saved = client.put(
+        "/api/admin/rules/default/text",
+        json={"revision": item["revision"], "text": yaml_text},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["rule_set"]["rule"]["team"] == "platform"
+    assert saved.json()["job"]["success"] is True
+    stored_text = rules_dir.joinpath("default.yaml").read_text(encoding="utf-8")
+    assert "# Custom team comment" in stored_text
+    assert "Coding" in stored_text
