@@ -1249,6 +1249,53 @@
       white-space: nowrap;
     }
 
+    /* Interactive theme preview bar */
+    .theme-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 2rem;
+    }
+
+    .theme-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--bg-card);
+      color: var(--text-soft);
+      font-family: 'Space Mono', ui-monospace, monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    .theme-tab:hover {
+      border-color: var(--line-strong);
+      color: var(--text-strong);
+      transform: translateY(-1px);
+    }
+
+    .theme-tab[aria-pressed="true"] {
+      border-color: var(--node-cyan);
+      background: var(--bg-raised);
+      color: var(--text-strong);
+    }
+
+    .theme-tab .swatch {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--sw, var(--node-cyan));
+      flex-shrink: 0;
+    }
+
+    .theme-preview-window {
+      margin-top: 1rem;
+    }
+
     /* On a phone the hero's own buttons follow right below the nav. */
     @media (max-width: 520px) {
       .nav-actions .btn-small {
@@ -1283,6 +1330,7 @@
         <a href="#board">Board</a>
         <a href="#search">Search</a>
         <a href="#analytics">Analytics</a>
+        <a href="#themes">Themes</a>
         <a href="#local">Local first</a>
         <a href="#capabilities">Capabilities</a>
       </nav>
@@ -1386,7 +1434,7 @@
         </div>
         <img class="theme-image editor-shot" loading="lazy" src="images/screenshots/hp_board_dark.png"
           data-dark="images/screenshots/hp_board_dark.png" data-light="images/screenshots/hp_board.png"
-          width="2862" height="1520" alt="Board lanes with the Implementation P1 priority pill active and marked" />
+          width="2832" height="1490" alt="Board lanes with the Implementation P1 priority pill active and marked" />
       </div>
 
       <div class="bento">
@@ -1404,7 +1452,7 @@
           </div>
           <img class="theme-image shot-top" loading="lazy" src="images/screenshots/hp_table_dark.png"
           data-dark="images/screenshots/hp_table_dark.png" data-light="images/screenshots/hp_table.png"
-          width="2862" height="1520" alt="The issue table filling the viewport height with pinned column headers" />
+          width="2832" height="1490" alt="The issue table filling the viewport height with pinned column headers" />
         </article>
       </div>
     </section>
@@ -1453,7 +1501,7 @@
         <div class="panel-shot">
           <img class="theme-image" loading="lazy" src="images/screenshots/hp_timeline_dark.png"
           data-dark="images/screenshots/hp_timeline_dark.png" data-light="images/screenshots/hp_timeline.png"
-          width="2830" height="180" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line and a tray counting 3 unscheduled milestones" />
+          width="2832" height="180" alt="The release timeline with milestones v1.1 to v1.5 around the NOW line and a tray counting 3 unscheduled milestones" />
         </div>
       </article>
 
@@ -1466,7 +1514,7 @@
           <div class="panel-shot">
             <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_priority_dark.png"
           data-dark="images/screenshots/hp_priority_dark.png" data-light="images/screenshots/hp_priority.png"
-          width="756" height="378" alt="Open issues by priority and issue type donuts with clickable legends" />
+          width="758" height="380" alt="Open issues by priority and issue type donuts with clickable legends" />
           </div>
         </article>
         <article class="card reveal" style="--i: 1">
@@ -1477,7 +1525,7 @@
           <div class="panel-shot">
             <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_quality_dark.png"
           data-dark="images/screenshots/hp_quality_dark.png" data-light="images/screenshots/hp_quality.png"
-          width="756" height="158" alt="Issue quality signals showing open hint counts" />
+          width="758" height="208" alt="Issue quality signals showing open hint counts" />
           </div>
         </article>
         <article class="card reveal" style="--i: 2">
@@ -1488,7 +1536,7 @@
           <div class="panel-shot">
             <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_unscheduled_dark.png"
           data-dark="images/screenshots/hp_unscheduled_dark.png" data-light="images/screenshots/hp_unscheduled.png"
-          width="756" height="321" alt="Open issues per milestone without a due date, stacked by priority, with a note on one hidden milestone whose issues are all closed" />
+          width="758" height="322" alt="Open issues per milestone without a due date, stacked by priority, with a note on one hidden milestone whose issues are all closed" />
           </div>
         </article>
         <article class="card reveal" style="--i: 3">
@@ -1499,8 +1547,103 @@
           <div class="panel-shot">
             <img class="theme-image" loading="lazy" style="width: 378px" src="images/screenshots/hp_velocity_dark.png"
           data-dark="images/screenshots/hp_velocity_dark.png" data-light="images/screenshots/hp_velocity.png"
-          width="756" height="300" alt="Daily new versus closed issues over seven days" />
+          width="758" height="300" alt="Daily new versus closed issues over seven days" />
           </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Themes & Inline Rules -->
+    <section class="block wrap" id="themes">
+      <p class="marker reveal" style="--c: var(--node-pink)"><span>Themes &amp; Rules</span></p>
+      <div class="split reveal">
+        <h2>Personal light &amp; dark themes. Direct rule editing.</h2>
+        <div class="split-side">
+          <p>Switch between seven popular color themes directly from the top bar—stored locally in your browser without admin access, so every teammate picks their own palette. Toggle this page's light/dark switch to preview both variants of every theme.</p>
+        </div>
+      </div>
+
+      <div class="theme-tabs reveal" role="group" aria-label="Preview dashboard color themes">
+        <button class="theme-tab" type="button" aria-pressed="true" style="--sw: #cba6f7"
+          data-dark="images/screenshots/hp_themes_dark.png"
+          data-light="images/screenshots/hp_themes.png"
+          data-label-dark="Appearance picker · Catppuccin Mocha"
+          data-label-light="Appearance picker · Catppuccin Latte"
+          data-alt="Top-bar Appearance popover open over the Catppuccin theme showing all 7 light and dark personal themes">
+          <span class="swatch" aria-hidden="true"></span>Picker (Catppuccin)
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #00d2dc"
+          data-dark="images/screenshots/hp_analytics_dark.png"
+          data-light="images/screenshots/hp_analytics.png"
+          data-label-dark="Theme · Bahonavi Pulse Dark"
+          data-label-light="Theme · Bahonavi Pulse Light"
+          data-alt="GitLab Pulse dashboard in the default Bahonavi Pulse theme">
+          <span class="swatch" aria-hidden="true"></span>Bahonavi Pulse
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #bd93f9"
+          data-dark="images/screenshots/hp_theme_dracula_dark.png"
+          data-light="images/screenshots/hp_theme_dracula.png"
+          data-label-dark="Theme · Dracula Dark"
+          data-label-light="Theme · Dracula Alucard"
+          data-alt="GitLab Pulse dashboard in the Dracula theme">
+          <span class="swatch" aria-hidden="true"></span>Dracula
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #58a6ff"
+          data-dark="images/screenshots/hp_theme_github_dark.png"
+          data-light="images/screenshots/hp_theme_github.png"
+          data-label-dark="Theme · GitHub Dark"
+          data-label-light="Theme · GitHub Light"
+          data-alt="GitLab Pulse dashboard in the GitHub theme">
+          <span class="swatch" aria-hidden="true"></span>GitHub
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #88c0d0"
+          data-dark="images/screenshots/hp_theme_nord_dark.png"
+          data-light="images/screenshots/hp_theme_nord.png"
+          data-label-dark="Theme · Nord Polar"
+          data-label-light="Theme · Nord Snow"
+          data-alt="GitLab Pulse dashboard in the Nord theme">
+          <span class="swatch" aria-hidden="true"></span>Nord
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #7aa2f7"
+          data-dark="images/screenshots/hp_theme_tokyo_dark.png"
+          data-light="images/screenshots/hp_theme_tokyo.png"
+          data-label-dark="Theme · Tokyo Night"
+          data-label-light="Theme · Tokyo Day"
+          data-alt="GitLab Pulse dashboard in the Tokyo Night theme">
+          <span class="swatch" aria-hidden="true"></span>Tokyo Night
+        </button>
+        <button class="theme-tab" type="button" aria-pressed="false" style="--sw: #fabd2f"
+          data-dark="images/screenshots/hp_theme_gruvbox_dark.png"
+          data-light="images/screenshots/hp_theme_gruvbox.png"
+          data-label-dark="Theme · Gruvbox Dark"
+          data-label-light="Theme · Gruvbox Light"
+          data-alt="GitLab Pulse dashboard in the Gruvbox theme">
+          <span class="swatch" aria-hidden="true"></span>Gruvbox
+        </button>
+      </div>
+
+      <figure class="window theme-preview-window reveal">
+        <figcaption><b>localhost:8501</b><span id="themePreviewCaption">Appearance picker &middot; Catppuccin Mocha</span><span class="state">stored in browser</span></figcaption>
+        <img id="themePreviewImg" class="theme-image" loading="lazy" src="images/screenshots/hp_themes_dark.png"
+          data-dark="images/screenshots/hp_themes_dark.png" data-light="images/screenshots/hp_themes.png"
+          width="2880" height="1800" alt="Top-bar Appearance popover open over the Catppuccin theme showing all 7 light and dark personal themes" />
+      </figure>
+
+      <div class="bento">
+        <article class="card big full reveal">
+          <div class="pad head-row">
+            <div>
+              <h3>Unlock to edit rules right on the dashboard</h3>
+              <p>Click <b>Edit</b> in the top bar to unlock rule-backed panels. Anchored popovers open right next to Open Mix, Workflow State, Quality Signals, and the scope bar with live before/after issue counts and inline color swatches—or switch to <b>YAML</b> in the edit bar to edit the underlying rule file directly while keeping your comments.</p>
+            </div>
+            <div class="chips">
+              <span class="chip" style="--c: var(--node-cyan)">anchored popovers</span>
+              <span class="chip" style="--c: var(--chart-7)">comment-preserving YAML</span>
+            </div>
+          </div>
+          <img class="theme-image shot-top" loading="lazy" src="images/screenshots/hp_rule_edit_dark.png"
+            data-dark="images/screenshots/hp_rule_edit_dark.png" data-light="images/screenshots/hp_rule_edit.png"
+            width="2880" height="1800" alt="Unlocked edit mode showing the slim edit bar and the anchored Open Mix Rules popover with live priority counts and inline color swatches" />
         </article>
       </div>
     </section>
@@ -1618,6 +1761,30 @@
 
     const themeToggle = document.getElementById('themeToggle');
     const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const themeTabs = Array.from(document.querySelectorAll('.theme-tab'));
+    const themePreviewImg = document.getElementById('themePreviewImg');
+    const themePreviewCaption = document.getElementById('themePreviewCaption');
+    let activeThemeTab = themeTabs.find((tab) => tab.getAttribute('aria-pressed') === 'true') || themeTabs[0];
+
+    function syncThemePreview(mode) {
+      if (!activeThemeTab || !themePreviewImg) return;
+      themePreviewImg.dataset.dark = activeThemeTab.dataset.dark;
+      themePreviewImg.dataset.light = activeThemeTab.dataset.light;
+      themePreviewImg.src = activeThemeTab.dataset[mode];
+      themePreviewImg.alt = activeThemeTab.dataset.alt || themePreviewImg.alt;
+      if (themePreviewCaption) {
+        themePreviewCaption.textContent =
+          mode === 'light' ? activeThemeTab.dataset.labelLight : activeThemeTab.dataset.labelDark;
+      }
+    }
+
+    themeTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        activeThemeTab = tab;
+        themeTabs.forEach((item) => item.setAttribute('aria-pressed', String(item === tab)));
+        syncThemePreview(root.dataset.theme || 'dark');
+      });
+    });
 
     function applyTheme(theme, persist) {
       root.dataset.theme = theme;
@@ -1631,6 +1798,7 @@
       document.querySelectorAll('.theme-image').forEach((image) => {
         image.src = image.dataset[theme];
       });
+      syncThemePreview(theme);
     }
 
     applyTheme(root.dataset.theme, false);

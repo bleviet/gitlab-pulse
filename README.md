@@ -57,6 +57,22 @@ With Charts on, clicking a donut slice or legend item, a workflow-state bar segm
   <img alt="A workflow-state bar selected as a filter" src="docs/images/screenshots/hp_chart_filter.png">
 </picture>
 
+### Personal light & dark themes
+Every user can open the top-bar **Appearance** picker (no admin access needed) to switch between Dark and Light mode and choose among **Bahonavi Pulse**, **Catppuccin** (Mocha/Latte), **Dracula** (Dark/Alucard), **GitHub**, **Nord**, **Tokyo Night** (Night/Day), and **Gruvbox**. Selections stay in each user's browser (`localStorage`).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_themes_dark.png">
+  <img alt="Top-bar Appearance picker with Catppuccin theme selected" src="docs/images/screenshots/hp_themes.png">
+</picture>
+
+### In-dashboard rule editing
+Unlock **Edit** in the top bar to reveal panel edit buttons and a slim edit bar. Anchored popovers let you edit priorities, issue types, impact levels, workflow stages, contexts, and quality checks with live issue counts and inline color swatches—or switch to **YAML** to edit the rule file directly while preserving comments.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/hp_rule_edit_dark.png">
+  <img alt="Unlocked rule edit mode with anchored Open Mix Rules popover" src="docs/images/screenshots/hp_rule_edit.png">
+</picture>
+
 ---
 
 ## Architecture
