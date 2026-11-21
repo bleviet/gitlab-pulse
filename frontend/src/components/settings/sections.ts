@@ -19,10 +19,10 @@ export const SECTIONS: SectionInfo[] = [
       "Issue types sort issues into kinds such as Bug or Feature in charts and tables. Rows are checked from top to bottom and the first row that matches wins, so put the more specific types first.",
   },
   {
-    id: "severity",
-    title: "Severity",
+    id: "impact",
+    title: "Impact",
     intro:
-      "Severity says how serious a problem is. Rows are checked from top to bottom and the first row that matches wins, so order matters.",
+      "Impact says how big the effect of an issue is across bugs, features, and tasks. Rows are checked from top to bottom and the first row that matches wins, so order matters.",
   },
   {
     id: "priority",
@@ -81,7 +81,7 @@ export function sectionForPath(path: string): SectionId | null {
   const parts = path.split(".");
   if (parts[0] === "classification") {
     const category = parts[1];
-    if (category === "type" || category === "severity" || category === "priority") {
+    if (category === "type" || category === "impact" || category === "priority") {
       return category;
     }
     return null;
@@ -117,7 +117,7 @@ export function describeUnplacedProblem(problem: RuleProblem, rule: RuleSetBody)
 export function rowNamesForSection(rule: RuleSetBody, section: SectionId): string[] {
   switch (section) {
     case "type":
-    case "severity":
+    case "impact":
     case "priority":
       return getCategory(rule, section).map((row) => row.name);
     case "stages":
@@ -148,7 +148,7 @@ export function addLabelToRow(
     );
   switch (section) {
     case "type":
-    case "severity":
+    case "impact":
     case "priority":
       return setCategoryValues(rule, section, withLabel(getCategory(rule, section)));
     case "stages":

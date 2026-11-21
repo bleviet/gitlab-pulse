@@ -34,7 +34,7 @@ function makeIssue(partial: Partial<IssueItem>): IssueItem {
     cycle_time: null,
     is_stale: false,
     issue_type: "Bug",
-    severity: "High",
+    impact: "High",
     priority: "P1",
     priority_rank: 0,
     team: "default",

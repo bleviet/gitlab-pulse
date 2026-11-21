@@ -313,7 +313,7 @@ class DashboardService:
             raw_cycle,
             raw_stale,
             raw_type,
-            raw_sev,
+            raw_impact,
             priority,
             raw_prio_rank,
             raw_team,
@@ -344,7 +344,9 @@ class DashboardService:
             _col_list(unique_df, "cycle_time"),
             _col_list(unique_df, "is_stale", False),
             _col_list(unique_df, "issue_type"),
-            _col_list(unique_df, "severity"),
+            _col_list(unique_df, "impact")
+            if "impact" in unique_df.columns
+            else _col_list(unique_df, "severity"),
             priorities,
             _col_list(unique_df, "priority_rank"),
             _col_list(unique_df, "team"),
@@ -393,7 +395,7 @@ class DashboardService:
                     cycle_time=_to_opt_int(raw_cycle),
                     is_stale=bool(raw_stale) if not _is_missing(raw_stale) else False,
                     issue_type=_to_opt_str(raw_type),
-                    severity=_to_opt_str(raw_sev),
+                    impact=_to_opt_str(raw_impact),
                     priority=str(priority),
                     priority_rank=_to_opt_int(raw_prio_rank),
                     team=_to_opt_str(raw_team),

@@ -28,7 +28,7 @@
 
 `app/processor/preview.py` answers "what would these rules change?" without writing anything. `summarize_impact()` runs `process_issues()` (the per-project pipeline shared with `Processor.process_project`) twice on the projects a draft rule set governs: once with the rules the processor uses today and once with the draft. It returns an `ImpactSummary`:
 
-- before/after counts of distinct issues per type, severity, priority, stage, context, and quality code, plus a `STALE` row for open stale issues
+- before/after counts of distinct issues per type, impact, priority, stage, context, and quality code, plus a `STALE` row for open stale issues
 - for every pattern in the draft, how many issues it matches (`label_pattern_counts`, `title_pattern_counts`)
 - the labels found on issues that no pattern of the draft matches (`unmapped_labels`, at most 100, with the full number in `unmapped_label_total`)
 

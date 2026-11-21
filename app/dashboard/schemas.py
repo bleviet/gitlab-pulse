@@ -35,7 +35,7 @@ class IssueItem(BaseModel):
     cycle_time: int | None = None
     is_stale: bool = False
     issue_type: str | None = None
-    severity: str | None = None
+    impact: str | None = None
     priority: str = "Unset"
     priority_rank: int | None = None
     team: str | None = None

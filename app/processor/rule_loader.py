@@ -41,6 +41,7 @@ class LabelMappings(BaseModel):
     """Label mapping configuration."""
 
     type: dict[str, str] = Field(default_factory=dict)
+    impact: dict[str, str] = Field(default_factory=dict)
     severity: dict[str, str] = Field(default_factory=dict)
     priority: dict[str, str] = Field(default_factory=dict)
 
@@ -150,10 +151,15 @@ class DomainRule(BaseModel):
     colors: dict[str, Any] = Field(default_factory=dict)
 
     def model_post_init(self, __context: Any) -> None:
-        """Migrate legacy mappings to classification."""
+        """Migrate legacy mappings and classification aliases."""
         if not self.classification and (self.label_mappings or self.title_patterns):
             self._migrate_mappings()
-            
+        if "severity" in self.classification and "impact" not in self.classification:
+            self.classification = {
+                ("impact" if k == "severity" else k): v
+                for k, v in self.classification.items()
+            }
+
     def _migrate_mappings(self) -> None:
         """Convert legacy label relationships to classification rules."""
         # Helper to ensure category dict exists
@@ -168,15 +174,16 @@ class DomainRule(BaseModel):
         # label_mappings.type: {"type::bug": "Bug"}
         for key, value in self.label_mappings.type.items():
             rule = get_match_rule("type", value)
-            rule.labels.append(key) # Treat as exact/prefix based on utils logic? 
-            # Note: utils.has_any_label checks exact match if no prefix.
-            # Legacy simple strings were exact matches usually.
-            
+            rule.labels.append(key)
+
+        for key, value in self.label_mappings.impact.items():
+            get_match_rule("impact", value).labels.append(key)
+
         for key, value in self.label_mappings.severity.items():
-             get_match_rule("severity", value).labels.append(key)
-             
+            get_match_rule("impact", value).labels.append(key)
+
         for key, value in self.label_mappings.priority.items():
-             get_match_rule("priority", value).labels.append(key)
+            get_match_rule("priority", value).labels.append(key)
              
         # 2. Migrate Title Patterns
         # title_patterns.type: {"Bug": ["bug", "fix"]}

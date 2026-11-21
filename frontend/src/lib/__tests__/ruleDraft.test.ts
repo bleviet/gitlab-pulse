@@ -36,7 +36,7 @@ function makeRule(): RuleSetBody {
       ],
     },
     validation: {
-      required_labels: { Bug: ["severity::high"] },
+      required_labels: { Bug: ["impact::high"] },
       required_fields: {},
       stale_threshold_days: 30,
       max_cycle_time_days: 60,
@@ -64,13 +64,13 @@ describe("list helpers", () => {
 
 describe("categories", () => {
   it("returns an empty list for a missing category", () => {
-    expect(getCategory(makeRule(), "severity")).toEqual([]);
+    expect(getCategory(makeRule(), "impact")).toEqual([]);
   });
 
   it("creates a missing category at the end and preserves others", () => {
     const rule = makeRule();
-    const next = setCategoryValues(rule, "severity", [{ name: "High", labels: ["h"], title: [] }]);
-    expect(next.classification.map((c) => c.name)).toEqual(["type", "custom", "severity"]);
+    const next = setCategoryValues(rule, "impact", [{ name: "High", labels: ["h"], title: [] }]);
+    expect(next.classification.map((c) => c.name)).toEqual(["type", "custom", "impact"]);
     expect(next.classification[0]).toBe(rule.classification[0]);
     expect(next.classification[1]).toBe(rule.classification[1]);
   });

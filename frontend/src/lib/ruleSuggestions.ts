@@ -3,7 +3,7 @@ import { getCategory, setCategoryValues } from "./ruleDraft";
 import { parsePattern, serializePattern } from "./rulePatterns";
 import type { MatcherRule, RuleSetBody, SectionId, WorkflowStage } from "./types";
 
-export type SuggestSection = "type" | "severity" | "priority" | "stages";
+export type SuggestSection = "type" | "impact" | "priority" | "stages";
 export type StageKind = "active" | "waiting" | "completed";
 
 export interface Suggestion {
@@ -16,12 +16,12 @@ export interface Suggestion {
 
 export const SUGGEST_SCOPES: Record<SuggestSection, string[]> = {
   type: ["type", "kind"],
-  severity: ["severity", "sev"],
+  impact: ["impact", "severity", "sev"],
   priority: ["priority", "prio"],
   stages: ["workflow", "status", "stage", "state"],
 };
 
-const SEVERITY_RANK: string[][] = [
+const IMPACT_RANK: string[][] = [
   ["critical", "blocker"],
   ["high", "major"],
   ["medium", "normal"],
@@ -102,8 +102,8 @@ function stageKind(value: string): StageKind {
 function compare(section: SuggestSection, a: Suggestion, b: Suggestion): number {
   const wa = spaced(a.name);
   const wb = spaced(b.name);
-  if (section === "severity") {
-    return rankOf(SEVERITY_RANK, wa) - rankOf(SEVERITY_RANK, wb) || a.name.localeCompare(b.name);
+  if (section === "impact") {
+    return rankOf(IMPACT_RANK, wa) - rankOf(IMPACT_RANK, wb) || a.name.localeCompare(b.name);
   }
   if (section === "stages") {
     return rankOf(STAGE_RANK, wa) - rankOf(STAGE_RANK, wb) || a.name.localeCompare(b.name);
@@ -116,7 +116,7 @@ function compare(section: SuggestSection, a: Suggestion, b: Suggestion): number 
       if (nb === null) return -1;
       return na - nb;
     }
-    return rankOf(SEVERITY_RANK, wa) - rankOf(SEVERITY_RANK, wb) || a.name.localeCompare(b.name);
+    return rankOf(IMPACT_RANK, wa) - rankOf(IMPACT_RANK, wb) || a.name.localeCompare(b.name);
   }
   return a.name.localeCompare(b.name);
 }

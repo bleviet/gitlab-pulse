@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { ApiError, createRuleSet, deleteRuleSet } from "../../lib/api";
 import { buildNewRuleSetBody } from "../../lib/ruleDraft";
 import type { AdminJobResponse, RuleProblem, RuleSetItem } from "../../lib/types";
-import type { Notice } from "./SettingsNotices";
+import type { Notice } from "./saveFlow";
 
 interface UseRuleSetActionsInput {
   selected: RuleSetItem | null;

@@ -1,8 +1,19 @@
 import type { Dispatch, SetStateAction } from "react";
 import { ApiError, saveRuleSet } from "../../lib/api";
-import type { RuleProblem, RuleSetBody, RuleSetItem, RuleSetsResponse } from "../../lib/types";
-import type { Notice } from "./SettingsNotices";
+import type {
+  AdminJobResponse,
+  RuleProblem,
+  RuleSetBody,
+  RuleSetItem,
+  RuleSetsResponse,
+} from "../../lib/types";
 import { sectionForPath, type SectionId } from "./sections";
+
+export interface Notice {
+  kind: "success" | "warning" | "error" | "conflict" | "info";
+  text: string;
+  job?: AdminJobResponse;
+}
 
 export interface SaveDeps {
   selected: RuleSetItem;

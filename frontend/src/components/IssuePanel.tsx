@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   KanbanSquare,
+  Pencil,
   RotateCcw,
   Table2,
   X,
@@ -53,6 +54,9 @@ interface IssuePanelProps {
   onChangeFacets: (next: IssueFacets) => void;
   onRemoveSidebarFilter: (key: string) => void;
   onClearAll: () => void;
+  editMode?: boolean;
+  stagesPopoverOpen?: boolean;
+  onEditStages?: (anchor: HTMLElement | null) => void;
 }
 
 type TablePageSize = "fit" | 10 | 20 | 30;
@@ -77,6 +81,9 @@ export function IssuePanel({
   onChangeFacets,
   onRemoveSidebarFilter,
   onClearAll,
+  editMode = false,
+  stagesPopoverOpen = false,
+  onEditStages,
 }: IssuePanelProps) {
   const [tableSize, setTableSize] = useState<TablePageSize>("fit");
   const [boardSize, setBoardSize] = useState<BoardPageSize>(10);
@@ -314,6 +321,19 @@ export function IssuePanel({
                 }
               }}
             />
+
+            {editMode && viewMode === "board" && onEditStages && (
+              <button
+                type="button"
+                data-rule-trigger="stages"
+                className={`panel-edit-btn${stagesPopoverOpen ? " active" : ""}`}
+                aria-expanded={stagesPopoverOpen}
+                onClick={(e) => onEditStages(e.currentTarget)}
+              >
+                <Pencil size={11} aria-hidden="true" />
+                <span>Stages</span>
+              </button>
+            )}
 
             <div className="pulse-segmented" role="group" aria-label="Issue display mode">
               <button

@@ -9,7 +9,7 @@ const impact: ImpactSummary = {
     { name: "Bug", before: 3, after: 5 },
     { name: null, before: 7, after: 5 },
   ],
-  severities: [{ name: null, before: 1, after: 1 }],
+  impacts: [{ name: null, before: 1, after: 1 }],
   priorities: [{ name: null, before: 2, after: 2 }],
   stages: [{ name: "Doing", before: 4, after: 4 }],
   contexts: [{ name: null, before: 0, after: 1 }],
@@ -37,7 +37,7 @@ describe("groupsForSection", () => {
   });
 
   it("labels empty names per group", () => {
-    expect(groupsForSection("severity", impact)[0].rows[0].label).toBe("No severity");
+    expect(groupsForSection("impact", impact)[0].rows[0].label).toBe("No impact");
     expect(groupsForSection("priority", impact)[0].rows[0].label).toBe("No priority");
     expect(groupsForSection("contexts", impact)[0].rows[0].label).toBe("No context");
   });

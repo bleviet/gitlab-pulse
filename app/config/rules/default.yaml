@@ -15,7 +15,7 @@ project_ids: []
 # Team/Domain identifier
 team: "default"
 
-# Classification Rules: Categorize issues by Type, Severity, Priority
+# Classification Rules: Categorize issues by Type, Impact, Priority
 classification:
   type:
     Bug: 
@@ -30,15 +30,15 @@ classification:
     Epic:
       labels: ["type::epic"]
       
-  severity:
+  impact:
     Critical:
-      labels: ["severity::critical"]
+      labels: ["impact::critical", "severity::critical"]
     High:
-      labels: ["severity::high"]
+      labels: ["impact::high", "severity::high"]
     Medium:
-      labels: ["severity::medium"]
+      labels: ["impact::medium", "severity::medium"]
     Low:
-      labels: ["severity::low"]
+      labels: ["impact::low", "severity::low"]
       
   priority:
     P1:
@@ -138,7 +138,7 @@ colors:
     primary: "#ff512f"   # --brand
     neutral: "#3d5370"   # --muted light
 
-    # Severity — semantic red → amber → yellow → green scale
+    # Impact — semantic red → amber → yellow → green scale
     critical: "#F43F5E"
     high:     "#FB923C"
     medium:   "#FBBF24"
@@ -167,7 +167,7 @@ colors:
     primary: "#ff512f"   # --brand
     neutral: "#7a8fa8"   # --muted dark
 
-    # Severity — semantic red → orange → amber → mint scale
+    # Impact — semantic red → orange → amber → mint scale
     critical: "#e06565"
     high:     "#e88236"
     medium:   "#f4a44a"   # --chart-6 Amber

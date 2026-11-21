@@ -71,7 +71,7 @@ def apply_classification(
     df: pd.DataFrame,
     rule: Optional[DomainRule] = None,
 ) -> pd.DataFrame:
-    """Apply classification rules to extract attributes (type, severity, etc).
+    """Apply classification rules to extract attributes (type, impact, etc).
 
     Replaces legacy apply_label_mappings.
     """
@@ -85,7 +85,7 @@ def apply_classification(
     if not classification:
         return df
 
-    # 2. Iterate over each category (e.g., "type", "severity", "priority")
+    # 2. Iterate over each category (e.g., "type", "impact", "priority")
     for category, values_map in classification.items():
         # Prepare target column
         # Standardize column naming if needed? For now matches category name.

@@ -143,7 +143,7 @@ class AnalyticsIssue(BaseModel):
 
     # Mapped fields from rules
     issue_type: Optional[str] = Field(default=None, description="Mapped type (Bug, Feature)")
-    severity: Optional[str] = Field(default=None, description="Mapped severity level")
+    impact: Optional[str] = Field(default=None, description="Mapped impact level")
     priority: Optional[str] = Field(default=None, description="Mapped priority level")
     priority_rank: Optional[int] = Field(
         default=None,
@@ -188,7 +188,7 @@ PARQUET_DTYPES = {
     "state": "category",
     "work_item_type": "category",
     "issue_type": "category",
-    "severity": "category",
+    "impact": "category",
     "priority": "category",
     "team": "category",
     "is_stale": "bool",

@@ -21,13 +21,13 @@ def sample_rule() -> DomainRule:
                 "type::feature": "Feature",
                 "type::task": "Task",
             },
-            severity={
-                "severity::high": "High",
-                "severity::low": "Low",
+            impact={
+                "impact::high": "High",
+                "impact::low": "Low",
             },
         ),
         validation=ValidationConfig(
-            required_labels={"Bug": ["contains:severity::"]},
+            required_labels={"Bug": ["contains:impact::"]},
             stale_threshold_days=30,
         ),
     )
@@ -46,7 +46,7 @@ def sample_issues_df() -> pd.DataFrame:
             "created_at": pd.Timestamp("2024-01-01", tz="UTC"),
             "updated_at": pd.Timestamp("2024-01-15", tz="UTC"),
             "closed_at": None,
-            "labels": ["type::bug", "severity::high"],
+            "labels": ["type::bug", "impact::high"],
             "work_item_type": "ISSUE",
             "parent_id": None,
         },
@@ -54,12 +54,12 @@ def sample_issues_df() -> pd.DataFrame:
             "id": 2,
             "iid": 2,
             "project_id": 101,
-            "title": "Bug missing severity",
+            "title": "Bug missing impact",
             "state": "opened",
             "created_at": pd.Timestamp("2024-01-01", tz="UTC"),
             "updated_at": pd.Timestamp("2024-01-15", tz="UTC"),
             "closed_at": None,
-            "labels": ["type::bug"],  # Missing severity
+            "labels": ["type::bug"],  # Missing impact
             "work_item_type": "ISSUE",
             "parent_id": None,
         },
@@ -119,6 +119,24 @@ class TestEnricher:
         # Check specific mappings
         bug_row = result[result["id"] == 1]
         assert bug_row["issue_type"].iloc[0] == "Bug"
+        assert bug_row["impact"].iloc[0] == "High"
+
+    def test_legacy_severity_classification_migrates_to_impact(
+        self, sample_issues_df: pd.DataFrame
+    ) -> None:
+        """Legacy classification.severity YAML rules map into the impact column."""
+        legacy_rule = DomainRule.model_validate(
+            {
+                "team": "legacy",
+                "classification": {
+                    "severity": {"High": {"labels": ["impact::high"]}},
+                },
+            }
+        )
+        assert "impact" in legacy_rule.classification
+        assert "severity" not in legacy_rule.classification
+        result = apply_classification(sample_issues_df, legacy_rule)
+        assert result[result["id"] == 1]["impact"].iloc[0] == "High"
 
 
 class TestValidator:
@@ -134,14 +152,14 @@ class TestValidator:
         # Issue 1 (perfect bug) should be valid
         assert 1 in result.valid_df["id"].values
 
-    def test_validate_missing_severity_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
-        """Test that a bug without severity is flagged while staying in the valid dataset."""
+    def test_validate_missing_impact_fails(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
+        """Test that a bug without impact is flagged while staying in the valid dataset."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
         enriched = apply_classification(enriched, sample_rule)
 
         result = validate_issues(enriched, sample_rule)
 
-        # Issue 2 (missing severity) should be in quality
+        # Issue 2 (missing impact) should be in quality
         assert 2 in result.valid_df["id"].values
         assert 2 in result.quality_df["id"].values
         error_row = result.quality_df[result.quality_df["id"] == 2]
@@ -162,7 +180,7 @@ class TestValidator:
         assert ErrorCodes.CONFLICTING_LABELS in issue_4_errors
 
     def test_validate_feature_passes(self, sample_issues_df: pd.DataFrame, sample_rule: DomainRule) -> None:
-        """Test that a feature (no severity required) passes validation."""
+        """Test that a feature (no impact required) passes validation."""
         enriched = enrich_metrics(sample_issues_df, sample_rule)
         enriched = apply_classification(enriched, sample_rule)
 

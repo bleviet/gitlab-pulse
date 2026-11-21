@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
 import { getCategory, problemsWithPrefix } from "../../lib/ruleDraft";
-import type { RuleSetBody, ValidationConfig } from "../../lib/types";
+import type { CountChange, RuleSetBody, ValidationConfig } from "../../lib/types";
 import { MatcherInput } from "./MatcherInput";
 
 const FIELD_OPTIONS: Array<[string, string]> = [
   ["assignee", "Assignee"],
   ["milestone", "Milestone"],
   ["description", "Description"],
-  ["severity", "Severity"],
+  ["impact", "Impact"],
   ["priority", "Priority"],
 ];
 
@@ -17,6 +17,7 @@ interface QualityEditorProps {
   onChange: (next: ValidationConfig) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  counts?: CountChange[];
   labelCounts?: Record<string, number>;
 }
 
@@ -27,11 +28,20 @@ function withKey<T>(record: Record<string, T[]>, key: string, list: T[]): Record
   return next;
 }
 
-export function QualityEditor({ rule, onChange, inventory, problems, labelCounts }: QualityEditorProps) {
+export function QualityEditor({
+  rule,
+  onChange,
+  inventory,
+  problems,
+  counts,
+  labelCounts,
+}: QualityEditorProps) {
   const validation = rule.validation;
 
   const typeNames = useMemo(() => {
-    const names = getCategory(rule, "type").map((t) => t.name).filter((n) => n.trim() !== "");
+    const names = getCategory(rule, "type")
+      .map((t) => t.name)
+      .filter((n) => n.trim() !== "");
     const extra = [
       ...Object.keys(validation.required_labels),
       ...Object.keys(validation.required_fields),
@@ -41,68 +51,79 @@ export function QualityEditor({ rule, onChange, inventory, problems, labelCounts
 
   const staleProblem = problems["validation.stale_threshold_days"];
   const cycleProblem = problems["validation.max_cycle_time_days"];
+  const staleCount = counts?.find((c) => c.name === "STALE");
+  const cycleCount = counts?.find((c) => c.name === "EXCEEDS_CYCLE_TIME");
 
-  const numberField = (
-    id: string,
-    before: string,
-    after: string,
-    value: number,
-    problem: string | undefined,
-    onValue: (n: number) => void,
-  ) => (
-    <div className="settings-field">
-      <div className="settings-sentence">
-        <label htmlFor={id}>{before}</label>
-        <input
-          id={id}
-          type="number"
-          min={1}
-          step={1}
-          className={`settings-input settings-number${problem ? " error" : ""}`}
-          value={Number.isNaN(value) ? "" : value}
-          aria-invalid={problem ? true : undefined}
-          aria-describedby={problem ? `${id}-problem` : undefined}
-          onChange={(e) => onValue(e.target.value === "" ? Number.NaN : Number(e.target.value))}
-        />
-        <span>{after}</span>
-      </div>
-      {problem && (
-        <p id={`${id}-problem`} className="settings-error-text" role="alert">
-          {problem}
-        </p>
-      )}
-    </div>
-  );
+  const renderBadge = (c?: CountChange) => {
+    if (!c) return null;
+    const delta = c.after - c.before;
+    return (
+      <span className={`rule-count-pill${delta !== 0 ? " changed" : ""}`}>
+        {delta !== 0 ? `${c.before}→${c.after}` : c.after}
+      </span>
+    );
+  };
 
   return (
-    <div className="settings-rows">
-      <div className="settings-row">
-        {numberField(
-          "settings-stale-days",
-          "Mark an open issue as stale after",
-          "days without an update",
-          validation.stale_threshold_days,
-          staleProblem,
-          (n) => onChange({ ...validation, stale_threshold_days: n }),
+    <div className="rule-compact-list">
+      <div className="rule-item rule-thresholds">
+        <div className="rule-threshold-row">
+          <label htmlFor="settings-stale-days">Stale after</label>
+          <input
+            id="settings-stale-days"
+            type="number"
+            min={1}
+            step={1}
+            className={`settings-input rule-num-input${staleProblem ? " error" : ""}`}
+            value={Number.isNaN(validation.stale_threshold_days) ? "" : validation.stale_threshold_days}
+            aria-invalid={staleProblem ? true : undefined}
+            onChange={(e) =>
+              onChange({
+                ...validation,
+                stale_threshold_days: e.target.value === "" ? Number.NaN : Number(e.target.value),
+              })
+            }
+          />
+          <span className="settings-hint">days quiet</span>
+          {renderBadge(staleCount)}
+        </div>
+        {staleProblem && (
+          <p className="settings-error-text" role="alert">
+            {staleProblem}
+          </p>
         )}
-        {numberField(
-          "settings-cycle-days",
-          "Flag issues whose cycle time exceeds",
-          "days",
-          validation.max_cycle_time_days,
-          cycleProblem,
-          (n) => onChange({ ...validation, max_cycle_time_days: n }),
+
+        <div className="rule-threshold-row">
+          <label htmlFor="settings-cycle-days">Cycle time &gt;</label>
+          <input
+            id="settings-cycle-days"
+            type="number"
+            min={1}
+            step={1}
+            className={`settings-input rule-num-input${cycleProblem ? " error" : ""}`}
+            value={Number.isNaN(validation.max_cycle_time_days) ? "" : validation.max_cycle_time_days}
+            aria-invalid={cycleProblem ? true : undefined}
+            onChange={(e) =>
+              onChange({
+                ...validation,
+                max_cycle_time_days: e.target.value === "" ? Number.NaN : Number(e.target.value),
+              })
+            }
+          />
+          <span className="settings-hint">days</span>
+          {renderBadge(cycleCount)}
+        </div>
+        {cycleProblem && (
+          <p className="settings-error-text" role="alert">
+            {cycleProblem}
+          </p>
         )}
       </div>
 
-      <h3 className="settings-subtitle">Required per issue type</h3>
-      <p className="settings-hint">
-        For each issue type, choose labels it must carry and fields it must have filled in.
-        Issues that miss them are flagged on the dashboard.
-      </p>
       {typeNames.length === 0 && (
-        <p className="settings-hint">Add an issue type first to set requirements for it.</p>
+        <p className="settings-hint">Add an issue type first to set per-type requirements.</p>
       )}
+
       {typeNames.map((type, t) => {
         const id = `settings-quality-${t}`;
         const fields = validation.required_fields[type] ?? [];
@@ -116,41 +137,43 @@ export function QualityEditor({ rule, onChange, inventory, problems, labelCounts
           });
         };
         return (
-          <div key={type} className="settings-row">
-            <h4 className="settings-row-title">{type}</h4>
-            <div className="settings-field">
-              <span className="settings-field-label">Required labels</span>
-              <MatcherInput
-                id={`${id}-labels`}
-                kind="label"
-                value={validation.required_labels[type] ?? []}
-                inventory={inventory}
-                matchCounts={labelCounts}
-                ariaLabel={`Required labels for ${type}`}
-                problems={problemsWithPrefix(problems, `validation.required_labels.${type}`)}
-                onChange={(next) =>
-                  onChange({
-                    ...validation,
-                    required_labels: withKey(validation.required_labels, type, next),
-                  })
-                }
-              />
+          <div key={type} className="rule-item">
+            <div className="rule-item-head">
+              <strong className="rule-type-heading">{type}</strong>
             </div>
-            <fieldset className="settings-fields-group">
-              <legend className="settings-field-label">Required fields</legend>
+            <div className="rule-field-pills" role="group" aria-label={`Required fields for ${type}`}>
               {[...FIELD_OPTIONS, ...extraFields.map((f): [string, string] => [f, f])].map(
-                ([value, label]) => (
-                  <label key={value} className="settings-check">
-                    <input
-                      type="checkbox"
-                      checked={fields.includes(value)}
-                      onChange={(e) => toggle(value, e.target.checked)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ),
+                ([value, label]) => {
+                  const active = fields.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`rule-field-pill${active ? " active" : ""}`}
+                      aria-pressed={active}
+                      onClick={() => toggle(value, !active)}
+                    >
+                      {label}
+                    </button>
+                  );
+                },
               )}
-            </fieldset>
+            </div>
+            <MatcherInput
+              id={`${id}-labels`}
+              kind="label"
+              value={validation.required_labels[type] ?? []}
+              inventory={inventory}
+              matchCounts={labelCounts}
+              ariaLabel={`Required labels for ${type}`}
+              problems={problemsWithPrefix(problems, `validation.required_labels.${type}`)}
+              onChange={(next) =>
+                onChange({
+                  ...validation,
+                  required_labels: withKey(validation.required_labels, type, next),
+                })
+              }
+            />
           </div>
         );
       })}

@@ -13,7 +13,8 @@ SIGNAL_MIXED_CLASSIFICATION = "MIXED_CLASSIFICATION"
 
 _CLASSIFICATION_GROUPS: tuple[tuple[str, str], ...] = (
     ("type::", "Mixed type labels"),
-    ("severity::", "Mixed severity labels"),
+    ("impact::", "Mixed impact labels"),
+    ("severity::", "Mixed impact labels"),
     ("priority::", "Mixed priority labels"),
 )
 

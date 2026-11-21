@@ -58,13 +58,13 @@ describe("suggestRows", () => {
     expect(s.existingRowIndex).toBe(0);
   });
 
-  it("orders severity, priority and stages by rank", () => {
-    const sev = suggestRows(
-      "severity",
+  it("orders impact, priority and stages by rank", () => {
+    const imp = suggestRows(
+      "impact",
       rule(),
-      inv(["severity::low", 1], ["severity::zzz", 1], ["severity::critical", 1], ["sev::major", 1]),
+      inv(["impact::low", 1], ["impact::zzz", 1], ["severity::critical", 1], ["sev::major", 1]),
     );
-    expect(sev.map((s) => s.name)).toEqual(["Critical", "Major", "Low", "Zzz"]);
+    expect(imp.map((s) => s.name)).toEqual(["Critical", "Major", "Low", "Zzz"]);
 
     const pri = suggestRows(
       "priority",

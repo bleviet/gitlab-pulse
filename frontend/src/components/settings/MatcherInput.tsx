@@ -23,9 +23,23 @@ interface MatcherInputProps {
 type MatcherOption =
   | { kind: "label"; key: string; item: LabelInventoryItem }
   | { kind: "contains"; key: string; text: string; matches: number }
+  | { kind: "regex"; key: string; pattern: string }
   | { kind: "new"; key: string; text: string };
 
 const MAX_OPTIONS = 40;
+
+export function extractRegexInput(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("regex:")) {
+    const body = trimmed.slice(6).trim();
+    return body || null;
+  }
+  if (trimmed.length >= 3 && trimmed.startsWith("/") && trimmed.endsWith("/")) {
+    const body = trimmed.slice(1, -1).trim();
+    return body || null;
+  }
+  return null;
+}
 
 function chipStyle(
   raw: string,
@@ -55,7 +69,6 @@ export function MatcherInput({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
-  const [advancedText, setAdvancedText] = useState("");
 
   const byName = useMemo(() => new Map(inventory.map((i) => [i.name, i])), [inventory]);
   const labelNames = useMemo(() => inventory.map((i) => i.name), [inventory]);
@@ -63,14 +76,24 @@ export function MatcherInput({
   const options = useMemo<MatcherOption[]>(() => {
     if (kind !== "label") return [];
     const text = query.trim();
+    const regexBody = extractRegexInput(text);
     const needle = text.toLowerCase();
     const selected = new Set(value);
-    const result: MatcherOption[] = inventory
-      .filter((item) => !selected.has(serializePattern({ mode: "exact", value: item.name })))
-      .filter((item) => !needle || item.name.toLowerCase().includes(needle))
-      .slice(0, MAX_OPTIONS)
-      .map((item) => ({ kind: "label", key: `label:${item.name}`, item }));
-    if (text) {
+    const result: MatcherOption[] = [];
+
+    if (regexBody) {
+      result.push({ kind: "regex", key: "regex", pattern: regexBody });
+    }
+
+    result.push(
+      ...inventory
+        .filter((item) => !selected.has(serializePattern({ mode: "exact", value: item.name })))
+        .filter((item) => !needle || item.name.toLowerCase().includes(needle))
+        .slice(0, MAX_OPTIONS)
+        .map((item): MatcherOption => ({ kind: "label", key: `label:${item.name}`, item })),
+    );
+
+    if (text && !regexBody) {
       result.push({
         kind: "contains",
         key: "contains",
@@ -94,6 +117,8 @@ export function MatcherInput({
       add(serializePattern({ mode: "exact", value: option.item.name }));
     } else if (option.kind === "contains") {
       add(serializePattern({ mode: "contains", value: option.text }));
+    } else if (option.kind === "regex") {
+      add(serializePattern({ mode: "regex", value: option.pattern }));
     } else {
       add(serializePattern({ mode: "exact", value: option.text }));
     }
@@ -104,15 +129,13 @@ export function MatcherInput({
   const addTitleWords = () => {
     const text = query.trim();
     if (!text) return;
-    add(serializePattern({ mode: "contains", value: text }));
+    const regexBody = extractRegexInput(text);
+    add(
+      regexBody
+        ? serializePattern({ mode: "regex", value: regexBody })
+        : serializePattern({ mode: "contains", value: text }),
+    );
     setQuery("");
-  };
-
-  const addAdvanced = () => {
-    const text = advancedText.trim();
-    if (!text) return;
-    add(serializePattern({ mode: "regex", value: text }));
-    setAdvancedText("");
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -203,7 +226,9 @@ export function MatcherInput({
             aria-label={ariaLabel}
             disabled={disabled}
             value={query}
-            placeholder={kind === "label" ? "Find a label..." : "Add words from the title..."}
+            placeholder={
+              kind === "label" ? "Add label (or /regex/)…" : "Add title word, press Enter…"
+            }
             onFocus={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onChange={(e) => {
@@ -214,7 +239,12 @@ export function MatcherInput({
             onKeyDown={handleKeyDown}
           />
           {showList && (
-            <div className="scope-dropdown settings-matcher-dropdown" role="listbox" id={listId} aria-label={ariaLabel}>
+            <div
+              className="scope-dropdown settings-matcher-dropdown"
+              role="listbox"
+              id={listId}
+              aria-label={ariaLabel}
+            >
               {options.map((option, idx) => {
                 const active = idx === Math.min(highlighted, options.length - 1);
                 return (
@@ -242,21 +272,21 @@ export function MatcherInput({
                           />
                           <span className="scope-option-label">{option.item.name}</span>
                         </span>
-                        <span className="scope-option-count">
-                          used by {option.item.count} {option.item.count === 1 ? "issue" : "issues"}
-                        </span>
+                        <span className="scope-option-count">{option.item.count}</span>
                       </>
                     )}
                     {option.kind === "contains" && (
                       <span className="scope-option-label">
-                        Any label containing "{option.text}" (matches {option.matches}{" "}
-                        {option.matches === 1 ? "label" : "labels"})
+                        Label containing "{option.text}" ({option.matches})
+                      </span>
+                    )}
+                    {option.kind === "regex" && (
+                      <span className="scope-option-label">
+                        Regex pattern <code>{option.pattern}</code>
                       </span>
                     )}
                     {option.kind === "new" && (
-                      <span className="scope-option-label">
-                        Use "{option.text}" as a new label name
-                      </span>
+                      <span className="scope-option-label">Use "{option.text}" as label</span>
                     )}
                   </button>
                 );
@@ -264,11 +294,10 @@ export function MatcherInput({
             </div>
           )}
         </div>
-        {kind === "title" && !disabled && (
+        {kind === "title" && !disabled && query.trim() !== "" && (
           <button
             type="button"
             className="pulse-btn-secondary settings-btn-small"
-            disabled={!query.trim()}
             onClick={addTitleWords}
           >
             Add
@@ -276,54 +305,11 @@ export function MatcherInput({
         )}
       </div>
 
-      {value.some((raw) => matchCounts?.[raw] === 0) && (
-        <p className="settings-hint">Entries outlined in amber match no issue right now.</p>
-      )}
-
       {problemEntries.map(([index, message]) => (
         <p key={index} id={`${id}-problem-${index}`} className="settings-error-text" role="alert">
           {message}
         </p>
       ))}
-
-      {kind === "title" && (
-        <p className="settings-hint">Upper and lower case matter: "bug" does not match "Bug".</p>
-      )}
-
-      {!disabled && (
-        <details className="settings-advanced">
-          <summary>Advanced</summary>
-          <div className="settings-advanced-body">
-            <div className="settings-inline-form">
-              <input
-                type="text"
-                className="settings-input"
-                aria-label={`${ariaLabel}: matches pattern`}
-                value={advancedText}
-                placeholder="matches pattern"
-                onChange={(e) => setAdvancedText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addAdvanced();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="pulse-btn-secondary settings-btn-small"
-                disabled={!advancedText.trim()}
-                onClick={addAdvanced}
-              >
-                Add pattern
-              </button>
-            </div>
-            <p className="settings-hint">
-              Patterns are checked when you save. Use them only if picking labels is not enough.
-            </p>
-          </div>
-        </details>
-      )}
     </div>
   );
 }

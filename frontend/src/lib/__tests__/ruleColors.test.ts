@@ -169,7 +169,7 @@ describe("custom colour rows", () => {
     const types = groups.find((g) => g.title === "Issue types");
     expect(types?.rows.map((r) => r.key)).toEqual(["bug", "feature", "task", "epic", "incident"]);
     expect(types?.rows.find((r) => r.key === "incident")?.hasDefault).toBe(true);
-    expect(types?.hints).toEqual(['"Low" uses the same colour as Severity "Low".']);
+    expect(types?.hints).toEqual(['"Low" uses the same colour as Impact "Low".']);
   });
 });
 

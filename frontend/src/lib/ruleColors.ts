@@ -203,7 +203,7 @@ const BUILTIN: Array<[string, Array<[string, string]>]> = [
 
 const CATEGORY_GROUPS: Array<[string, string, string[]]> = [
   ["Issue types", "type", ["bug", "feature", "task", "epic"]],
-  ["Severity", "severity", ["critical", "high", "medium", "low", "unset"]],
+  ["Impact", "impact", ["critical", "high", "medium", "low", "unset"]],
   ["Priority", "priority", ["p1", "p2", "p3"]],
 ];
 

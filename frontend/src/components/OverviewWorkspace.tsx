@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildIssueTypeDonutData, buildPriorityDonutData } from "../lib/analytics";
 import { buildUnscheduledMilestonesData } from "../lib/timeline";
@@ -7,9 +7,11 @@ import type {
   IssueFacets,
   IssueItem,
   IssueViewMode,
+  SectionId,
   ThemeMode,
   ValueMode,
 } from "../lib/types";
+import type { RulePopoverId } from "./settings/useRuleEditor";
 import { DailyVelocityChart } from "./charts/DailyVelocityChart";
 import { PriorityDonut } from "./charts/PriorityDonut";
 import { QualitySignalsChart } from "./charts/QualitySignalsChart";
@@ -35,6 +37,14 @@ interface OverviewWorkspaceProps {
   valueMode: ValueMode;
   onSelectMilestone: (title: string) => void;
   onSetChartFilter: (chartId: ActiveChartId, nextFacets: IssueFacets) => void;
+  editMode?: boolean;
+  activeRulePopover?: RulePopoverId | null;
+  ruleProblemCounts?: Partial<Record<SectionId, number>>;
+  onOpenRulePopover?: (
+    id: RulePopoverId,
+    anchor: HTMLElement | null,
+    placement?: "right" | "bottom",
+  ) => void;
   issuePanel: ReactNode;
 }
 
@@ -53,6 +63,10 @@ export function OverviewWorkspace({
   valueMode,
   onSelectMilestone,
   onSetChartFilter,
+  editMode = false,
+  activeRulePopover = null,
+  ruleProblemCounts,
+  onOpenRulePopover,
   issuePanel,
 }: OverviewWorkspaceProps) {
   const [isWideScreen, setIsWideScreen] = useState(() =>
@@ -258,12 +272,46 @@ export function OverviewWorkspace({
     el.classList.add("flash");
   };
 
+  const renderEditButton = (id: RulePopoverId, label: string, problems = 0) => {
+    if (!editMode || !onOpenRulePopover) return null;
+    const active = activeRulePopover === id;
+    const placement = isWideSplit ? "right" : "bottom";
+    return (
+      <button
+        type="button"
+        data-rule-trigger={id}
+        className={`panel-edit-btn${active ? " active" : ""}${problems > 0 ? " has-error" : ""}`}
+        aria-expanded={active}
+        aria-controls={active ? `rule-popover-${id}` : undefined}
+        aria-label={label}
+        onClick={(e) => onOpenRulePopover(id, e.currentTarget, placement)}
+      >
+        <Pencil size={11} aria-hidden="true" />
+        <span>Edit</span>
+        {problems > 0 && <span className="edit-bar-badge">{problems}</span>}
+      </button>
+    );
+  };
+
+  const mixProblems =
+    (ruleProblemCounts?.priority ?? 0) + (ruleProblemCounts?.type ?? 0);
+  const stagesProblems = ruleProblemCounts?.stages ?? 0;
+  const qualityProblems = ruleProblemCounts?.quality ?? 0;
+
+  const panelEditClass = (id: RulePopoverId) =>
+    editMode
+      ? `pulse-panel edit-target${activeRulePopover === id ? " edit-active" : ""}`
+      : "pulse-panel";
+
   const renderChartCards = () => (
     <>
-      <div className="pulse-panel">
+      <div className={panelEditClass("mix")}>
         <div className="pulse-panel-head">
           <span className="pulse-panel-title">Open Mix</span>
-          <span className="pulse-panel-meta">Priority · Type</span>
+          <div className="pulse-panel-head-right">
+            {!editMode && <span className="pulse-panel-meta">Priority · Type</span>}
+            {renderEditButton("mix", "Edit priority and issue type rules", mixProblems)}
+          </div>
         </div>
         <div className="priority-mix-pair">
           <PriorityDonut
@@ -299,10 +347,13 @@ export function OverviewWorkspace({
         </div>
       </div>
 
-      <div className="pulse-panel">
+      <div className={panelEditClass("stages")}>
         <div className="pulse-panel-head">
           <span className="pulse-panel-title">Workflow State</span>
-          <span className="pulse-panel-meta">Open · Closed</span>
+          <div className="pulse-panel-head-right">
+            {!editMode && <span className="pulse-panel-meta">Open · Closed</span>}
+            {renderEditButton("stages", "Edit workflow stages", stagesProblems)}
+          </div>
         </div>
         <WorkflowStateRow
           issues={issues}
@@ -365,10 +416,13 @@ export function OverviewWorkspace({
         />
       </div>
 
-      <div className="pulse-panel">
+      <div className={panelEditClass("quality")}>
         <div className="pulse-panel-head">
           <span className="pulse-panel-title">Issue Quality Signals</span>
-          <span className="pulse-panel-meta">Open Hints</span>
+          <div className="pulse-panel-head-right">
+            {!editMode && <span className="pulse-panel-meta">Open Hints</span>}
+            {renderEditButton("quality", "Edit quality check rules", qualityProblems)}
+          </div>
         </div>
         <QualitySignalsChart
           issues={issues}

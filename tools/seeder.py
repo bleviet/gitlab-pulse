@@ -32,7 +32,7 @@ NOTE_AUTHOR_POOL: Final[list[tuple[str, str]]] = [
 
 # Label pools
 TYPE_LABELS = ["type::bug", "type::feature", "type::task"]
-SEVERITY_LABELS = ["severity::critical", "severity::high", "severity::medium", "severity::low"]
+IMPACT_LABELS = ["impact::critical", "impact::high", "impact::medium", "impact::low"]
 PRIORITY_LABELS = ["priority::1", "priority::2", "priority::3"]
 CONTEXT_LABELS = [
     "project::A", "project::B", "project::C",
@@ -415,9 +415,9 @@ def _generate_labels(inject_errors: bool = False, state: str = "opened") -> list
     if random.random() < 0.95:
         labels.append(random.choice(TYPE_LABELS))
 
-    # Severity label for bugs (85% have one)
-    if "type::bug" in labels and random.random() < 0.85:
-        labels.append(random.choice(SEVERITY_LABELS))
+    # Impact label across issue types (75% have one)
+    if random.random() < 0.75:
+        labels.append(random.choice(IMPACT_LABELS))
 
     # Priority label (70% have one)
     if random.random() < 0.7:

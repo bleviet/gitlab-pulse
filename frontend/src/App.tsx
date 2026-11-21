@@ -3,7 +3,10 @@ import { AdminModal } from "./components/AdminModal";
 import { IssuePanel } from "./components/IssuePanel";
 import { OverviewWorkspace } from "./components/OverviewWorkspace";
 import { ScopeBar } from "./components/ScopeBar";
-import { SettingsWorkspace } from "./components/settings/SettingsWorkspace";
+import { EditModeBar } from "./components/settings/EditModeBar";
+import { NewRuleSetDialog } from "./components/settings/NewRuleSetDialog";
+import { RuleEditorPopover } from "./components/settings/RuleEditorPopover";
+import { useRuleEditor } from "./components/settings/useRuleEditor";
 import { SummaryBar } from "./components/SummaryBar";
 import { TopBar } from "./components/TopBar";
 import {
@@ -75,7 +78,6 @@ export function App() {
   const [activeChart, setActiveChart] = useState<ActiveChartId>(null);
 
   const [adminModalOpen, setAdminModalOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [globalFilters, setGlobalFilters] = useState<GlobalFilters>(() => ({
@@ -338,6 +340,21 @@ export function App() {
     setIsAdmin(res.authenticated);
   };
 
+  const ruleEditor = useRuleEditor({
+    enabled: !IS_DEMO,
+    isAdmin,
+    activeTeamFilter: globalFilters.team,
+    issues: payload?.issues ?? [],
+    labelStyles: payload?.label_styles ?? {},
+    onReloadDashboard: () => loadData(true),
+  });
+
+  const loadErrorNames = Object.keys(ruleEditor.response?.load_errors ?? {});
+  const loadErrorNotice =
+    loadErrorNames.length === 0
+      ? null
+      : `${loadErrorNames.length} rule ${loadErrorNames.length === 1 ? "file" : "files"} could not be read and ${loadErrorNames.length === 1 ? "is" : "are"} ignored: ${loadErrorNames.join(", ")}`;
+
   const activeMilestone = globalFilters.milestone !== "All" ? globalFilters.milestone : null;
   const hasCockpit =
     !loading &&
@@ -345,12 +362,14 @@ export function App() {
     Boolean(payload && payload.issues.length > 0 && scopedIssues.length > 0);
 
   return (
-    <div className="pulse-app">
+    <div className={`pulse-app${ruleEditor.editMode ? " is-editing-rules" : ""}`}>
       <TopBar
         chartsVisible={chartsVisible}
         theme={theme}
         valueMode={valueMode}
         isAdmin={isAdmin}
+        editMode={ruleEditor.editMode}
+        unlockPopoverOpen={ruleEditor.unlockPopoverOpen}
         syncStatus={payload?.sync_status}
         version={payload?.version}
         refreshing={refreshing}
@@ -359,7 +378,10 @@ export function App() {
         onChangeValueMode={setValueMode}
         onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
         onOpenAdmin={() => setAdminModalOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onToggleEditMode={ruleEditor.toggleEditMode}
+        onCloseUnlockPopover={() => ruleEditor.setUnlockPopoverOpen(false)}
+        onLogin={handleAdminLogin}
+        onUnlocked={ruleEditor.handleUnlocked}
         scopeBar={
           payload && (
             <ScopeBar
@@ -372,10 +394,44 @@ export function App() {
               totalCount={payload.issues.length}
               onChangeFilters={handleChangeGlobalFilters}
               onApplyIssueQuery={handleApplyIssueQueryFromScope}
+              editMode={ruleEditor.editMode}
+              contextsPopoverOpen={ruleEditor.activePopover?.id === "contexts"}
+              onEditContexts={(anchor) => ruleEditor.openPopover("contexts", anchor, "bottom")}
             />
           )
         }
       />
+
+      {!IS_DEMO && ruleEditor.editMode && (
+        <EditModeBar
+          loadState={ruleEditor.loadState}
+          loadError={ruleEditor.loadError}
+          chartsVisible={chartsVisible}
+          ruleSets={ruleEditor.ruleSets}
+          selected={ruleEditor.selected}
+          defaultName={ruleEditor.defaultName}
+          dirty={ruleEditor.dirty}
+          saving={ruleEditor.saving}
+          problemCount={ruleEditor.allProblems.length}
+          problemCountBySection={ruleEditor.problemCountBySection}
+          unplacedProblems={ruleEditor.unplacedProblems}
+          loadErrorNotice={loadErrorNotice}
+          notice={ruleEditor.notice}
+          activePopover={ruleEditor.activePopover}
+          onRetryLoad={() => void ruleEditor.load(ruleEditor.selectedName)}
+          onSelectRuleSet={ruleEditor.handleSelectRuleSet}
+          onOpenPopover={ruleEditor.openPopover}
+          onNewRuleSet={ruleEditor.openNewRuleSet}
+          onDiscard={ruleEditor.handleDiscard}
+          onSave={() => void ruleEditor.handleSave()}
+          onDismissNotice={() => ruleEditor.setNotice(null)}
+          onReloadLatest={() => {
+            ruleEditor.setNotice(null);
+            void ruleEditor.load(ruleEditor.selectedName);
+          }}
+          onLock={ruleEditor.exitEditMode}
+        />
+      )}
 
       {!IS_DEMO && (
         <AdminModal
@@ -388,15 +444,63 @@ export function App() {
         />
       )}
 
-      {!IS_DEMO && (
-        <SettingsWorkspace
-          open={settingsOpen}
-          isAdmin={isAdmin}
-          issues={payload?.issues ?? []}
-          labelStyles={payload?.label_styles ?? {}}
-          onClose={() => setSettingsOpen(false)}
-          onLogin={handleAdminLogin}
-          onReloadDashboard={() => loadData(true)}
+      {!IS_DEMO &&
+        ruleEditor.editMode &&
+        ruleEditor.activePopover &&
+        ruleEditor.draft &&
+        ruleEditor.selected && (
+          <RuleEditorPopover
+            active={ruleEditor.activePopover}
+            draft={ruleEditor.draft}
+            selected={ruleEditor.selected}
+            isDefault={ruleEditor.isDefault}
+            hasDefault={ruleEditor.defaultName !== null}
+            paletteDefaults={ruleEditor.paletteDefaults}
+            theme={theme}
+            otherTeamNames={ruleEditor.otherTeamNames}
+            canEdit={ruleEditor.canEdit}
+            dirty={ruleEditor.dirty}
+            saving={ruleEditor.saving}
+            deleting={ruleEditor.actions.busy}
+            inventory={ruleEditor.inventory}
+            projectInventory={ruleEditor.projectInventory}
+            claimedBy={ruleEditor.claimedBy}
+            problems={ruleEditor.problems}
+            impact={ruleEditor.preview.impact}
+            onChange={ruleEditor.updateDraft}
+            onChangeMixSubTab={ruleEditor.setMixSubTab}
+            onGoToDefault={() =>
+              ruleEditor.defaultName && ruleEditor.handleSelectRuleSet(ruleEditor.defaultName)
+            }
+            onDelete={() => void ruleEditor.actions.remove()}
+            onLoadVersion={ruleEditor.handleLoadVersion}
+            onClose={ruleEditor.closePopover}
+          />
+        )}
+
+      {!IS_DEMO && ruleEditor.newRuleSetOpen && ruleEditor.selected && (
+        <NewRuleSetDialog
+          projects={ruleEditor.projectInventory}
+          claimedBy={{
+            ...ruleEditor.claimedBy,
+            ...Object.fromEntries(
+              ruleEditor.selected.rule.project_ids.map((id) => [
+                id,
+                ruleEditor.selected?.rule.team || ruleEditor.selected?.name || "",
+              ]),
+            ),
+          }}
+          sourceLabel={
+            ruleEditor.isDefault
+              ? "the default rules"
+              : `the rules of ${ruleEditor.selected.rule.team}`
+          }
+          teamNames={ruleEditor.teamNames}
+          busy={ruleEditor.actions.busy}
+          problems={ruleEditor.actions.createProblems}
+          error={ruleEditor.actions.createError}
+          onCreate={(team, ids) => void ruleEditor.handleCreateRuleSet(team, ids)}
+          onClose={() => ruleEditor.setNewRuleSetOpen(false)}
         />
       )}
 
@@ -455,6 +559,10 @@ export function App() {
               setActiveChart(chartId);
               setFacets(nextFacets);
             }}
+            editMode={ruleEditor.editMode}
+            activeRulePopover={ruleEditor.activePopover?.id ?? null}
+            ruleProblemCounts={ruleEditor.problemCountBySection}
+            onOpenRulePopover={ruleEditor.openPopover}
             issuePanel={
               <IssuePanel
                 issues={scopedIssues}
@@ -482,6 +590,9 @@ export function App() {
                 onChangeFacets={handleFacetsChange}
                 onRemoveSidebarFilter={handleRemoveSidebarFilter}
                 onClearAll={handleClearAll}
+                editMode={ruleEditor.editMode}
+                stagesPopoverOpen={ruleEditor.activePopover?.id === "stages"}
+                onEditStages={(anchor) => ruleEditor.openPopover("stages", anchor, "bottom")}
               />
             }
           />

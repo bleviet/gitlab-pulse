@@ -1,13 +1,16 @@
-import type { ReactNode } from "react";
-import { BarChart3, Moon, RefreshCw, Settings, Shield, Sun } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { BarChart3, Lock, LockOpen, Moon, RefreshCw, Shield, Sun, X } from "lucide-react";
 import { IS_DEMO } from "../lib/api";
 import type { SyncStatus, ThemeMode, ValueMode } from "../lib/types";
+import { UnlockForm } from "./settings/UnlockForm";
 
 interface TopBarProps {
   chartsVisible: boolean;
   theme: ThemeMode;
   valueMode: ValueMode;
   isAdmin: boolean;
+  editMode: boolean;
+  unlockPopoverOpen: boolean;
   scopeBar?: ReactNode;
   syncStatus?: SyncStatus;
   version?: string;
@@ -17,7 +20,10 @@ interface TopBarProps {
   onChangeValueMode: (mode: ValueMode) => void;
   onToggleTheme: () => void;
   onOpenAdmin: () => void;
-  onOpenSettings: () => void;
+  onToggleEditMode: () => void;
+  onCloseUnlockPopover: () => void;
+  onLogin: (password: string) => Promise<void>;
+  onUnlocked: () => void;
 }
 
 export function TopBar({
@@ -25,6 +31,8 @@ export function TopBar({
   theme,
   valueMode,
   isAdmin,
+  editMode,
+  unlockPopoverOpen,
   scopeBar,
   syncStatus,
   version,
@@ -34,8 +42,31 @@ export function TopBar({
   onChangeValueMode,
   onToggleTheme,
   onOpenAdmin,
-  onOpenSettings,
+  onToggleEditMode,
+  onCloseUnlockPopover,
+  onLogin,
+  onUnlocked,
 }: TopBarProps) {
+  const unlockAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!unlockPopoverOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (unlockAnchorRef.current && !unlockAnchorRef.current.contains(e.target as Node)) {
+        onCloseUnlockPopover();
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseUnlockPopover();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [unlockPopoverOpen, onCloseUnlockPopover]);
+
   const isSyncError = Boolean(syncStatus && /error|fail/i.test(syncStatus.status));
   const syncTitle = syncStatus
     ? `Status: ${syncStatus.status} · Last sync: ${syncStatus.last_sync}${version ? ` · v${version}` : ""} — Click to refresh`
@@ -131,15 +162,48 @@ export function TopBar({
         </button>
 
         {!IS_DEMO && (
-          <button
-            type="button"
-            className="pulse-icon-btn"
-            aria-label="Open settings"
-            onClick={onOpenSettings}
-            title="Settings"
-          >
-            <Settings size={15} />
-          </button>
+          <div ref={unlockAnchorRef} className="topbar-unlock-anchor">
+            <button
+              type="button"
+              className={`pulse-icon-btn pulse-toggle-btn${editMode ? " edit-unlocked" : ""}`}
+              aria-pressed={editMode}
+              aria-expanded={unlockPopoverOpen ? true : undefined}
+              aria-label={editMode ? "Lock rules" : "Unlock rules to edit"}
+              onClick={onToggleEditMode}
+              title={
+                editMode
+                  ? "Rules unlocked — click to lock"
+                  : "Unlock to edit rules directly on the dashboard"
+              }
+            >
+              {editMode ? <LockOpen size={14} /> : <Lock size={14} />}
+              <span>{editMode ? "Unlocked" : "Edit"}</span>
+            </button>
+
+            {unlockPopoverOpen && (
+              <div
+                className="scope-popover topbar-unlock-popover"
+                role="dialog"
+                aria-label="Unlock rule editing"
+              >
+                <div className="scope-popover-head">
+                  <span className="pulse-panel-title">Unlock Editing</span>
+                  <button
+                    type="button"
+                    className="pulse-icon-btn rule-popover-close"
+                    aria-label="Close"
+                    onClick={onCloseUnlockPopover}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <p className="settings-hint">
+                  Enter the admin password to edit rules directly on the dashboard.
+                </p>
+                <UnlockForm onLogin={onLogin} onDone={onUnlocked} />
+              </div>
+            )}
+          </div>
         )}
 
         {!IS_DEMO && (

@@ -1,16 +1,15 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
 import { moveItem, problemsWithPrefix, removeAt, STAGE_TYPES, updateAt } from "../../lib/ruleDraft";
-import type { WorkflowStage } from "../../lib/types";
+import type { CountChange, WorkflowStage } from "../../lib/types";
 import { MatcherInput } from "./MatcherInput";
 import { RowControls } from "./RowControls";
-import { TextField } from "./TextField";
 
-const STAGE_KINDS: Array<{ value: (typeof STAGE_TYPES)[number]; label: string; help: string }> = [
-  { value: "active", label: "Active", help: "Being worked on." },
-  { value: "waiting", label: "Waiting", help: "Queued for someone, e.g. review or testing." },
-  { value: "completed", label: "Completed", help: "Finished." },
+const STAGE_KINDS: Array<{ value: (typeof STAGE_TYPES)[number]; label: string }> = [
+  { value: "active", label: "Active" },
+  { value: "waiting", label: "Waiting" },
+  { value: "completed", label: "Done" },
 ];
 
 interface StagesEditorProps {
@@ -18,52 +17,75 @@ interface StagesEditorProps {
   onChange: (next: WorkflowStage[]) => void;
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
+  counts?: CountChange[];
   labelCounts?: Record<string, number>;
   extraActions?: ReactNode;
 }
 
-export function StagesEditor({ stages, onChange, inventory, problems, labelCounts, extraActions }: StagesEditorProps) {
+export function StagesEditor({
+  stages,
+  onChange,
+  inventory,
+  problems,
+  counts,
+  labelCounts,
+  extraActions,
+}: StagesEditorProps) {
+  const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
+
   return (
-    <div className="settings-rows">
+    <div className="rule-compact-list">
       {stages.length === 0 && (
-        <p className="settings-hint">With no stages, every issue shows as Backlog, including closed ones.</p>
+        <p className="settings-hint">With no stages, every issue shows as Backlog.</p>
       )}
       {stages.map((stage, i) => {
         const id = `settings-stage-${i}`;
+        const nameProblem = problems[`workflow.stages.${i}.name`];
         const typeProblem = problems[`workflow.stages.${i}.type`];
-        const typeProblemId = `${id}-type-problem`;
-        const selected = STAGE_KINDS.find((k) => k.value === stage.type);
+        const count = stage.name.trim()
+          ? counts?.find((c) => c.name?.toLowerCase() === stage.name.trim().toLowerCase())
+          : undefined;
+        const delta = count ? count.after - count.before : 0;
+        const showDesc = stage.description.trim() !== "" || Boolean(expandedNotes[i]);
+
         return (
-          <div key={i} className="settings-row">
-            <div className="settings-row-head">
-              <span className="settings-row-index" aria-hidden="true">
-                {i + 1}
-              </span>
-              <TextField
+          <div key={i} className="rule-item">
+            <div className="rule-item-head">
+              <input
                 id={`${id}-name`}
-                label={`Name of stage ${i + 1}`}
+                type="text"
+                className={`settings-input rule-name-input${nameProblem ? " error" : ""}`}
+                aria-label={`Name of stage ${i + 1}`}
+                aria-invalid={nameProblem ? true : undefined}
+                placeholder="Stage name"
                 value={stage.name}
-                problem={problems[`workflow.stages.${i}.name`]}
-                onChange={(name) => onChange(updateAt(stages, i, { name }))}
+                onChange={(e) => onChange(updateAt(stages, i, { name: e.target.value }))}
               />
+              {count && (
+                <span className={`rule-count-pill${delta !== 0 ? " changed" : ""}`}>
+                  {delta !== 0 ? `${count.before}→${count.after}` : count.after}
+                </span>
+              )}
               <RowControls
                 label={stage.name}
                 index={i}
                 count={stages.length}
-                onMove={(delta) => onChange(moveItem(stages, i, delta))}
+                onMove={(deltaMove) => onChange(moveItem(stages, i, deltaMove))}
                 onRemove={() => onChange(removeAt(stages, i))}
               />
             </div>
 
-            <div className="settings-field">
-              <span className="settings-field-label" id={`${id}-kind-label`}>
-                What kind of stage is this?
-              </span>
+            {nameProblem && (
+              <p className="settings-error-text" role="alert">
+                {nameProblem}
+              </p>
+            )}
+
+            <div className="rule-stage-meta">
               <div
-                className="pulse-segmented"
+                className="pulse-segmented compact"
                 role="group"
-                aria-labelledby={`${id}-kind-label`}
-                aria-describedby={typeProblem ? typeProblemId : undefined}
+                aria-label={`Kind of stage ${stage.name || i + 1}`}
               >
                 {STAGE_KINDS.map((kind) => (
                   <button
@@ -76,53 +98,63 @@ export function StagesEditor({ stages, onChange, inventory, problems, labelCount
                   </button>
                 ))}
               </div>
-              <p className="settings-hint">
-                {selected
-                  ? `${selected.label}: ${selected.help}`
-                  : "Active: being worked on. Waiting: queued for someone, e.g. review or testing. Completed: finished."}
-              </p>
-              {typeProblem && (
-                <p id={typeProblemId} className="settings-error-text" role="alert">
-                  {typeProblem}
-                </p>
+              {!showDesc && (
+                <button
+                  type="button"
+                  className="rule-inline-link"
+                  onClick={() => setExpandedNotes((prev) => ({ ...prev, [i]: true }))}
+                >
+                  + Description
+                </button>
               )}
             </div>
 
-            <div className="settings-field">
-              <span className="settings-field-label">Issue is in this stage when it has this label</span>
-              <MatcherInput
-                id={`${id}-labels`}
-                kind="label"
-                value={stage.labels}
-                inventory={inventory}
-                matchCounts={labelCounts}
-                ariaLabel={`Labels for stage ${stage.name || i + 1}`}
-                problems={problemsWithPrefix(problems, `workflow.stages.${i}.labels`)}
-                onChange={(labels) => onChange(updateAt(stages, i, { labels }))}
-              />
-            </div>
+            {typeProblem && (
+              <p className="settings-error-text" role="alert">
+                {typeProblem}
+              </p>
+            )}
 
-            <TextField
-              id={`${id}-description`}
-              label="Description (optional)"
-              value={stage.description}
-              onChange={(description) => onChange(updateAt(stages, i, { description }))}
+            <MatcherInput
+              id={`${id}-labels`}
+              kind="label"
+              value={stage.labels}
+              inventory={inventory}
+              matchCounts={labelCounts}
+              ariaLabel={`Labels for stage ${stage.name || i + 1}`}
+              problems={problemsWithPrefix(problems, `workflow.stages.${i}.labels`)}
+              onChange={(labels) => onChange(updateAt(stages, i, { labels }))}
             />
+
+            {showDesc && (
+              <input
+                id={`${id}-description`}
+                type="text"
+                className="settings-input rule-desc-input"
+                aria-label={`Description for stage ${stage.name || i + 1}`}
+                placeholder="Optional stage description…"
+                value={stage.description}
+                onChange={(e) => onChange(updateAt(stages, i, { description: e.target.value }))}
+              />
+            )}
           </div>
         );
       })}
-      <div className="settings-add-row">
-        <button
-          type="button"
-          className="pulse-btn-secondary"
-          onClick={() =>
-            onChange([...stages, { name: "", labels: [], type: "active", description: "" }])
-          }
-        >
-          <Plus size={14} />
-          <span>Add stage</span>
-        </button>
-        {extraActions}
+
+      <div className="rule-list-footer">
+        <div className="settings-add-row">
+          <button
+            type="button"
+            className="pulse-btn-secondary settings-btn-small"
+            onClick={() =>
+              onChange([...stages, { name: "", labels: [], type: "active", description: "" }])
+            }
+          >
+            <Plus size={13} />
+            <span>Add stage</span>
+          </button>
+          {extraActions}
+        </div>
       </div>
     </div>
   );

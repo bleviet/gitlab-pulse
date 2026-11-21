@@ -33,7 +33,7 @@ function makeMsIssue(partial: Partial<IssueItem>): IssueItem {
     cycle_time: null,
     is_stale: false,
     issue_type: "Task",
-    severity: null,
+    impact: null,
     priority: "P2",
     priority_rank: 1,
     team: "default",

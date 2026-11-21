@@ -35,7 +35,7 @@ function makeIssue(id: number, iid = id): IssueItem {
     cycle_time: null,
     is_stale: false,
     issue_type: "Bug",
-    severity: null,
+    impact: null,
     priority: "High",
     priority_rank: 1,
     team: "Core",

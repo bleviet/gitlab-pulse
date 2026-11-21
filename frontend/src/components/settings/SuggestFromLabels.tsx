@@ -19,7 +19,7 @@ const KIND_WORDS: Record<StageKind, string> = {
 
 const NOUNS: Record<SuggestSection, string> = {
   type: "issue types",
-  severity: "severity levels",
+  impact: "impact levels",
   priority: "priority levels",
   stages: "stages",
 };
@@ -46,6 +46,7 @@ export function SuggestFromLabels({
 
   const scope = SUGGEST_SCOPES[section][0];
   const empty = rowNamesForSection(rule, section).length === 0;
+  if (!empty && suggestions.length === 0 && !open) return null;
 
   const openPanel = () => {
     setChosen(new Set(suggestions.map((s) => s.label)));
@@ -72,12 +73,12 @@ export function SuggestFromLabels({
       )}
       <button
         type="button"
-        className={empty ? "pulse-btn-primary" : "pulse-btn-secondary"}
+        className={`${empty ? "pulse-btn-primary" : "pulse-btn-secondary"} settings-btn-small`}
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openPanel())}
       >
-        <Wand2 size={14} />
-        <span>Suggest from my labels</span>
+        <Wand2 size={13} />
+        <span>Suggest ({suggestions.length})</span>
       </button>
       {open && (
         <div className="settings-suggest" role="group" aria-label="Suggestions from your labels">

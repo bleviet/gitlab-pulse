@@ -44,9 +44,9 @@ export function groupsForSection(section: SectionId, impact: ImpactSummary): Imp
   switch (section) {
     case "type":
       return [{ title: "Issues by type", rows: toRows(impact.types, named("No type")) }];
-    case "severity":
+    case "impact":
       return [
-        { title: "Issues by severity", rows: toRows(impact.severities, named("No severity")) },
+        { title: "Issues by impact", rows: toRows(impact.impacts, named("No impact")) },
       ];
     case "priority":
       return [
@@ -95,7 +95,7 @@ export function mergeProblems(...lists: RuleProblem[][]): RuleProblem[] {
 
 const OVERVIEW_SECTIONS: SectionId[] = [
   "type",
-  "severity",
+  "impact",
   "priority",
   "stages",
   "contexts",

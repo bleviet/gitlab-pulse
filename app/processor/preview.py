@@ -48,7 +48,7 @@ class ImpactSummary(BaseModel):
     total_issues: int
     project_ids: list[int]
     types: list[CountChange]
-    severities: list[CountChange]
+    impacts: list[CountChange]
     priorities: list[CountChange]
     stages: list[CountChange]
     contexts: list[CountChange]
@@ -299,7 +299,7 @@ def summarize_impact(
         total_issues=int(issues_all["id"].nunique()) if not issues_all.empty else 0,
         project_ids=sorted([*governed, *removed]),
         types=change("issue_type", draft.classification.get("type", {}), valid_pair),
-        severities=change("severity", draft.classification.get("severity", {}), valid_pair),
+        impacts=change("impact", draft.classification.get("impact", {}), valid_pair),
         priorities=change("priority", draft.classification.get("priority", {}), valid_pair),
         stages=_changes(
             _distinct_counts(before_v, "stage"),

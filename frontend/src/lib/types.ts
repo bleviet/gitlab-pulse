@@ -22,7 +22,7 @@ export interface IssueItem {
   cycle_time: number | null;
   is_stale: boolean;
   issue_type: string | null;
-  severity: string | null;
+  impact: string | null;
   priority: string;
   priority_rank: number | null;
   team: string | null;
@@ -123,7 +123,7 @@ export type ActiveChartId =
 
 export type SectionId =
   | "type"
-  | "severity"
+  | "impact"
   | "priority"
   | "stages"
   | "contexts"
@@ -212,7 +212,7 @@ export interface ImpactSummary {
   total_issues: number;
   project_ids: number[];
   types: CountChange[];
-  severities: CountChange[];
+  impacts: CountChange[];
   priorities: CountChange[];
   stages: CountChange[];
   contexts: CountChange[];

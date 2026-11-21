@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Calendar, Filter, Search, X } from "lucide-react";
+import { Calendar, Filter, Pencil, Search, X } from "lucide-react";
 import { resolvePresetDates } from "../lib/facets";
 import {
   buildScopeSuggestions,
@@ -19,6 +19,9 @@ interface ScopeBarProps {
   totalCount: number;
   onChangeFilters: (next: GlobalFilters) => void;
   onApplyIssueQuery: (query: string) => void;
+  editMode?: boolean;
+  contextsPopoverOpen?: boolean;
+  onEditContexts?: (anchor: HTMLElement | null) => void;
 }
 
 type FlatScopeItem =
@@ -67,6 +70,9 @@ export function ScopeBar({
   totalCount,
   onChangeFilters,
   onApplyIssueQuery,
+  editMode = false,
+  contextsPopoverOpen = false,
+  onEditContexts,
 }: ScopeBarProps) {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -334,6 +340,24 @@ export function ScopeBar({
                 }}
               >
                 <X size={12} />
+              </button>
+            )}
+            {editMode && onEditContexts && (
+              <button
+                type="button"
+                data-rule-trigger="contexts"
+                className={`scope-edit-btn${contextsPopoverOpen ? " active" : ""}`}
+                aria-label="Edit context rules"
+                aria-expanded={contextsPopoverOpen}
+                title="Edit contexts"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onEditContexts(e.currentTarget);
+                }}
+              >
+                <Pencil size={11} />
               </button>
             )}
           </div>
