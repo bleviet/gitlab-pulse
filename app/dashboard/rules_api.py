@@ -1,17 +1,19 @@
 """Rule set viewing and saving endpoints for the in-dashboard rule editor."""
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 
 from app.dashboard.admin import ADMIN_COOKIE_NAME, AdminSessions, run_pipeline_step
+from app.dashboard.palettes import default_palettes
 from app.dashboard.schemas import (
     ClassificationCategoryModel,
     ClassificationValueModel,
     ContextRuleModel,
     ContextsModel,
+    PaletteDefaults,
     RuleCreateRequest,
     RuleDeleteResponse,
     RulePreviewRequest,
@@ -22,6 +24,7 @@ from app.dashboard.schemas import (
     RuleSetBody,
     RuleSetItem,
     RuleSetsResponse,
+    RuleTextResponse,
     RuleVersionModel,
     RuleVersionResponse,
     RuleVersionsResponse,
@@ -204,14 +207,26 @@ def _check_name(store: RuleStore, name: str) -> None:
 
 
 def _validate_body(
-    body: RuleSetBody, others: Mapping[str, DomainRule]
+    body: RuleSetBody,
+    others: Mapping[str, DomainRule],
+    known_colors: Iterable[Mapping[str, object]],
 ) -> tuple[DomainRule | None, list[RuleProblem]]:
-    """Convert and validate a draft; the rule is None after duplicate names."""
+    """Convert and validate a draft; the rule is None after duplicate names.
+
+    Colour problems are dropped when the submitted colours equal any of
+    ``known_colors``: existing values may predate the colour check and are not
+    editable on every rule set.
+    """
     duplicates = _duplicate_classification_problems(body)
     if duplicates:
         return None, duplicates
     rule = body_to_rule(body)
-    return rule, validate_rule_set(rule, others)
+    problems = validate_rule_set(rule, others)
+    if any(rule.colors == known for known in known_colors):
+        problems = [
+            p for p in problems if p.path != "colors" and not p.path.startswith("colors.")
+        ]
+    return rule, problems
 
 
 def _problems_error(problems: list[RuleProblem]) -> HTTPException:
@@ -248,11 +263,13 @@ def _check_draft(
     _check_name(store, name)
     stored_sets = store.list_rule_sets()[0]
     others = {s.name: s.rule for s in stored_sets if s.name != name}
-    rule, problems = _validate_body(body, others)
-    if rule is None:
-        return None, None, {}, problems
     current = next((s for s in stored_sets if s.name == name), None)
     saved = current.rule if current is not None else None
+    rule, problems = _validate_body(
+        body, others, [saved.colors] if saved is not None else []
+    )
+    if rule is None:
+        return None, None, {}, problems
     if saved is not None and set(rule.project_ids) == set(saved.project_ids):
         problems = [p for p in problems if p.path != "project_ids"]
     return rule, saved, others, problems
@@ -267,12 +284,20 @@ def create_rules_router(
     @router.get("/api/rules", response_model=RuleSetsResponse)
     def list_rules() -> RuleSetsResponse:
         rule_sets, load_errors = store.list_rule_sets()
+        light, dark = default_palettes()
         return RuleSetsResponse(
             rule_sets=[_to_item(stored) for stored in rule_sets],
             load_errors=load_errors,
             source=store.source,
             default_name=effective_default_name({s.name: s.rule for s in rule_sets}),
+            palette_defaults=PaletteDefaults(light=light, dark=dark),
         )
+
+    @router.get("/api/rules/{name}/text", response_model=RuleTextResponse)
+    def rule_text(name: str) -> RuleTextResponse:
+        _check_name(store, name)
+        path, text = store.read_text(name)
+        return RuleTextResponse(path=path, text=text)
 
     @router.put("/api/admin/rules/{name}", response_model=RuleSaveResponse)
     async def save_rule(
@@ -316,7 +341,9 @@ def create_rules_router(
         sessions.require(pulse_admin_session)
         stored_sets, load_errors = store.list_rule_sets()
         rule, problems = _validate_body(
-            payload.rule, {s.name: s.rule for s in stored_sets}
+            payload.rule,
+            {s.name: s.rule for s in stored_sets},
+            [s.rule.colors for s in stored_sets],
         )
         if problems or rule is None:
             raise _problems_error(problems)

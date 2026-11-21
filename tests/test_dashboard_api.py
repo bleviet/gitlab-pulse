@@ -1,5 +1,6 @@
 """Integration tests for the FastAPI Layer 3 dashboard API."""
 
+import json
 import struct
 import subprocess
 from pathlib import Path
@@ -725,3 +726,68 @@ def test_default_name_is_none_without_default_and_last_set_is_protected(
     assert res.status_code == 422
     assert res.json()["detail"] == "The last rule set cannot be deleted."
     assert rules_dir.joinpath("default.yaml").is_file()
+
+
+def test_rules_response_includes_palette_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _ = _rules_client(tmp_path, monkeypatch)
+
+    defaults = client.get("/api/rules").json()["palette_defaults"]
+
+    assert defaults["light"]["bug"] == "#b51c3c"
+    assert defaults["dark"]["bug"] == "#f5576c"
+
+
+def test_invalid_colour_change_is_rejected_but_unchanged_named_colour_is_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+    rules_dir.joinpath("default.yaml").write_text(
+        'team: default\ncolors:\n  light:\n    bug: red\nworkflow:\n  stages:\n    - name: Review\n',
+        encoding="utf-8",
+    )
+    _login(client)
+    item = client.get("/api/rules").json()["rule_sets"][0]
+    rule = item["rule"]
+
+    rule["workflow"]["stages"][0]["description"] = "Edited"
+    ok = client.put(
+        "/api/admin/rules/default", json={"revision": item["revision"], "rule": rule}
+    )
+    assert ok.status_code == 200
+
+    item = ok.json()["rule_set"]
+    original = json.loads(json.dumps(item["rule"]))
+    rule = item["rule"]
+    rule["colors"]["light"]["bug"] = "blue"
+    bad = client.put(
+        "/api/admin/rules/default", json={"revision": item["revision"], "rule": rule}
+    )
+    assert bad.status_code == 422
+    assert [p["path"] for p in bad.json()["detail"]["problems"]] == ["colors.light.bug"]
+
+    created = client.post(
+        "/api/admin/rules",
+        json={"rule": {**original, "team": "Copy", "project_ids": [4]}},
+    )
+    assert created.status_code == 200
+
+
+def test_rule_text_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+
+    res = client.get("/api/rules/default/text")
+
+    assert res.status_code == 200
+    assert res.json()["text"] == rules_dir.joinpath("default.yaml").read_text(encoding="utf-8")
+    assert res.json()["path"].endswith("default.yaml")
+    assert client.get("/api/rules/nope/text").status_code == 404
+
+    _login(client)
+    item = client.get("/api/rules").json()["rule_sets"][0]
+    item["rule"]["workflow"]["stages"][0]["description"] = "Fresh text"
+    assert client.put(
+        "/api/admin/rules/default", json={"revision": item["revision"], "rule": item["rule"]}
+    ).status_code == 200
+    assert "Fresh text" in client.get("/api/rules/default/text").json()["text"]

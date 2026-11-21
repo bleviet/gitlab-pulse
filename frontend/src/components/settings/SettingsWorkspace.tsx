@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchRules } from "../../lib/api";
 import { buildLabelInventory } from "../../lib/labelInventory";
 import { buildProjectInventory } from "../../lib/projectInventory";
-import { isDirty, validateRuleSet } from "../../lib/ruleDraft";
+import { validateRuleSet } from "../../lib/ruleDraft";
 import { mergeProblems } from "../../lib/ruleImpact";
 import type {
   IssueItem,
+  PaletteDefaults,
   LabelStyle,
-  RuleProblem,
   RuleSetBody,
-  RuleSetItem,
-  RuleSetsResponse,
 } from "../../lib/types";
 import { ImpactPanel } from "./ImpactPanel";
 import { NewRuleSetDialog } from "./NewRuleSetDialog";
@@ -27,6 +24,7 @@ import { SettingsHeader } from "./SettingsHeader";
 import { SettingsNav } from "./SettingsNav";
 import { SettingsNotices, type Notice } from "./SettingsNotices";
 import { useRuleSetActions } from "./useRuleSetActions";
+import { useRuleSetsData } from "./useRuleSetsData";
 import { useProblemSummary, useRuleContext } from "./useWorkspaceProblems";
 import { useRulePreview } from "./useRulePreview";
 
@@ -41,8 +39,7 @@ interface SettingsWorkspaceProps {
 }
 
 const NO_PROJECTS: number[] = [];
-
-type LoadState = "loading" | "error" | "ready";
+const NO_PALETTE: PaletteDefaults = { light: {}, dark: {} };
 
 export function SettingsWorkspace({
   open,
@@ -53,12 +50,21 @@ export function SettingsWorkspace({
   onLogin,
   onReloadDashboard,
 }: SettingsWorkspaceProps) {
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [response, setResponse] = useState<RuleSetsResponse | null>(null);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [draft, setDraft] = useState<RuleSetBody | null>(null);
-  const [serverProblems, setServerProblems] = useState<RuleProblem[]>([]);
+  const {
+    loadState,
+    loadError,
+    response,
+    setResponse,
+    selectedName,
+    setSelectedName,
+    draft,
+    setDraft,
+    serverProblems,
+    setServerProblems,
+    selected,
+    dirty,
+    load,
+  } = useRuleSetsData();
   const [section, setSection] = useState<SectionId>("type");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -66,12 +72,6 @@ export function SettingsWorkspace({
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
-
-  const selected: RuleSetItem | null = useMemo(
-    () => response?.rule_sets.find((r) => r.name === selectedName) ?? null,
-    [response, selectedName],
-  );
-  const dirty = Boolean(selected && draft && isDirty(selected.rule, draft));
 
   const inventory = useMemo(() => buildLabelInventory(issues, labelStyles), [issues, labelStyles]);
 
@@ -110,28 +110,6 @@ export function SettingsWorkspace({
     [clientProblems, serverProblems, preview.problems],
   );
   const { problems, unplacedProblems, problemCountBySection } = useProblemSummary(allProblems, draft);
-
-  const load = useCallback(async (preferredName?: string | null, preferDefault = false) => {
-    setLoadState("loading");
-    setLoadError(null);
-    try {
-      const data = await fetchRules();
-      const chosen =
-        (preferDefault
-          ? data.rule_sets.find((r) => r.name === data.default_name)
-          : data.rule_sets.find((r) => r.name === preferredName)) ??
-        data.rule_sets[0] ??
-        null;
-      setResponse(data);
-      setSelectedName(chosen?.name ?? null);
-      setDraft(chosen?.rule ?? null);
-      setServerProblems([]);
-      setLoadState("ready");
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Could not load the rules");
-      setLoadState("error");
-    }
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -251,6 +229,7 @@ export function SettingsWorkspace({
           canEdit={canEdit}
           defaultName={defaultName}
           newBlocked={dirty}
+          saving={saving}
           onNewRuleSet={() => {
             actions.resetCreate();
             setNewOpen(true);
@@ -315,7 +294,10 @@ export function SettingsWorkspace({
                   onQuickAdd={handleQuickAdd}
                 />
 
-                <fieldset className="settings-fieldset" disabled={!canEdit || saving}>
+                <fieldset
+                    className="settings-fieldset"
+                    disabled={(!canEdit || saving) && !(section === "text" || (section === "colors" && !isDefault))}
+                  >
                   <legend className="settings-visually-hidden">{current.title}</legend>
                   <SectionContent
                     section={section}
@@ -323,6 +305,8 @@ export function SettingsWorkspace({
                     selected={selected}
                     isDefault={isDefault}
                     hasDefault={defaultName !== null}
+                    paletteDefaults={response?.palette_defaults ?? NO_PALETTE}
+                    onGoToDefault={() => defaultName && handleSelectRuleSet(defaultName)}
                     otherTeamNames={otherTeamNames}
                     canEdit={canEdit}
                     dirty={dirty}
@@ -333,6 +317,8 @@ export function SettingsWorkspace({
                     labelCounts={preview.impact?.label_pattern_counts}
                     titleCounts={preview.impact?.title_pattern_counts}
                     deleting={actions.busy}
+                    readOnly={!canEdit || saving}
+                    saving={saving}
                     onChange={updateDraft}
                     onDelete={() => void actions.remove()}
                     onLoadVersion={handleLoadVersion}

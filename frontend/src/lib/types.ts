@@ -128,8 +128,10 @@ export type SectionId =
   | "stages"
   | "contexts"
   | "quality"
+  | "colors"
   | "projects"
-  | "history";
+  | "history"
+  | "text";
 
 export interface MatcherRule {
   name: string;
@@ -181,6 +183,7 @@ export interface RuleSetsResponse {
   rule_sets: RuleSetItem[];
   load_errors: Record<string, string>;
   default_name: string | null;
+  palette_defaults: PaletteDefaults;
   source: "template" | "user";
 }
 
@@ -241,4 +244,14 @@ export interface RuleVersionResponse {
 
 export interface RuleDeleteResponse {
   job: AdminJobResponse;
+}
+
+export interface PaletteDefaults {
+  light: Record<string, string>;
+  dark: Record<string, string>;
+}
+
+export interface RuleTextResponse {
+  path: string;
+  text: string;
 }

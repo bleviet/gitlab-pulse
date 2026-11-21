@@ -58,8 +58,11 @@ export function groupsForSection(section: SectionId, impact: ImpactSummary): Imp
       return [
         { title: "Issues by context", rows: toRows(impact.contexts, named("No context")) },
       ];
+    case "colors":
+      return [];
     case "projects":
     case "history":
+    case "text":
       return OVERVIEW_SECTIONS.flatMap((id) => groupsForSection(id, impact));
     case "quality":
       return [

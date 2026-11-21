@@ -398,3 +398,68 @@ def test_read_version_rejects_bad_or_missing_ids(tmp_path: Path, version_id: str
     store, _, _ = _make_store(tmp_path)
     with pytest.raises(RuleVersionNotFoundError):
         store.read_version("default", version_id)
+
+
+def _colour_paths(colors: dict[str, object]) -> list[str]:
+    return [p.path for p in validate_rule_set(DomainRule(colors=colors), {})]
+
+
+def test_validate_colours_accepts_valid_forms() -> None:
+    colors: dict[str, object] = {
+        "light": {"bug": "#fff"},
+        "Dark": {"bug": "#1A7a62"},
+        "global": {"task": "#abc"},
+        "primary": "#ff512f",
+    }
+    assert _colour_paths(colors) == []
+
+
+def test_validate_colours_reports_exact_paths() -> None:
+    colors: dict[str, object] = {
+        "light": {"bug": "red", "task": "#12345"},
+        "dark": {"bug": 5},
+        "global": {"epic": "#ggg"},
+        "primary": "blue",
+        "neutral": 7,
+    }
+    assert _colour_paths(colors) == [
+        "colors.light.bug",
+        "colors.light.task",
+        "colors.dark.bug",
+        "colors.global.epic",
+        "colors.primary",
+        "colors.neutral",
+    ]
+    message = validate_rule_set(DomainRule(colors={"light": {"bug": "red"}}), {})[0].message
+    assert message == (
+        "Enter a colour as # followed by 3 or 6 letters or digits, for example #1a7a62."
+    )
+
+
+def test_validate_colours_non_mapping_group_cannot_be_read() -> None:
+    problems = validate_rule_set(DomainRule(colors={"light": "#fff"}), {})
+    assert [(p.path, p.message) for p in problems] == [
+        ("colors.light", "This colour setting cannot be read.")
+    ]
+
+
+def test_read_text_returns_path_and_bytes_for_both_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, user, template = _make_store(tmp_path)
+    template.joinpath("default.yaml").write_text("team: \u00fcber\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    path, text = store.read_text("default")
+    assert (path, text) == ("template/default.yaml", "team: \u00fcber\n")
+
+    revision = _revision(store, "default")
+    store.write("default", DomainRule(team="saved"), revision)
+    path, text = store.read_text("default")
+    assert path == "user/default.yaml"
+    assert text == user.joinpath("default.yaml").read_text(encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path / "template")
+    assert store.read_text("default")[0] == (user / "default.yaml").resolve().as_posix()
+    with pytest.raises(RuleSetNotFoundError):
+        store.read_text("missing")

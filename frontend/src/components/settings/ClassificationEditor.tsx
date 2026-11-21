@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
 import { moveItem, problemsWithPrefix, removeAt, updateAt } from "../../lib/ruleDraft";
@@ -34,6 +35,7 @@ interface ClassificationEditorProps {
   problems: Record<string, string>;
   labelCounts?: Record<string, number>;
   titleCounts?: Record<string, number>;
+  extraActions?: ReactNode;
 }
 
 export function ClassificationEditor({
@@ -44,6 +46,7 @@ export function ClassificationEditor({
   problems,
   labelCounts,
   titleCounts,
+  extraActions,
 }: ClassificationEditorProps) {
   const copy = COPY[category];
   const base = `classification.${category}`;
@@ -105,14 +108,17 @@ export function ClassificationEditor({
           </div>
         );
       })}
-      <button
-        type="button"
-        className="pulse-btn-secondary settings-add-btn"
-        onClick={() => onChange([...rows, { name: "", labels: [], title: [] }])}
-      >
-        <Plus size={14} />
-        <span>{copy.add}</span>
-      </button>
+      <div className="settings-add-row">
+        <button
+          type="button"
+          className="pulse-btn-secondary"
+          onClick={() => onChange([...rows, { name: "", labels: [], title: [] }])}
+        >
+          <Plus size={14} />
+          <span>{copy.add}</span>
+        </button>
+        {extraActions}
+      </div>
     </div>
   );
 }

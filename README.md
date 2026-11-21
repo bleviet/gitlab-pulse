@@ -155,9 +155,11 @@ Rules determine how issues are classified (Bug, Feature, etc.), which labels pla
 
 **Several teams:** **New rule set** creates rules for one team and the projects you tick; all other projects keep using the default rule set. **Team & projects** changes the assignment later, and **Earlier versions** loads a previous version (or the version shipped with GitLab Pulse) back into the editor, where you can check its effect before saving.
 
+**Starting from existing labels:** if your projects already use scoped labels such as `type::bug`, `priority::1`, or `workflow::review`, **Suggest from my labels** in the type, severity, priority, and stage sections proposes the matching rows. **Colours** changes the colours used for types, severities, priorities, and stages in both themes.
+
 **Where rules are stored:** `app/config/rules/default.yaml` is a read-only template. The first save from the Settings screen copies the template rules to `data/rules/` and writes there from then on. `data/rules/` is gitignored and sits on the Docker data volume, so saved rules survive image rebuilds. The previous version of a file is kept in `data/rules/.history/` on every save.
 
-**By hand (optional):** the files are plain YAML and can still be edited directly, in `data/rules/` once it exists, otherwise in `app/config/rules/`. Create additional files (e.g., `my_project.yaml`) and restrict them to specific projects with `project_ids`. Comments in a file are dropped the next time that file is saved from the Settings screen. Run the processor after a manual edit.
+**By hand (optional):** **View as text** in Settings shows the stored file and its location. The files are plain YAML and can still be edited directly, in `data/rules/` once it exists, otherwise in `app/config/rules/`. Create additional files (e.g., `my_project.yaml`) and restrict them to specific projects with `project_ids`. Comments in a file are dropped the next time that file is saved from the Settings screen. Run the processor after a manual edit.
 
 ### 3. Run the Pipeline
 Fetch the data, process it into analytics, and launch the dashboard:

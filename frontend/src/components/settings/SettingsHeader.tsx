@@ -24,6 +24,7 @@ interface SettingsHeaderProps {
   canEdit: boolean;
   defaultName: string | null;
   newBlocked: boolean;
+  saving: boolean;
   onSelectRuleSet: (name: string) => void;
   onNewRuleSet: () => void;
   onClose: () => void;
@@ -35,6 +36,7 @@ export function SettingsHeader({
   canEdit,
   defaultName,
   newBlocked,
+  saving,
   onSelectRuleSet,
   onNewRuleSet,
   onClose,
@@ -55,6 +57,7 @@ export function SettingsHeader({
                 id="settings-rule-set"
                 className="settings-select"
                 value={selected.name}
+                disabled={saving}
                 onChange={(e) => onSelectRuleSet(e.target.value)}
               >
                 {ruleSets.map((r) => (

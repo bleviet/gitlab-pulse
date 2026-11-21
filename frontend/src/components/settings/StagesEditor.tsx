@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
 import { moveItem, problemsWithPrefix, removeAt, STAGE_TYPES, updateAt } from "../../lib/ruleDraft";
@@ -18,9 +19,10 @@ interface StagesEditorProps {
   inventory: LabelInventoryItem[];
   problems: Record<string, string>;
   labelCounts?: Record<string, number>;
+  extraActions?: ReactNode;
 }
 
-export function StagesEditor({ stages, onChange, inventory, problems, labelCounts }: StagesEditorProps) {
+export function StagesEditor({ stages, onChange, inventory, problems, labelCounts, extraActions }: StagesEditorProps) {
   return (
     <div className="settings-rows">
       {stages.length === 0 && (
@@ -109,16 +111,19 @@ export function StagesEditor({ stages, onChange, inventory, problems, labelCount
           </div>
         );
       })}
-      <button
-        type="button"
-        className="pulse-btn-secondary settings-add-btn"
-        onClick={() =>
-          onChange([...stages, { name: "", labels: [], type: "active", description: "" }])
-        }
-      >
-        <Plus size={14} />
-        <span>Add stage</span>
-      </button>
+      <div className="settings-add-row">
+        <button
+          type="button"
+          className="pulse-btn-secondary"
+          onClick={() =>
+            onChange([...stages, { name: "", labels: [], type: "active", description: "" }])
+          }
+        >
+          <Plus size={14} />
+          <span>Add stage</span>
+        </button>
+        {extraActions}
+      </div>
     </div>
   );
 }

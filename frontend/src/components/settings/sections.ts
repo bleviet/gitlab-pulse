@@ -49,6 +49,12 @@ export const SECTIONS: SectionInfo[] = [
       "Quality checks flag issues that need attention, such as issues that went quiet, took too long, or are missing labels or fields.",
   },
   {
+    id: "colors",
+    title: "Colours",
+    intro:
+      "Colours are used in charts, badges and the board. The brand colours apply unless you change them here. You can set a colour for the light and the dark theme separately.",
+  },
+  {
     id: "projects",
     title: "Team & projects",
     group: "This rule set",
@@ -61,6 +67,13 @@ export const SECTIONS: SectionInfo[] = [
     group: "This rule set",
     intro:
       "Going back to an earlier version does not save anything by itself. The version is loaded into the editor as unsaved changes, so you can check its effect and then choose Save & apply, or discard it.",
+  },
+  {
+    id: "text",
+    title: "View as text",
+    group: "This rule set",
+    intro:
+      "This is the rule set as it is stored, for people who maintain GitLab Pulse. It cannot be edited here.",
   },
 ];
 
@@ -75,6 +88,7 @@ export function sectionForPath(path: string): SectionId | null {
   }
   if (parts[0] === "workflow") return "stages";
   if (parts[0] === "contexts") return "contexts";
+  if (parts[0] === "colors") return "colors";
   if (parts[0] === "team" || parts[0] === "project_ids") return "projects";
   if (parts[0] === "validation") return "quality";
   return null;
@@ -111,8 +125,10 @@ export function rowNamesForSection(rule: RuleSetBody, section: SectionId): strin
     case "contexts":
       return rule.contexts.rules.map((row) => row.name);
     case "quality":
+    case "colors":
     case "projects":
     case "history":
+    case "text":
       return [];
   }
 }
@@ -140,8 +156,10 @@ export function addLabelToRow(
     case "contexts":
       return { ...rule, contexts: { ...rule.contexts, rules: withLabel(rule.contexts.rules) } };
     case "quality":
+    case "colors":
     case "projects":
     case "history":
+    case "text":
       return rule;
   }
 }

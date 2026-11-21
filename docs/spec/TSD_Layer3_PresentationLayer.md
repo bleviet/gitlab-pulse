@@ -42,6 +42,11 @@ The legacy Streamlit UI, Plotly wrapper layer, and experimental Custom View buil
 - `POST /api/admin/rules` -> creates a rule set from `{rule}`; the server derives the file name from the team name. Validated against every existing rule set, so a project that already belongs to another rule set or a second default is rejected with `422`. Runs the processor like a save.
 - `DELETE /api/admin/rules/{name}?revision=...` -> archives and removes a rule set and runs the processor. The effective default rule set cannot be deleted (`422`), because projects without their own rule set would lose their rules, and neither can the last remaining rule set, because an empty `data/rules/` would hand control back to the shipped template without telling anyone.
 - `GET /api/admin/rules/{name}/versions` and `GET /api/admin/rules/{name}/versions/{id}` -> earlier versions of a rule set (history copies and the shipped template) and the content of one. There is no restore endpoint; the UI saves a loaded version through `PUT`.
+- `GET /api/rules/{name}/text` -> `{path, text}`: the stored file of one rule set, for the read-only text view. No authentication, like `GET /api/rules`.
+
+`GET /api/rules` also returns `palette_defaults` (the built-in light and dark colours from `palettes.py`), so the colours editor shows the effective colour and can reset an override without keeping a second copy of the brand palette in the frontend.
+
+Problems on `project_ids` and on `colors` are reported only when that part of the rule set changed in the request. Both can be wrong in hand-written files without being editable on the screen the user is on (colours are edited only in the default rule set), and an unrelated edit must not be blocked by them.
 
 The rule API represents `classification` as ordered lists (`[{name, values: [{name, labels, title}]}]`) rather than the nested mapping used in YAML. Order decides which value wins and how priorities rank, and JavaScript re-orders object keys that look like integers (a priority named `1`), so a mapping cannot carry the order to the browser reliably.
 

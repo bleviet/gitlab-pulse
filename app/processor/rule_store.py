@@ -37,6 +37,8 @@ _STAMP_FORMAT = "%Y%m%dT%H%M%S%fZ"
 _INVALID_NAME_MESSAGE = (
     "Rule set names may only use lowercase letters, digits, '-' and '_'."
 )
+_COLOUR_PATTERN = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
+_COLOUR_GROUPS = ("light", "dark", "global")
 _STAGE_TYPES = ("active", "waiting", "completed")
 _PATTERN_PREFIXES = ("regex:", "contains:", "exact:")
 _FILE_HEADER = (
@@ -191,6 +193,39 @@ def _check_patterns(
                 )
 
 
+def _check_colour(value: object, path: str, problems: list[RuleProblem]) -> None:
+    if not isinstance(value, str):
+        problems.append(
+            RuleProblem(path=path, message="This colour setting cannot be read.")
+        )
+    elif not _COLOUR_PATTERN.fullmatch(value):
+        problems.append(
+            RuleProblem(
+                path=path,
+                message=(
+                    "Enter a colour as # followed by 3 or 6 letters or digits, "
+                    "for example #1a7a62."
+                ),
+            )
+        )
+
+
+def _check_colours(colors: Mapping[str, object], problems: list[RuleProblem]) -> None:
+    for key, value in colors.items():
+        if str(key).strip().lower() not in _COLOUR_GROUPS:
+            _check_colour(value, f"colors.{key}", problems)
+        elif isinstance(value, Mapping):
+            for leaf_key, leaf in value.items():
+                _check_colour(leaf, f"colors.{key}.{leaf_key}", problems)
+        else:
+            problems.append(
+                RuleProblem(
+                    path=f"colors.{key}",
+                    message="This colour setting cannot be read.",
+                )
+            )
+
+
 def validate_rule_set(
     rule: DomainRule, others: Mapping[str, DomainRule]
 ) -> list[RuleProblem]:
@@ -309,6 +344,8 @@ def validate_rule_set(
                 )
             )
 
+    _check_colours(rule.colors, problems)
+
     return problems
 
 
@@ -414,6 +451,28 @@ class RuleStore:
         content = dump_rule(rule).encode("utf-8")
         _write_atomic(target, content)
         return StoredRuleSet(name=name, revision=_revision(content), rule=rule)
+
+    def read_text(self, name: str) -> tuple[str, str]:
+        """Return a rule file's display path and its content as stored.
+
+        Args:
+            name: Rule set name (file stem)
+
+        Returns:
+            The POSIX path (relative to the working directory when inside it,
+            otherwise absolute) and the UTF-8 decoded file content
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetNotFoundError: If no rule file has this name
+        """
+        self.check_exists(name)
+        file_path = (self.active_path / f"{name}.yaml").resolve()
+        try:
+            shown = file_path.relative_to(Path.cwd().resolve())
+        except ValueError:
+            shown = file_path
+        return shown.as_posix(), file_path.read_text(encoding="utf-8")
 
     def create(self, name: str, rule: DomainRule) -> StoredRuleSet:
         """Create a new rule set.

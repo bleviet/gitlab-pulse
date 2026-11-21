@@ -22,7 +22,7 @@
 - The effective default is the rule set with an empty `project_ids` list whose file name sorts first, the one `RuleLoader` registers as the fallback. The store exposes its name so the API, the dry run, and the UI agree on which rule set that is when hand-edited files contain more than one.
 - `RuleStore.list_versions()` and `read_version()` expose the history copies of one rule set, newest first, plus the template file of the same name as the version `template`. Version IDs are accepted only as `template` or a timestamp of the exact history format, which keeps the lookup inside the history directory.
 - `dump_rule()` serialises a `DomainRule` without the deprecated keys (`label_mappings`, `title_patterns`, `contexts.method`, `contexts.patterns`) and without sorting keys, because the key order of `classification` decides which value wins and how priorities rank.
-- `validate_rule_set()` returns plain-language problems with a field path for conditions the lenient `DomainRule` model accepts: empty names, duplicate stage or context names, unknown stage types, empty patterns, regular expressions that do not compile, thresholds below 1, a project claimed by two rule sets, and more than one default rule set.
+- `validate_rule_set()` returns plain-language problems with a field path for conditions the lenient `DomainRule` model accepts: empty names, duplicate stage or context names, unknown stage types, empty patterns, regular expressions that do not compile, thresholds below 1, a project claimed by two rule sets, more than one default rule set, an empty team name, and colour overrides that are not `#` plus 3 or 6 hex digits.
 
 ### 1.3 Dry run
 

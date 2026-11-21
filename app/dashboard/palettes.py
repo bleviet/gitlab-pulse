@@ -68,6 +68,11 @@ _SEMANTIC_DARK: dict[str, str] = {
 }
 
 
+def default_palettes() -> tuple[dict[str, str], dict[str, str]]:
+    """Return copies of the built-in (light, dark) semantic color maps."""
+    return dict(_SEMANTIC_LIGHT), dict(_SEMANTIC_DARK)
+
+
 def _normalize_color_mapping(value: object) -> dict[str, str]:
     if not isinstance(value, Mapping):
         return {}

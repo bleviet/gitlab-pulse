@@ -222,6 +222,15 @@ class RuleSetItem(BaseModel):
     rule: RuleSetBody
 
 
+class PaletteDefaults(BaseModel):
+    """Built-in semantic colors used when a rule set sets no override."""
+
+    model_config = ConfigDict(frozen=True)
+
+    light: dict[str, str]
+    dark: dict[str, str]
+
+
 class RuleSetsResponse(BaseModel):
     """All rule sets, files that failed to load, and where they came from."""
 
@@ -231,6 +240,7 @@ class RuleSetsResponse(BaseModel):
     load_errors: dict[str, str] = Field(default_factory=dict)
     source: Literal["template", "user"]
     default_name: str | None = None
+    palette_defaults: PaletteDefaults
 
 
 class RuleProblemModel(BaseModel):
@@ -311,3 +321,12 @@ class RuleVersionResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     rule: RuleSetBody
+
+
+class RuleTextResponse(BaseModel):
+    """A rule file's location and content as stored on disk."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: str
+    text: str

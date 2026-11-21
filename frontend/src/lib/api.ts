@@ -8,6 +8,7 @@ import type {
   RuleSaveResponse,
   RuleSetBody,
   RuleSetsResponse,
+  RuleTextResponse,
   RuleVersionResponse,
   RuleVersionsResponse,
 } from "./types";
@@ -148,4 +149,8 @@ export function fetchRuleVersion(name: string, id: string): Promise<RuleVersionR
   return requestJson<RuleVersionResponse>(
     `/api/admin/rules/${encodeURIComponent(name)}/versions/${encodeURIComponent(id)}`,
   );
+}
+
+export function fetchRuleText(name: string): Promise<RuleTextResponse> {
+  return requestJson<RuleTextResponse>(`/api/rules/${encodeURIComponent(name)}/text`);
 }

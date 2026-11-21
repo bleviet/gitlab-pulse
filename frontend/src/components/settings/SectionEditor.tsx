@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
 import { getCategory, setCategoryValues } from "../../lib/ruleDraft";
 import type { RuleSetBody } from "../../lib/types";
@@ -6,6 +7,8 @@ import { ContextsEditor } from "./ContextsEditor";
 import { QualityEditor } from "./QualityEditor";
 import type { SectionId } from "./sections";
 import { StagesEditor } from "./StagesEditor";
+import type { SuggestSection } from "../../lib/ruleSuggestions";
+import { SuggestFromLabels } from "./SuggestFromLabels";
 
 interface SectionEditorProps {
   section: SectionId;
@@ -14,6 +17,7 @@ interface SectionEditorProps {
   problems: Record<string, string>;
   labelCounts?: Record<string, number>;
   titleCounts?: Record<string, number>;
+  canEdit: boolean;
   onChange: (next: RuleSetBody) => void;
 }
 
@@ -24,8 +28,18 @@ export function SectionEditor({
   problems,
   labelCounts,
   titleCounts,
+  canEdit,
   onChange,
 }: SectionEditorProps) {
+  const suggest = (target: SuggestSection): ReactNode => (
+    <SuggestFromLabels
+      section={target}
+      rule={rule}
+      inventory={inventory}
+      canEdit={canEdit}
+      onChange={onChange}
+    />
+  );
   switch (section) {
     case "type":
     case "severity":
@@ -34,6 +48,7 @@ export function SectionEditor({
         <ClassificationEditor
           key={section}
           category={section}
+          extraActions={suggest(section)}
           rows={getCategory(rule, section)}
           inventory={inventory}
           problems={problems}
@@ -46,6 +61,7 @@ export function SectionEditor({
       return (
         <StagesEditor
           stages={rule.workflow.stages}
+          extraActions={suggest("stages")}
           inventory={inventory}
           problems={problems}
           labelCounts={labelCounts}
@@ -73,8 +89,10 @@ export function SectionEditor({
           onChange={(validation) => onChange({ ...rule, validation })}
         />
       );
+    case "colors":
     case "projects":
     case "history":
+    case "text":
       return null;
   }
 }

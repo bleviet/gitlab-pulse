@@ -61,3 +61,11 @@ describe("addLabelToRow", () => {
     expect(rowNamesForSection(full, "quality")).toEqual([]);
   });
 });
+
+describe("colors and text sections", () => {
+  it("places colour problems in the colours section", () => {
+    expect(sectionForPath("colors.light.bug")).toBe("colors");
+    expect(sectionForPath("colors.global.bug")).toBe("colors");
+    expect(sectionForPath("colors")).toBe("colors");
+  });
+});

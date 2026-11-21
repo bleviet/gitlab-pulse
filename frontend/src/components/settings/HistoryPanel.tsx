@@ -103,7 +103,7 @@ export function HistoryPanel({ name, refreshKey, canEdit, dirty, onLoadVersion }
           </li>
         ))}
       </ul>
-      <p className="settings-hint">Team name and projects stay as they are now.</p>
+      <p className="settings-hint">Team name and projects stay as they are now. Everything else, including colours, comes from the version you load.</p>
       {actionError && (
         <p className="settings-error-text" role="alert">
           {actionError}

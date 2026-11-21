@@ -188,6 +188,16 @@ export function ImpactPanel({
   rowNames,
   onQuickAdd,
 }: ImpactPanelProps) {
+  if (section === "colors") {
+    return (
+      <aside className="settings-impact" aria-label="Effect on your data">
+        <h3 className="settings-impact-title">Effect on your data</h3>
+        <div aria-live="polite" className="settings-impact-status">
+          <p className="settings-hint">Colours do not change which issues are counted.</p>
+        </div>
+      </aside>
+    );
+  }
   const { status, error } = preview;
   const impact = canEdit && !hasClientProblems && status !== "error" ? preview.impact : null;
   const updating = status === "loading" || preview.pending;
@@ -210,7 +220,7 @@ export function ImpactPanel({
       (projects > 0 ? ` in ${plural(projects, "project", "projects")}` : "");
   }
   const isTotal = Boolean(impact && impact.total_issues > 0);
-  const overview = section === "projects" || section === "history";
+  const overview = section === "projects" || section === "history" || section === "text";
   const groups = impact
     ? overview
       ? changedGroups(impact)

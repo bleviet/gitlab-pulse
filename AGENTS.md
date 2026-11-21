@@ -93,7 +93,8 @@ rule file may restrict itself to `project_ids`.
 ### Theming (binding)
 
 - UI chrome colors (backgrounds, text, borders, surfaces, fonts) belong in
-  `frontend/src/styles/tokens.css` (`:root` dark default / `[data-theme="light"]`).
+  `frontend/src/styles/tokens.css` (`:root, [data-theme="dark"]` dark default /
+  `[data-theme="light"]`; either attribute also forces a theme on a subtree).
 - Semantic data colors (issue type, severity, priority, stage, milestone status)
   are resolved by `app/dashboard/palettes.py` (with YAML rule overrides) and
   consumed in `frontend/src/lib/colors.ts`. Never hardcode off-brand colors in

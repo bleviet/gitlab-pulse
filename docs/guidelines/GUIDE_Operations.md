@@ -41,7 +41,16 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 **A:** In **Settings**, click **New rule set**, enter the team name, and tick the team's projects. The new rule set starts as a copy of the one you were looking at. Projects that are not ticked in any rule set use the default rule set. A project can belong to only one rule set; move it under **Team & projects**.
 
 ### **Q: I saved a mistake. How do I go back?**
-**A:** In **Settings**, open **Earlier versions**, pick the version that was in use before the mistake, and click **Load into editor**. Nothing changes yet: the version appears as unsaved changes, the **Effect on your data** panel shows what it would change, and **Save & apply** makes it current. The list also offers the version shipped with GitLab Pulse. Team name and project assignment are not taken from the old version.
+**A:** In **Settings**, open **Earlier versions**, pick the version that was in use before the mistake, and click **Load into editor**. Nothing changes yet: the version appears as unsaved changes, the **Effect on your data** panel shows what it would change, and **Save & apply** makes it current. The list also offers the version shipped with GitLab Pulse. Team name and project assignment are not taken from the old version; everything else, including colours, is.
+
+### **Q: How do I change the colours of types, priorities, or stages?**
+**A:** In **Settings**, select the default rule set and open **Colours**. Each entry has a colour for the light and for the dark theme; **Reset** goes back to the brand colour. A type, severity, or priority you added yourself gets an automatic colour until you choose one. Colours are shared by all teams.
+
+### **Q: We already use labels like `type::bug` and `workflow::review`. Do I have to enter them one by one?**
+**A:** No. In **Issue types**, **Severity**, **Priority**, and **Workflow stages**, click **Suggest from my labels**. The screen lists labels of that form found on your issues, proposes a row for each, and adds the ones you leave ticked to your unsaved changes.
+
+### **Q: I want to see the rule file itself.**
+**A:** **Settings** -> **View as text** shows the stored YAML and its location, read-only, with a copy button.
 
 ### **Q: Where are the rule files?**
 **A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.
