@@ -2,11 +2,14 @@ import type {
   AdminJobResponse,
   AdminStatusResponse,
   DashboardPayload,
+  RuleDeleteResponse,
   RuleProblem,
   RulePreviewResponse,
   RuleSaveResponse,
   RuleSetBody,
   RuleSetsResponse,
+  RuleVersionResponse,
+  RuleVersionsResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -118,5 +121,31 @@ export function previewRuleSet(
   return requestJson<RulePreviewResponse>(
     `/api/admin/rules/${encodeURIComponent(name)}/preview`,
     { method: "POST", body: JSON.stringify({ rule }), signal },
+  );
+}
+
+export function createRuleSet(rule: RuleSetBody): Promise<RuleSaveResponse> {
+  return requestJson<RuleSaveResponse>("/api/admin/rules", {
+    method: "POST",
+    body: JSON.stringify({ rule }),
+  });
+}
+
+export function deleteRuleSet(name: string, revision: string): Promise<RuleDeleteResponse> {
+  return requestJson<RuleDeleteResponse>(
+    `/api/admin/rules/${encodeURIComponent(name)}?revision=${encodeURIComponent(revision)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function fetchRuleVersions(name: string): Promise<RuleVersionsResponse> {
+  return requestJson<RuleVersionsResponse>(
+    `/api/admin/rules/${encodeURIComponent(name)}/versions`,
+  );
+}
+
+export function fetchRuleVersion(name: string, id: string): Promise<RuleVersionResponse> {
+  return requestJson<RuleVersionResponse>(
+    `/api/admin/rules/${encodeURIComponent(name)}/versions/${encodeURIComponent(id)}`,
   );
 }

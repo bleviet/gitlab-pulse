@@ -5,9 +5,10 @@ interface TextFieldProps {
   onChange: (next: string) => void;
   problem?: string;
   placeholder?: string;
+  hint?: string;
 }
 
-export function TextField({ id, label, value, onChange, problem, placeholder }: TextFieldProps) {
+export function TextField({ id, label, value, onChange, problem, placeholder, hint }: TextFieldProps) {
   const problemId = `${id}-problem`;
   return (
     <div className="settings-field">
@@ -19,9 +20,14 @@ export function TextField({ id, label, value, onChange, problem, placeholder }: 
         value={value}
         placeholder={placeholder}
         aria-invalid={problem ? true : undefined}
-        aria-describedby={problem ? problemId : undefined}
+        aria-describedby={problem ? problemId : hint ? `${id}-hint` : undefined}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint && !problem && (
+        <p id={`${id}-hint`} className="settings-hint">
+          {hint}
+        </p>
+      )}
       {problem && (
         <p id={problemId} className="settings-error-text" role="alert">
           {problem}

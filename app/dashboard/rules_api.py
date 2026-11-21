@@ -1,6 +1,8 @@
 """Rule set viewing and saving endpoints for the in-dashboard rule editor."""
 
 import asyncio
+from collections.abc import Mapping
+from pathlib import Path
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 
@@ -10,6 +12,8 @@ from app.dashboard.schemas import (
     ClassificationValueModel,
     ContextRuleModel,
     ContextsModel,
+    RuleCreateRequest,
+    RuleDeleteResponse,
     RulePreviewRequest,
     RulePreviewResponse,
     RuleProblemModel,
@@ -18,6 +22,9 @@ from app.dashboard.schemas import (
     RuleSetBody,
     RuleSetItem,
     RuleSetsResponse,
+    RuleVersionModel,
+    RuleVersionResponse,
+    RuleVersionsResponse,
     ValidationModel,
     WorkflowModel,
     WorkflowStageModel,
@@ -38,9 +45,13 @@ from app.processor.rule_store import (
     InvalidRuleSetNameError,
     RevisionConflictError,
     RuleProblem,
+    RuleSetExistsError,
     RuleSetNotFoundError,
     RuleStore,
+    RuleVersionNotFoundError,
     StoredRuleSet,
+    effective_default_name,
+    unique_name,
     validate_rule_set,
 )
 
@@ -178,19 +189,8 @@ def _duplicate_classification_problems(body: RuleSetBody) -> list[RuleProblem]:
     return problems
 
 
-def _check_draft(
-    store: RuleStore, name: str, body: RuleSetBody
-) -> tuple[DomainRule | None, dict[str, DomainRule], list[RuleProblem]]:
-    """Validate a draft rule set for saving or previewing.
-
-    Returns:
-        The converted rule (None when duplicate classification names make the
-        conversion unreliable), the other stored rule sets by name, and the
-        problems found.
-
-    Raises:
-        HTTPException: 422 for an invalid name, 404 for an unknown rule set.
-    """
+def _check_name(store: RuleStore, name: str) -> None:
+    """Raise HTTP 422 for an invalid name and 404 for an unknown rule set."""
     try:
         store.check_exists(name)
     except InvalidRuleSetNameError as exc:
@@ -202,18 +202,60 @@ def _check_draft(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
 
+
+def _validate_body(
+    body: RuleSetBody, others: Mapping[str, DomainRule]
+) -> tuple[DomainRule | None, list[RuleProblem]]:
+    """Convert and validate a draft; the rule is None after duplicate names."""
     duplicates = _duplicate_classification_problems(body)
     if duplicates:
-        return None, {}, duplicates
-
+        return None, duplicates
     rule = body_to_rule(body)
+    return rule, validate_rule_set(rule, others)
+
+
+def _problems_error(problems: list[RuleProblem]) -> HTTPException:
+    summary = (
+        "1 problem needs" if len(problems) == 1 else f"{len(problems)} problems need"
+    )
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "message": f"{summary} fixing before these rules can be saved.",
+            "problems": [
+                RuleProblemModel(path=problem.path, message=problem.message).model_dump()
+                for problem in problems
+            ],
+        },
+    )
+
+
+def _check_draft(
+    store: RuleStore, name: str, body: RuleSetBody
+) -> tuple[
+    DomainRule | None, DomainRule | None, dict[str, DomainRule], list[RuleProblem]
+]:
+    """Validate a draft of an existing rule set for saving or previewing.
+
+    Returns:
+        The converted rule (None when duplicate classification names make the
+        conversion unreliable), the stored version of this rule set, the other
+        stored rule sets by name, and the problems found.
+
+    Raises:
+        HTTPException: 422 for an invalid name, 404 for an unknown rule set.
+    """
+    _check_name(store, name)
     stored_sets = store.list_rule_sets()[0]
     others = {s.name: s.rule for s in stored_sets if s.name != name}
-    problems = validate_rule_set(rule, others)
+    rule, problems = _validate_body(body, others)
+    if rule is None:
+        return None, None, {}, problems
     current = next((s for s in stored_sets if s.name == name), None)
-    if current is not None and set(rule.project_ids) == set(current.rule.project_ids):
+    saved = current.rule if current is not None else None
+    if saved is not None and set(rule.project_ids) == set(saved.project_ids):
         problems = [p for p in problems if p.path != "project_ids"]
-    return rule, others, problems
+    return rule, saved, others, problems
 
 
 def create_rules_router(
@@ -229,6 +271,7 @@ def create_rules_router(
             rule_sets=[_to_item(stored) for stored in rule_sets],
             load_errors=load_errors,
             source=store.source,
+            default_name=effective_default_name({s.name: s.rule for s in rule_sets}),
         )
 
     @router.put("/api/admin/rules/{name}", response_model=RuleSaveResponse)
@@ -238,27 +281,9 @@ def create_rules_router(
         pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
     ) -> RuleSaveResponse:
         sessions.require(pulse_admin_session)
-        rule, _others, problems = _check_draft(store, name, payload.rule)
+        rule, _saved, _others, problems = _check_draft(store, name, payload.rule)
         if problems or rule is None:
-            summary = (
-                "1 problem needs"
-                if len(problems) == 1
-                else f"{len(problems)} problems need"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={
-                    "message": (
-                        f"{summary} fixing before these rules can be saved."
-                    ),
-                    "problems": [
-                        RuleProblemModel(
-                            path=problem.path, message=problem.message
-                        ).model_dump()
-                        for problem in problems
-                    ],
-                },
-            )
+            raise _problems_error(problems)
 
         try:
             stored = store.write(name, rule, payload.revision)
@@ -283,6 +308,106 @@ def create_rules_router(
         service.clear_cache()
         return RuleSaveResponse(rule_set=_to_item(stored), job=job)
 
+    @router.post("/api/admin/rules", response_model=RuleSaveResponse)
+    async def create_rule(
+        payload: RuleCreateRequest,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RuleSaveResponse:
+        sessions.require(pulse_admin_session)
+        stored_sets, load_errors = store.list_rule_sets()
+        rule, problems = _validate_body(
+            payload.rule, {s.name: s.rule for s in stored_sets}
+        )
+        if problems or rule is None:
+            raise _problems_error(problems)
+        taken = {s.name for s in stored_sets} | {Path(f).stem for f in load_errors}
+        try:
+            stored = store.create(unique_name(rule.team, taken), rule)
+        except RuleSetExistsError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+            ) from exc
+        job = await run_pipeline_step("app/processor/main.py", "Processor (L2)", service)
+        service.clear_cache()
+        return RuleSaveResponse(rule_set=_to_item(stored), job=job)
+
+    @router.delete("/api/admin/rules/{name}", response_model=RuleDeleteResponse)
+    async def delete_rule(
+        name: str,
+        revision: str,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RuleDeleteResponse:
+        sessions.require(pulse_admin_session)
+        _check_name(store, name)
+        stored = {s.name: s.rule for s in store.list_rule_sets()[0]}
+        if name == effective_default_name(stored):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The rule set that applies to all other projects cannot be deleted.",
+            )
+        if len(stored) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The last rule set cannot be deleted.",
+            )
+        try:
+            store.delete(name, revision)
+        except RevisionConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "These rules were changed by someone else. "
+                    "Reload to see the latest version."
+                ),
+            ) from exc
+        job = await run_pipeline_step("app/processor/main.py", "Processor (L2)", service)
+        service.clear_cache()
+        return RuleDeleteResponse(job=job)
+
+    @router.get(
+        "/api/admin/rules/{name}/versions", response_model=RuleVersionsResponse
+    )
+    def list_rule_versions(
+        name: str,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RuleVersionsResponse:
+        sessions.require(pulse_admin_session)
+        _check_name(store, name)
+        return RuleVersionsResponse(
+            versions=[
+                RuleVersionModel(
+                    id=version.id,
+                    kind=version.kind,
+                    saved_at=version.saved_at.isoformat() if version.saved_at else None,
+                )
+                for version in store.list_versions(name)
+            ]
+        )
+
+    @router.get(
+        "/api/admin/rules/{name}/versions/{version_id}",
+        response_model=RuleVersionResponse,
+    )
+    def get_rule_version(
+        name: str,
+        version_id: str,
+        pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    ) -> RuleVersionResponse:
+        sessions.require(pulse_admin_session)
+        _check_name(store, name)
+        try:
+            rule = store.read_version(name, version_id)
+        except RuleVersionNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="This version cannot be read.",
+            ) from exc
+        return RuleVersionResponse(rule=rule_to_body(rule))
+
     @router.post("/api/admin/rules/{name}/preview", response_model=RulePreviewResponse)
     async def preview_rule(
         name: str,
@@ -291,7 +416,7 @@ def create_rules_router(
         pulse_admin_session: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
     ) -> RulePreviewResponse:
         sessions.require(pulse_admin_session)
-        rule, others, problems = _check_draft(store, name, payload.rule)
+        rule, saved, others, problems = _check_draft(store, name, payload.rule)
         if problems or rule is None:
             return RulePreviewResponse(
                 problems=[
@@ -310,6 +435,7 @@ def create_rules_router(
                     name,
                     rule,
                     others,
+                    saved,
                 )
             except ConfigurationConflictError as exc:
                 raise HTTPException(

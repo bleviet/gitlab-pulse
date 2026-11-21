@@ -37,6 +37,12 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 ### **Q: How do I change the rules without editing a file?**
 **A:** Open **Settings** in the top-right navigation bar, unlock editing with the admin password, change the rules, and click **Save & apply**. Before saving, the **Effect on your data** panel shows the issue counts with the saved rules and with your changes. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
 
+### **Q: How do I give one team its own rules?**
+**A:** In **Settings**, click **New rule set**, enter the team name, and tick the team's projects. The new rule set starts as a copy of the one you were looking at. Projects that are not ticked in any rule set use the default rule set. A project can belong to only one rule set; move it under **Team & projects**.
+
+### **Q: I saved a mistake. How do I go back?**
+**A:** In **Settings**, open **Earlier versions**, pick the version that was in use before the mistake, and click **Load into editor**. Nothing changes yet: the version appears as unsaved changes, the **Effect on your data** panel shows what it would change, and **Save & apply** makes it current. The list also offers the version shipped with GitLab Pulse. Team name and project assignment are not taken from the old version.
+
 ### **Q: Where are the rule files?**
 **A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.
 

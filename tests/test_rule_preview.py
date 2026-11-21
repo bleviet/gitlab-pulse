@@ -13,6 +13,7 @@ from app.processor.rule_loader import (
     StageConfig,
     load_rule_file,
 )
+from app.processor.rule_store import effective_default_name
 
 TODAY_YAML = """
 project_ids: []
@@ -272,3 +273,71 @@ def test_default_other_does_not_block_draft_with_explicit_projects(
     )
 
     assert impact.project_ids == [1]
+
+
+def test_removing_a_project_previews_fallback_to_default_rules(tmp_path: Path) -> None:
+    processed, rules, default = _setup(tmp_path)
+    _write_project(processed, 2, [(20, "opened", ["only::mine"], "Other", 1)])
+    rules.joinpath("p2.yaml").write_text(
+        'project_ids: [2]\nclassification:\n  type:\n    Mine:\n      labels: ["only::mine"]\n',
+        encoding="utf-8",
+    )
+    saved = load_rule_file(rules / "p2.yaml")
+    draft = saved.model_copy(deep=True)
+    draft.project_ids = [99]
+
+    impact = summarize_impact(
+        processed, rules, "p2", draft, {"default": default}, saved
+    )
+
+    assert impact.project_ids == [2]
+    assert impact.total_issues == 1
+    assert [(c.name, c.before, c.after) for c in impact.types] == [
+        ("Mine", 1, 0),
+        (None, 0, 1),
+    ]
+    assert impact.label_pattern_counts == {"only::mine": 0}
+
+
+def test_removed_project_without_any_default_falls_back_to_empty_rule(
+    tmp_path: Path,
+) -> None:
+    processed, rules, _ = _setup(tmp_path)
+    _write_project(processed, 2, [(20, "opened", ["only::mine"], "Other", 1)])
+    rules.joinpath("p2.yaml").write_text(
+        'project_ids: [2]\nclassification:\n  type:\n    Mine:\n      labels: ["only::mine"]\n',
+        encoding="utf-8",
+    )
+    saved = load_rule_file(rules / "p2.yaml")
+    draft = saved.model_copy(deep=True)
+    draft.project_ids = [99]
+
+    impact = summarize_impact(processed, rules, "p2", draft, {}, saved)
+
+    assert [(c.name, c.before, c.after) for c in impact.types] == [("Mine", 1, 0)]
+
+
+def test_adding_a_project_still_governs_it(tmp_path: Path) -> None:
+    processed, rules, default = _setup(tmp_path)
+    _write_project(processed, 2, [(20, "opened", ["only::mine"], "Other", 1)])
+    saved = DomainRule(project_ids=[99])
+    draft = DomainRule(project_ids=[99, 2])
+
+    impact = summarize_impact(
+        processed, rules, "p2", draft, {"default": default}, saved
+    )
+
+    assert impact.project_ids == [2]
+    assert impact.total_issues == 1
+
+
+def test_effective_default_name_uses_file_name_order() -> None:
+    sets = {
+        "a": DomainRule(project_ids=[1]),
+        "b": DomainRule(),
+        "a-b": DomainRule(),
+        "a1": DomainRule(),
+    }
+    assert effective_default_name(sets) == "a-b"
+    assert effective_default_name({"x": DomainRule(project_ids=[1])}) is None
+    assert effective_default_name({}) is None

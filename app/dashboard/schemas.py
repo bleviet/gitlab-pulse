@@ -230,6 +230,7 @@ class RuleSetsResponse(BaseModel):
     rule_sets: list[RuleSetItem]
     load_errors: dict[str, str] = Field(default_factory=dict)
     source: Literal["template", "user"]
+    default_name: str | None = None
 
 
 class RuleProblemModel(BaseModel):
@@ -270,3 +271,43 @@ class RulePreviewResponse(BaseModel):
 
     problems: list[RuleProblemModel] = Field(default_factory=list)
     impact: ImpactSummary | None = None
+
+
+class RuleCreateRequest(BaseModel):
+    """New rule set; its file name is derived from the team name."""
+
+    rule: RuleSetBody
+
+
+class RuleDeleteResponse(BaseModel):
+    """Result of the processor re-run after deleting a rule set."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job: AdminJobResponse
+
+
+class RuleVersionModel(BaseModel):
+    """An earlier version of a rule set."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    kind: Literal["history", "template"]
+    saved_at: str | None = None
+
+
+class RuleVersionsResponse(BaseModel):
+    """Earlier versions of a rule set, newest first."""
+
+    model_config = ConfigDict(frozen=True)
+
+    versions: list[RuleVersionModel] = Field(default_factory=list)
+
+
+class RuleVersionResponse(BaseModel):
+    """Content of one earlier version of a rule set."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rule: RuleSetBody

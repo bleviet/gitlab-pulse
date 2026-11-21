@@ -58,6 +58,9 @@ export function groupsForSection(section: SectionId, impact: ImpactSummary): Imp
       return [
         { title: "Issues by context", rows: toRows(impact.contexts, named("No context")) },
       ];
+    case "projects":
+    case "history":
+      return OVERVIEW_SECTIONS.flatMap((id) => groupsForSection(id, impact));
     case "quality":
       return [
         {
@@ -85,4 +88,26 @@ export function mergeProblems(...lists: RuleProblem[][]): RuleProblem[] {
     merged.push(problem);
   }
   return merged;
+}
+
+const OVERVIEW_SECTIONS: SectionId[] = [
+  "type",
+  "severity",
+  "priority",
+  "stages",
+  "contexts",
+  "quality",
+];
+
+export function changedGroups(impact: ImpactSummary): ImpactGroup[] {
+  const result: ImpactGroup[] = [];
+  for (const section of OVERVIEW_SECTIONS) {
+    for (const group of groupsForSection(section, impact)) {
+      if (!group.rows.some((row) => row.delta !== 0)) continue;
+      const changed = group.rows.filter((row) => row.delta !== 0);
+      const rest = group.rows.filter((row) => row.delta === 0);
+      result.push({ title: group.title, rows: [...changed, ...rest] });
+    }
+  }
+  return result;
 }

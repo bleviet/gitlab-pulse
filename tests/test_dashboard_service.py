@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.dashboard.service import DashboardService
+from app.dashboard.palettes import find_default_rule, resolve_palettes
+from app.dashboard.service import DashboardService, _extract_stages
+from app.processor.rule_loader import DomainRule, StageConfig, WorkflowConfig
 
 
 def _write_fixture_data(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
@@ -219,3 +221,33 @@ def test_dashboard_service_caches_by_mtime_and_clears(tmp_path: Path) -> None:
     service.clear_cache()
     third = service.get_dashboard_payload()
     assert third is not first
+
+
+def _stage_rule(team: str, project_ids: list[int], stage: str, color: str) -> DomainRule:
+    return DomainRule(
+        team=team,
+        project_ids=project_ids,
+        workflow=WorkflowConfig(stages=[StageConfig(name=stage)]),
+        colors={"global": {"bug": color}},
+    )
+
+
+def test_renamed_default_rule_set_still_provides_colors_and_leads_stages() -> None:
+    other = _stage_rule("alpha", [5], "Other", "#111111")
+    default = _stage_rule("Platform", [], "First", "#222222")
+    rules = {5: other, 0: default}
+
+    assert find_default_rule(rules) is default
+    assert resolve_palettes(rules).light["bug"] == "#222222"
+    assert [s.name for s in _extract_stages(rules)] == ["First", "Other"]
+
+
+def test_rules_without_default_keep_team_default_then_first_fallback() -> None:
+    named = _stage_rule("default", [5], "Named", "#333333")
+    first = _stage_rule("alpha", [6], "Alpha", "#444444")
+
+    assert find_default_rule({6: first, 5: named}) is named
+    assert find_default_rule({6: first}) is first
+    assert find_default_rule({}) is None
+    assert resolve_palettes({6: first}).light["bug"] == "#444444"
+    assert [s.name for s in _extract_stages({6: first, 5: named})] == ["Named", "Alpha"]

@@ -535,3 +535,193 @@ def test_preview_skips_work_when_client_disconnected(
 
     assert res.status_code == 200
     assert res.json()["impact"] is None
+
+
+def _new_rule(rule: dict[str, object], team: str, project_ids: list[int]) -> dict[str, object]:
+    return {**rule, "team": team, "project_ids": project_ids}
+
+
+def test_create_rule_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    client, rules_dir = _rules_client(tmp_path, monkeypatch, calls)
+    base = client.get("/api/rules").json()["rule_sets"][0]["rule"]
+
+    assert client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base, "Backend Team", [7])}
+    ).status_code == 401
+    _login(client)
+
+    res = client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base, "Backend Team", [7])}
+    )
+    assert res.status_code == 200
+    assert res.json()["rule_set"]["name"] == "backend-team"
+    assert res.json()["job"]["success"] is True
+    assert any("app/processor/main.py" in cmd for cmd in calls)
+    assert rules_dir.joinpath("backend-team.yaml").is_file()
+    names = [i["name"] for i in client.get("/api/rules").json()["rule_sets"]]
+    assert names == ["backend-team", "default"]
+
+    second = client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base, "Backend Team", [8])}
+    )
+    assert second.status_code == 200
+    assert second.json()["rule_set"]["name"] == "backend-team-2"
+
+
+def test_create_rule_set_validates_projects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _ = _rules_client(tmp_path, monkeypatch)
+    _login(client)
+    base = client.get("/api/rules").json()["rule_sets"][0]["rule"]
+    assert client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base, "A", [7])}
+    ).status_code == 200
+
+    claimed = client.post("/api/admin/rules", json={"rule": _new_rule(base, "B", [7])})
+    assert claimed.status_code == 422
+    assert [p["path"] for p in claimed.json()["detail"]["problems"]] == ["project_ids"]
+
+    second_default = client.post("/api/admin/rules", json={"rule": _new_rule(base, "C", [])})
+    assert second_default.status_code == 422
+    assert [p["path"] for p in second_default.json()["detail"]["problems"]] == ["project_ids"]
+
+    no_team = client.post("/api/admin/rules", json={"rule": _new_rule(base, " ", [9])})
+    assert no_team.status_code == 422
+    assert [p["path"] for p in no_team.json()["detail"]["problems"]] == ["team"]
+
+
+def test_delete_rule_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    client, rules_dir = _rules_client(tmp_path, monkeypatch, calls)
+    base = client.get("/api/rules").json()["rule_sets"][0]
+    created = client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base["rule"], "Temp", [7])}
+    )
+    assert created.status_code == 401
+    _login(client)
+    created = client.post(
+        "/api/admin/rules", json={"rule": _new_rule(base["rule"], "Temp", [7])}
+    ).json()["rule_set"]
+    calls.clear()
+
+    url = "/api/admin/rules/temp"
+    client.cookies.clear()
+    assert client.delete(url, params={"revision": created["revision"]}).status_code == 401
+    _login(client)
+
+    default = client.delete("/api/admin/rules/default", params={"revision": base["revision"]})
+    assert default.status_code == 422
+    assert default.json()["detail"] == (
+        "The rule set that applies to all other projects cannot be deleted."
+    )
+    assert client.delete(url, params={"revision": "stale"}).status_code == 409
+    assert client.delete("/api/admin/rules/nope", params={"revision": "x"}).status_code == 404
+
+    ok = client.delete(url, params={"revision": created["revision"]})
+    assert ok.status_code == 200
+    assert ok.json()["job"]["success"] is True
+    assert any("app/processor/main.py" in cmd for cmd in calls)
+    assert not rules_dir.joinpath("temp.yaml").exists()
+    assert len(list((rules_dir / ".history").glob("temp-*.yaml"))) == 1
+
+
+def test_rule_versions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret-pass")
+    template = tmp_path / "template"
+    user = tmp_path / "user"
+    template.mkdir()
+    template.joinpath("default.yaml").write_text(
+        "team: shipped\nworkflow:\n  stages:\n    - name: Review\n", encoding="utf-8"
+    )
+    service = DashboardService(
+        analytics_path=tmp_path / "analytics",
+        processed_path=tmp_path / "processed",
+        state_path=tmp_path / "state.json",
+        rules_path=user,
+    )
+    client = TestClient(
+        create_app(
+            service=service,
+            frontend_dist=tmp_path / "missing_dist",
+            rule_store=RuleStore(user_path=user, template_path=template),
+        )
+    )
+    monkeypatch.setattr(
+        "app.dashboard.admin.subprocess.run",
+        lambda cmd, **_kw: subprocess.CompletedProcess(cmd, 0, "ok", ""),
+    )
+    assert client.get("/api/admin/rules/default/versions").status_code == 401
+    _login(client)
+    item = client.get("/api/rules").json()["rule_sets"][0]
+    for team in ("one", "two"):
+        rule = {**item["rule"], "team": team}
+        res = client.put(
+            "/api/admin/rules/default", json={"revision": item["revision"], "rule": rule}
+        )
+        assert res.status_code == 200
+        item = res.json()["rule_set"]
+
+    versions = client.get("/api/admin/rules/default/versions").json()["versions"]
+    assert [v["kind"] for v in versions] == ["history", "history", "template"]
+    assert versions[0]["id"] > versions[1]["id"]
+    assert versions[0]["saved_at"].endswith("+00:00") and versions[2]["saved_at"] is None
+    assert client.get("/api/admin/rules/nope/versions").status_code == 404
+
+    newest = client.get(f"/api/admin/rules/default/versions/{versions[0]['id']}")
+    assert newest.json()["rule"]["team"] == "one"
+    oldest = client.get(f"/api/admin/rules/default/versions/{versions[1]['id']}")
+    assert oldest.json()["rule"]["team"] == "shipped"
+    shipped = client.get("/api/admin/rules/default/versions/template")
+    assert shipped.json()["rule"]["team"] == "shipped"
+    assert client.get("/api/admin/rules/default/versions/not-an-id").status_code == 404
+    assert client.get("/api/admin/rules/nope/versions/template").status_code == 404
+    history_dir = user / ".history"
+    broken = next(history_dir.glob("default-*.yaml"))
+    broken.write_text("team: [unclosed\n", encoding="utf-8")
+    unreadable = client.get(f"/api/admin/rules/default/versions/{broken.stem[len('default-'):]}")
+    assert unreadable.status_code == 422
+    assert unreadable.json()["detail"] == "This version cannot be read."
+
+
+def test_default_name_and_deleting_extra_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+    assert client.get("/api/rules").json()["default_name"] == "default"
+    rules_dir.joinpath("zeta.yaml").write_text("team: zeta\n", encoding="utf-8")
+    body = client.get("/api/rules").json()
+    assert body["default_name"] == "default"
+    revisions = {i["name"]: i["revision"] for i in body["rule_sets"]}
+    _login(client)
+
+    effective = client.delete(
+        "/api/admin/rules/default", params={"revision": revisions["default"]}
+    )
+    assert effective.status_code == 422
+    assert "cannot be deleted" in effective.json()["detail"]
+
+    extra = client.delete("/api/admin/rules/zeta", params={"revision": revisions["zeta"]})
+    assert extra.status_code == 200
+    assert not rules_dir.joinpath("zeta.yaml").exists()
+
+
+def test_default_name_is_none_without_default_and_last_set_is_protected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, rules_dir = _rules_client(tmp_path, monkeypatch)
+    rules_dir.joinpath("default.yaml").write_text(
+        "team: only\nproject_ids: [3]\n", encoding="utf-8"
+    )
+    body = client.get("/api/rules").json()
+    assert body["default_name"] is None
+    _login(client)
+
+    res = client.delete(
+        "/api/admin/rules/default", params={"revision": body["rule_sets"][0]["revision"]}
+    )
+
+    assert res.status_code == 422
+    assert res.json()["detail"] == "The last rule set cannot be deleted."
+    assert rules_dir.joinpath("default.yaml").is_file()

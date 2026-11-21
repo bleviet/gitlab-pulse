@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LabelInventoryItem } from "../../lib/labelInventory";
-import { formatDelta, groupsForSection, type ImpactRow } from "../../lib/ruleImpact";
+import { changedGroups, formatDelta, groupsForSection, type ImpactRow } from "../../lib/ruleImpact";
 import type { ImpactSummary, SectionId } from "../../lib/types";
 import type { RulePreview } from "./useRulePreview";
 
@@ -10,6 +10,7 @@ const WIDE_QUERY = "(min-width: 1200px)";
 interface ImpactPanelProps {
   section: SectionId;
   canEdit: boolean;
+  dirty: boolean;
   saving: boolean;
   hasClientProblems: boolean;
   preview: RulePreview;
@@ -179,6 +180,7 @@ function UnmappedLabels({
 export function ImpactPanel({
   section,
   canEdit,
+  dirty,
   saving,
   hasClientProblems,
   preview,
@@ -208,6 +210,12 @@ export function ImpactPanel({
       (projects > 0 ? ` in ${plural(projects, "project", "projects")}` : "");
   }
   const isTotal = Boolean(impact && impact.total_issues > 0);
+  const overview = section === "projects" || section === "history";
+  const groups = impact
+    ? overview
+      ? changedGroups(impact)
+      : groupsForSection(section, impact)
+    : [];
   const showError = canEdit && !hasClientProblems && status === "error";
 
   return (
@@ -226,7 +234,12 @@ export function ImpactPanel({
       )}
       {impact && impact.total_issues > 0 && (
         <>
-          {groupsForSection(section, impact).map((group) => (
+          {overview && groups.length === 0 && (
+            <p className="settings-hint">
+              {dirty ? "Issue counts stay the same with these changes." : "No unsaved changes."}
+            </p>
+          )}
+          {groups.map((group) => (
             <section key={group.title} className="settings-impact-group">
               <h4 className="settings-impact-heading">{group.title}</h4>
               <ul className="settings-impact-list">
@@ -236,6 +249,7 @@ export function ImpactPanel({
               </ul>
             </section>
           ))}
+          {!overview && (
           <UnmappedLabels
             impact={impact}
             inventory={inventory}
@@ -244,6 +258,7 @@ export function ImpactPanel({
             rowNames={rowNames}
             onQuickAdd={onQuickAdd}
           />
+          )}
         </>
       )}
     </aside>

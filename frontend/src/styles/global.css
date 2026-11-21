@@ -2228,6 +2228,148 @@ select {
   max-width: 28rem;
 }
 
+.settings-nav-divider {
+  height: 1px;
+  margin: 0.6rem 0.5rem 0.2rem;
+  background: var(--line-strong);
+  flex-shrink: 0;
+}
+
+.settings-nav-group {
+  padding: 0.25rem 0.75rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.settings-intro-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.settings-project-list {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.settings-project {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  list-style: none;
+}
+
+.settings-project:hover {
+  background: var(--surface);
+}
+
+.settings-project-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-project-meta {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.settings-project-readonly {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.settings-danger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--node-pink);
+}
+
+.settings-danger-btn {
+  border-color: var(--node-pink);
+  color: var(--node-pink);
+}
+
+.settings-danger-btn:hover:not(:disabled) {
+  border-color: var(--node-pink);
+  background: var(--surface-hover);
+}
+
+.settings-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 4, 12, 0.65);
+  backdrop-filter: blur(6px);
+}
+
+.settings-modal {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+.settings-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.settings-version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
 .settings-savebar {
   display: flex;
   align-items: center;
@@ -2432,6 +2574,17 @@ select {
 
   .settings-main {
     padding: 1rem 0.9rem 2rem;
+  }
+
+  .settings-nav-divider {
+    width: 1px;
+    height: auto;
+    margin: 0 0.4rem;
+    align-self: stretch;
+  }
+
+  .settings-nav-group {
+    align-self: center;
   }
 
   .settings-row-head {

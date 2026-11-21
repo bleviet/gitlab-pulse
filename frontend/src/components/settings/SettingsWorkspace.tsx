@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, fetchRules, saveRuleSet } from "../../lib/api";
+import { fetchRules } from "../../lib/api";
 import { buildLabelInventory } from "../../lib/labelInventory";
-import { isDirty, problemsByPath, validateRuleSet } from "../../lib/ruleDraft";
+import { buildProjectInventory } from "../../lib/projectInventory";
+import { isDirty, validateRuleSet } from "../../lib/ruleDraft";
 import { mergeProblems } from "../../lib/ruleImpact";
 import type {
   IssueItem,
@@ -12,19 +13,21 @@ import type {
   RuleSetsResponse,
 } from "../../lib/types";
 import { ImpactPanel } from "./ImpactPanel";
+import { NewRuleSetDialog } from "./NewRuleSetDialog";
 import { SaveBar } from "./SaveBar";
-import { SectionEditor } from "./SectionEditor";
+import { SectionContent } from "./SectionContent";
 import {
   addLabelToRow,
-  describeUnplacedProblem,
   rowNamesForSection,
   SECTIONS,
-  sectionForPath,
-  splitProblems,
   type SectionId,
 } from "./sections";
+import { runSave } from "./saveFlow";
 import { SettingsHeader } from "./SettingsHeader";
+import { SettingsNav } from "./SettingsNav";
 import { SettingsNotices, type Notice } from "./SettingsNotices";
+import { useRuleSetActions } from "./useRuleSetActions";
+import { useProblemSummary, useRuleContext } from "./useWorkspaceProblems";
 import { useRulePreview } from "./useRulePreview";
 
 interface SettingsWorkspaceProps {
@@ -36,6 +39,8 @@ interface SettingsWorkspaceProps {
   onLogin: (password: string) => Promise<void>;
   onReloadDashboard: () => Promise<void>;
 }
+
+const NO_PROJECTS: number[] = [];
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -71,7 +76,23 @@ export function SettingsWorkspace({
   const inventory = useMemo(() => buildLabelInventory(issues, labelStyles), [issues, labelStyles]);
 
   const canEdit = isAdmin && !sessionExpired;
-  const clientProblems = useMemo(() => (draft ? validateRuleSet(draft) : []), [draft]);
+
+  const projectInventory = useMemo(() => buildProjectInventory(issues), [issues]);
+  const { claimedBy, ruleContext } = useRuleContext(
+    response,
+    selectedName,
+    selected?.rule.project_ids ?? NO_PROJECTS,
+  );
+  const defaultName = response?.default_name ?? null;
+  const isDefault = selected !== null && selected.name === defaultName;
+  const teamNames = (response?.rule_sets ?? []).map((r) => r.rule.team);
+  const otherTeamNames = (response?.rule_sets ?? [])
+    .filter((r) => r.name !== selectedName)
+    .map((r) => r.rule.team);
+  const clientProblems = useMemo(
+    () => (draft ? validateRuleSet(draft, ruleContext) : []),
+    [draft, ruleContext],
+  );
   const preview = useRulePreview({
     enabled: canEdit && loadState === "ready" && !!selected && clientProblems.length === 0,
     name: selectedName,
@@ -88,29 +109,19 @@ export function SettingsWorkspace({
     () => mergeProblems(clientProblems, serverProblems, preview.problems),
     [clientProblems, serverProblems, preview.problems],
   );
-  const problems = useMemo(() => problemsByPath(allProblems), [allProblems]);
+  const { problems, unplacedProblems, problemCountBySection } = useProblemSummary(allProblems, draft);
 
-  const unplacedProblems = useMemo(
-    () => (draft ? splitProblems(allProblems).unplaced.map((p) => describeUnplacedProblem(p, draft)) : []),
-    [allProblems, draft],
-  );
-
-  const problemCountBySection = useMemo(() => {
-    const counts: Partial<Record<SectionId, number>> = {};
-    for (const problem of allProblems) {
-      const id = sectionForPath(problem.path);
-      if (id) counts[id] = (counts[id] ?? 0) + 1;
-    }
-    return counts;
-  }, [allProblems]);
-
-  const load = useCallback(async (preferredName?: string | null) => {
+  const load = useCallback(async (preferredName?: string | null, preferDefault = false) => {
     setLoadState("loading");
     setLoadError(null);
     try {
       const data = await fetchRules();
       const chosen =
-        data.rule_sets.find((r) => r.name === preferredName) ?? data.rule_sets[0] ?? null;
+        (preferDefault
+          ? data.rule_sets.find((r) => r.name === data.default_name)
+          : data.rule_sets.find((r) => r.name === preferredName)) ??
+        data.rule_sets[0] ??
+        null;
       setResponse(data);
       setSelectedName(chosen?.name ?? null);
       setDraft(chosen?.rule ?? null);
@@ -133,6 +144,19 @@ export function SettingsWorkspace({
     dialogRef.current?.focus();
     return () => previouslyFocused?.focus();
   }, [open, load]);
+
+  const [newOpen, setNewOpen] = useState(false);
+  const handleSessionExpired = useCallback(() => {
+    setSessionExpired(true);
+    setUnlockOpen(true);
+  }, []);
+  const actions = useRuleSetActions({
+    selected,
+    load,
+    onReloadDashboard,
+    setNotice,
+    onSessionExpired: handleSessionExpired,
+  });
 
   const requestClose = useCallback(() => {
     if (saving) return;
@@ -175,59 +199,19 @@ export function SettingsWorkspace({
 
   const handleSave = async () => {
     if (!selected || !draft) return;
-    setSaving(true);
-    setNotice(null);
-    setServerProblems([]);
-    try {
-      const res = await saveRuleSet(selected.name, selected.revision, draft);
-      setResponse((prev) =>
-        prev
-          ? {
-              ...prev,
-              rule_sets: prev.rule_sets.map((r) => (r.name === res.rule_set.name ? res.rule_set : r)),
-            }
-          : prev,
-      );
-      setDraft(res.rule_set.rule);
-      setSessionExpired(false);
-      if (res.job.success) {
-        try {
-          await onReloadDashboard();
-          setNotice({ kind: "success", text: "Saved. The dashboard has been recalculated." });
-        } catch {
-          setNotice({
-            kind: "warning",
-            text: "Saved and recalculated, but the dashboard could not be refreshed. Use the refresh button in the top bar.",
-          });
-        }
-      } else {
-        setNotice({
-          kind: "warning",
-          text: "Your rules were saved, but recalculating the dashboard failed.",
-          job: res.job,
-        });
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
-        setServerProblems(err.problems);
-        setNotice({ kind: "error", text: err.message });
-        const first = err.problems.map((p) => sectionForPath(p.path)).find((s) => s !== null);
-        if (first) setSection(first);
-      } else if (err instanceof ApiError && err.status === 409) {
-        setNotice({ kind: "conflict", text: err.message });
-      } else if (err instanceof ApiError && err.status === 401) {
-        setSessionExpired(true);
-        setUnlockOpen(true);
-        setNotice({ kind: "error", text: "Your session has ended. Unlock editing to save." });
-      } else {
-        setNotice({
-          kind: "error",
-          text: err instanceof Error ? err.message : "Saving failed",
-        });
-      }
-    } finally {
-      setSaving(false);
-    }
+    await runSave({
+      selected,
+      draft,
+      setSaving,
+      setNotice,
+      setServerProblems,
+      setResponse,
+      setDraft,
+      setSessionExpired,
+      setUnlockOpen,
+      setSection,
+      onReloadDashboard,
+    });
   };
 
   const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
@@ -236,6 +220,16 @@ export function SettingsWorkspace({
     loadErrorNames.length === 0
       ? null
       : `${loadErrorNames.length} rule ${loadErrorNames.length === 1 ? "file" : "files"} could not be read and ${loadErrorNames.length === 1 ? "is" : "are"} ignored: ${loadErrorNames.join(", ")}`;
+
+  const handleLoadVersion = (rule: RuleSetBody, text: string) => {
+    if (!draft) return;
+    updateDraft({ ...rule, team: draft.team, project_ids: draft.project_ids });
+    setNotice({ kind: "info", text });
+  };
+
+  const handleCreate = async (team: string, projectIds: number[]) => {
+    if (await actions.create(team, projectIds)) setNewOpen(false);
+  };
 
   const handleQuickAdd = (label: string, rowIndex: number) => {
     if (draft) updateDraft(addLabelToRow(draft, section, rowIndex, label));
@@ -254,6 +248,13 @@ export function SettingsWorkspace({
         <SettingsHeader
           selected={selected}
           ruleSets={response?.rule_sets ?? []}
+          canEdit={canEdit}
+          defaultName={defaultName}
+          newBlocked={dirty}
+          onNewRuleSet={() => {
+            actions.resetCreate();
+            setNewOpen(true);
+          }}
           onSelectRuleSet={handleSelectRuleSet}
           onClose={requestClose}
         />
@@ -276,27 +277,7 @@ export function SettingsWorkspace({
         {loadState === "ready" && draft && (
           <>
             <div className="settings-body">
-              <nav className="settings-nav" aria-label="Settings sections">
-                {SECTIONS.map((s) => {
-                  const count = problemCountBySection[s.id] ?? 0;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className="settings-nav-item"
-                      aria-current={s.id === section ? "page" : undefined}
-                      onClick={() => setSection(s.id)}
-                    >
-                      <span>{s.title}</span>
-                      {count > 0 && (
-                        <span className="settings-nav-badge" aria-label={`${count} problems`}>
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
+              <SettingsNav section={section} problemCounts={problemCountBySection} onSelect={setSection} />
 
               <div className="settings-main">
                 <div className="settings-editor-head">
@@ -325,6 +306,7 @@ export function SettingsWorkspace({
                 <ImpactPanel
                   section={section}
                   canEdit={canEdit}
+                  dirty={dirty}
                   saving={saving}
                   hasClientProblems={clientProblems.length > 0}
                   preview={preview}
@@ -335,18 +317,43 @@ export function SettingsWorkspace({
 
                 <fieldset className="settings-fieldset" disabled={!canEdit || saving}>
                   <legend className="settings-visually-hidden">{current.title}</legend>
-                  <SectionEditor
+                  <SectionContent
                     section={section}
-                    rule={draft}
+                    draft={draft}
+                    selected={selected}
+                    isDefault={isDefault}
+                    hasDefault={defaultName !== null}
+                    otherTeamNames={otherTeamNames}
+                    canEdit={canEdit}
+                    dirty={dirty}
                     inventory={inventory}
+                    projectInventory={projectInventory}
+                    claimedBy={claimedBy}
                     problems={problems}
                     labelCounts={preview.impact?.label_pattern_counts}
                     titleCounts={preview.impact?.title_pattern_counts}
+                    deleting={actions.busy}
                     onChange={updateDraft}
+                    onDelete={() => void actions.remove()}
+                    onLoadVersion={handleLoadVersion}
                   />
                 </fieldset>
               </div>
             </div>
+
+            {newOpen && selected && (
+              <NewRuleSetDialog
+                projects={projectInventory}
+                claimedBy={{ ...claimedBy, ...Object.fromEntries(selected.rule.project_ids.map((id) => [id, selected.rule.team || selected.name])) }}
+                sourceLabel={isDefault ? "the default rules" : `the rules of ${selected.rule.team}`}
+                teamNames={teamNames}
+                busy={actions.busy}
+                problems={actions.createProblems}
+                error={actions.createError}
+                onCreate={(team, ids) => void handleCreate(team, ids)}
+                onClose={() => setNewOpen(false)}
+              />
+            )}
 
             <SaveBar
               dirty={dirty}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildNewRuleSetBody,
   getCategory,
   isDirty,
   moveItem,
@@ -7,6 +8,7 @@ import {
   problemsWithPrefix,
   removeAt,
   setCategoryValues,
+  teamNameInUse,
   updateAt,
   validateRuleSet,
 } from "../ruleDraft";
@@ -163,5 +165,66 @@ describe("problem lookups", () => {
     expect(problemsWithPrefix(problemsByPath(problems), "classification.type.0.labels")).toEqual({
       2: "a",
     });
+  });
+});
+
+describe("team and project checks", () => {
+  it("flags an empty team name", () => {
+    const rule = { ...makeRule(), team: " " };
+    expect(validateRuleSet(rule).map((p) => p.path)).toEqual(["team"]);
+  });
+
+  it("flags an empty project list while another default exists", () => {
+    const rule = { ...makeRule(), project_ids: [] };
+    const context = { otherDefaultExists: true, claimedBy: {}, savedProjectIds: [1] };
+    expect(validateRuleSet(rule, context).map((p) => p.path)).toEqual(["project_ids"]);
+    expect(validateRuleSet(rule, { ...context, otherDefaultExists: false })).toEqual([]);
+    expect(validateRuleSet(rule)).toEqual([]);
+  });
+
+  it("names every claimed project and team in one problem", () => {
+    const rule = { ...makeRule(), project_ids: [101, 102, 103] };
+    const problems = validateRuleSet(rule, {
+      otherDefaultExists: false,
+      claimedBy: { 101: "Backend", 102: "Platform" },
+      savedProjectIds: [],
+    });
+    expect(problems).toEqual([
+      {
+        path: "project_ids",
+        message: "Project 101 already belongs to Backend, and Project 102 to Platform.",
+      },
+    ]);
+  });
+
+  it("skips project checks when the project list is unchanged", () => {
+    const rule = { ...makeRule(), project_ids: [1, 2] };
+    const context = {
+      otherDefaultExists: true,
+      claimedBy: { 1: "Platform" },
+      savedProjectIds: [2, 1],
+    };
+    expect(validateRuleSet(rule, context)).toEqual([]);
+    expect(validateRuleSet({ ...rule, project_ids: [1] }, context)).toHaveLength(1);
+  });
+});
+
+describe("teamNameInUse", () => {
+  it("compares case-insensitively and ignores blanks", () => {
+    expect(teamNameInUse(" core ", ["Core"])).toBe(true);
+    expect(teamNameInUse("Other", ["Core"])).toBe(false);
+    expect(teamNameInUse("", [""])).toBe(false);
+  });
+});
+
+describe("buildNewRuleSetBody", () => {
+  it("copies the rules with a new team and projects, keeping colors", () => {
+    const base = makeRule();
+    const next = buildNewRuleSetBody(base, " Mobile ", [4, 5]);
+    expect(next.team).toBe("Mobile");
+    expect(next.project_ids).toEqual([4, 5]);
+    expect(next.colors).toBe(base.colors);
+    expect(next.classification).toBe(base.classification);
+    expect(base.team).toBe("Core");
   });
 });

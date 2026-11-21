@@ -74,18 +74,27 @@ def _normalize_color_mapping(value: object) -> dict[str, str]:
     return {str(k).strip().lower(): str(v) for k, v in value.items() if isinstance(v, str)}
 
 
+def find_default_rule(rules: Mapping[int, DomainRule]) -> DomainRule | None:
+    """Return the rule set that applies to all projects without their own.
+
+    Prefers the rule set registered for "all other projects" (empty
+    ``project_ids``), then one whose team is ``default``, then the first rule
+    set. Returns None when there are no rule sets.
+    """
+    if 0 in rules:
+        return rules[0]
+    for rule in rules.values():
+        if rule.team == "default":
+            return rule
+    return next(iter(rules.values()), None)
+
+
 def resolve_palettes(rules: Mapping[int, DomainRule]) -> ThemePalettes:
     """Resolve light/dark semantic color maps and priority order from rules."""
     light = dict(_SEMANTIC_LIGHT)
     dark = dict(_SEMANTIC_DARK)
 
-    default_rule: DomainRule | None = None
-    for rule in rules.values():
-        if rule.team == "default":
-            default_rule = rule
-            break
-    if default_rule is None:
-        default_rule = next(iter(rules.values()), DomainRule())
+    default_rule = find_default_rule(rules) or DomainRule()
 
     overrides = default_rule.colors
     if isinstance(overrides, Mapping):

@@ -73,5 +73,8 @@ export function SectionEditor({
           onChange={(validation) => onChange({ ...rule, validation })}
         />
       );
+    case "projects":
+    case "history":
+      return null;
   }
 }

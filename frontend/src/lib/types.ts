@@ -121,7 +121,15 @@ export type ActiveChartId =
   | `stage_bar_${number}`
   | null;
 
-export type SectionId = "type" | "severity" | "priority" | "stages" | "contexts" | "quality";
+export type SectionId =
+  | "type"
+  | "severity"
+  | "priority"
+  | "stages"
+  | "contexts"
+  | "quality"
+  | "projects"
+  | "history";
 
 export interface MatcherRule {
   name: string;
@@ -172,6 +180,7 @@ export interface RuleSetItem {
 export interface RuleSetsResponse {
   rule_sets: RuleSetItem[];
   load_errors: Record<string, string>;
+  default_name: string | null;
   source: "template" | "user";
 }
 
@@ -214,4 +223,22 @@ export interface ImpactSummary {
 export interface RulePreviewResponse {
   problems: RuleProblem[];
   impact: ImpactSummary | null;
+}
+
+export interface RuleVersionEntry {
+  id: string;
+  kind: "history" | "template";
+  saved_at: string | null;
+}
+
+export interface RuleVersionsResponse {
+  versions: RuleVersionEntry[];
+}
+
+export interface RuleVersionResponse {
+  rule: RuleSetBody;
+}
+
+export interface RuleDeleteResponse {
+  job: AdminJobResponse;
 }

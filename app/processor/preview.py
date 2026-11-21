@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.processor.main import process_issues
 from app.processor.rule_loader import DomainRule, RuleLoader
+from app.processor.rule_store import effective_default_name
 from app.processor.utils import match_text
 
 UNMAPPED_LABEL_LIMIT = 100
@@ -71,10 +72,7 @@ def _governed_projects(
     draft: DomainRule,
     others: Mapping[str, DomainRule],
 ) -> dict[int, Path]:
-    if not draft.project_ids and any(
-        not other.project_ids and f"{other_name}.yaml" < f"{name}.yaml"
-        for other_name, other in others.items()
-    ):
+    if not draft.project_ids and effective_default_name({**others, name: draft}) != name:
         return {}
     claimed = {pid for rule in others.values() for pid in rule.project_ids}
     governed: dict[int, Path] = {}
@@ -88,6 +86,19 @@ def _governed_projects(
         elif project_id not in claimed:
             governed[project_id] = filepath
     return governed
+
+
+def _removed_projects(
+    processed_path: Path, draft: DomainRule, saved: DomainRule | None
+) -> dict[int, Path]:
+    if saved is None:
+        return {}
+    removed = set(saved.project_ids) - set(draft.project_ids)
+    return {
+        project_id: processed_path / f"issues_{project_id}.parquet"
+        for project_id in sorted(removed)
+        if (processed_path / f"issues_{project_id}.parquet").is_file()
+    }
 
 
 def _concat(frames: list[pd.DataFrame]) -> pd.DataFrame:
@@ -198,6 +209,7 @@ def summarize_impact(
     name: str,
     draft: DomainRule,
     others: Mapping[str, DomainRule],
+    saved: DomainRule | None = None,
 ) -> ImpactSummary:
     """Compare today's rules with a draft over the processed issue data.
 
@@ -207,6 +219,9 @@ def summarize_impact(
         name: Name (file stem) of the rule set being edited
         draft: The rule set being edited
         others: The other rule sets by name, excluding the one being edited
+        saved: The stored version of the rule set being edited, if any. Projects
+            it lists that the draft drops are compared against the default rules
+            they would fall back to.
 
     Returns:
         Distinct-issue counts before and after, pattern hit counts, and labels
@@ -216,6 +231,9 @@ def summarize_impact(
         ConfigurationConflictError: If two rule files claim the same project
     """
     governed = _governed_projects(processed_path, name, draft, others)
+    removed = _removed_projects(processed_path, draft, saved)
+    default_name = effective_default_name(others)
+    fallback = others[default_name] if default_name is not None else DomainRule()
     loader = RuleLoader(rules_path)
 
     raw_frames: list[pd.DataFrame] = []
@@ -223,18 +241,24 @@ def summarize_impact(
     before_quality: list[pd.DataFrame] = []
     after_valid: list[pd.DataFrame] = []
     after_quality: list[pd.DataFrame] = []
-    for project_id, filepath in governed.items():
+    all_issues: list[pd.DataFrame] = []
+    for project_id, filepath in [*governed.items(), *removed.items()]:
         raw = pd.read_parquet(filepath)
-        raw_frames.append(raw)
+        all_issues.append(raw)
+        if project_id in governed:
+            raw_frames.append(raw)
         current = loader.get_rule(project_id) or loader.get_default_rule()
         valid, quality = process_issues(raw.copy(), current)
         before_valid.append(valid)
         before_quality.append(quality)
-        valid, quality = process_issues(raw.copy(), draft)
+        valid, quality = process_issues(
+            raw.copy(), draft if project_id in governed else fallback
+        )
         after_valid.append(valid)
         after_quality.append(quality)
 
     raw_all = _concat(raw_frames)
+    issues_all = _concat(all_issues)
     before_v, before_q = _concat(before_valid), _concat(before_quality)
     after_v, after_q = _concat(after_valid), _concat(after_quality)
 
@@ -272,8 +296,8 @@ def summarize_impact(
     )
 
     return ImpactSummary(
-        total_issues=int(raw_all["id"].nunique()) if not raw_all.empty else 0,
-        project_ids=sorted(governed),
+        total_issues=int(issues_all["id"].nunique()) if not issues_all.empty else 0,
+        project_ids=sorted([*governed, *removed]),
         types=change("issue_type", draft.classification.get("type", {}), valid_pair),
         severities=change("severity", draft.classification.get("severity", {}), valid_pair),
         priorities=change("priority", draft.classification.get("priority", {}), valid_pair),

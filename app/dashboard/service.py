@@ -18,7 +18,7 @@ from app.dashboard.data_loader import (
     load_labels,
     load_valid_issues,
 )
-from app.dashboard.palettes import resolve_palettes
+from app.dashboard.palettes import find_default_rule, resolve_palettes
 from app.dashboard.schemas import (
     DashboardPayload,
     FilterOptions,
@@ -135,11 +135,7 @@ def _normalize_priority_series(df: pd.DataFrame) -> list[str]:
 
 
 def _extract_stages(rules: dict[int, DomainRule]) -> list[StageMeta]:
-    default_rule: DomainRule | None = None
-    for rule in rules.values():
-        if rule.team == "default":
-            default_rule = rule
-            break
+    default_rule = find_default_rule(rules)
     ordered_rules = (
         [default_rule, *[r for r in rules.values() if r is not default_rule]]
         if default_rule is not None

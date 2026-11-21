@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import shutil
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -30,6 +30,13 @@ logger = logging.getLogger(__name__)
 HISTORY_DIR_NAME = ".history"
 HISTORY_KEEP = 20
 _NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_VERSION_ID_PATTERN = re.compile(r"\d{8}T\d{12}Z")
+TEMPLATE_VERSION_ID = "template"
+_MAX_SLUG_LENGTH = 60
+_STAMP_FORMAT = "%Y%m%dT%H%M%S%fZ"
+_INVALID_NAME_MESSAGE = (
+    "Rule set names may only use lowercase letters, digits, '-' and '_'."
+)
 _STAGE_TYPES = ("active", "waiting", "completed")
 _PATTERN_PREFIXES = ("regex:", "contains:", "exact:")
 _FILE_HEADER = (
@@ -57,8 +64,26 @@ class StoredRuleSet(BaseModel):
     rule: DomainRule
 
 
+class RuleVersion(BaseModel):
+    """An earlier version of a rule set that can be loaded back into the editor."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    kind: Literal["history", "template"]
+    saved_at: datetime | None
+
+
 class RuleSetNotFoundError(Exception):
     """Raised when the named rule set does not exist."""
+
+
+class RuleSetExistsError(Exception):
+    """Raised when creating a rule set whose name is already taken."""
+
+
+class RuleVersionNotFoundError(Exception):
+    """Raised when the requested version of a rule set does not exist."""
 
 
 class RevisionConflictError(Exception):
@@ -67,6 +92,42 @@ class RevisionConflictError(Exception):
 
 class InvalidRuleSetNameError(Exception):
     """Raised when a rule set name is not a safe file stem."""
+
+
+def unique_name(team: str, existing: Collection[str]) -> str:
+    """Derive an unused rule set name from a team name.
+
+    Args:
+        team: Team name typed by the user
+        existing: Rule set names already in use
+
+    Returns:
+        A slug of the team name, suffixed ``-2``, ``-3``, ... when taken
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", team.lower()).strip("-")
+    slug = slug[:_MAX_SLUG_LENGTH].strip("-") or "rule-set"
+    if slug not in existing:
+        return slug
+    suffix = 2
+    while f"{slug}-{suffix}" in existing:
+        suffix += 1
+    return f"{slug}-{suffix}"
+
+
+def effective_default_name(rule_sets: Mapping[str, DomainRule]) -> str | None:
+    """Name of the rule set the processor uses for projects without their own.
+
+    Among rule sets with an empty ``project_ids`` list, the one whose file name
+    sorts first wins, as in ``RuleLoader``.
+
+    Args:
+        rule_sets: Rule sets by name
+
+    Returns:
+        The name of the effective default, or None when there is none
+    """
+    candidates = [name for name, rule in rule_sets.items() if not rule.project_ids]
+    return min(candidates, key=lambda name: f"{name}.yaml", default=None)
 
 
 def dump_rule(rule: DomainRule) -> str:
@@ -143,6 +204,11 @@ def validate_rule_set(
         A list of problems; empty when the rule set is valid
     """
     problems: list[RuleProblem] = []
+
+    if not rule.team.strip():
+        problems.append(
+            RuleProblem(path="team", message="Give this rule set a team name.")
+        )
 
     for category, values in rule.classification.items():
         for index, (value_name, match) in enumerate(values.items()):
@@ -311,10 +377,7 @@ class RuleStore:
             RuleSetNotFoundError: If no rule file has this name
         """
         if not _NAME_PATTERN.fullmatch(name):
-            raise InvalidRuleSetNameError(
-                "Rule set names may only use lowercase letters, digits, "
-                "'-' and '_'."
-            )
+            raise InvalidRuleSetNameError(_INVALID_NAME_MESSAGE)
         if not (self.active_path / f"{name}.yaml").is_file():
             raise RuleSetNotFoundError(f"Rule set '{name}' does not exist.")
 
@@ -343,12 +406,7 @@ class RuleStore:
                 f"Rule set '{name}' changed since it was loaded."
             )
 
-        if self.source == "template":
-            self.user_path.mkdir(parents=True, exist_ok=True)
-            for template_file in sorted(self.template_path.glob("*.yaml")):
-                _write_atomic(
-                    self.user_path / template_file.name, template_file.read_bytes()
-                )
+        self._seed_from_template()
 
         target = self.user_path / f"{name}.yaml"
         self._archive(target, name)
@@ -357,11 +415,124 @@ class RuleStore:
         _write_atomic(target, content)
         return StoredRuleSet(name=name, revision=_revision(content), rule=rule)
 
+    def create(self, name: str, rule: DomainRule) -> StoredRuleSet:
+        """Create a new rule set.
+
+        Args:
+            name: Rule set name (file stem)
+            rule: The rule content
+
+        Returns:
+            The stored rule set with its revision
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetExistsError: If a rule set with this name already exists
+        """
+        if not _NAME_PATTERN.fullmatch(name):
+            raise InvalidRuleSetNameError(_INVALID_NAME_MESSAGE)
+        if (self.active_path / f"{name}.yaml").exists():
+            raise RuleSetExistsError(f"Rule set '{name}' already exists.")
+        self._seed_from_template()
+        content = dump_rule(rule).encode("utf-8")
+        _write_atomic(self.user_path / f"{name}.yaml", content)
+        return StoredRuleSet(name=name, revision=_revision(content), rule=rule)
+
+    def delete(self, name: str, expected_revision: str) -> None:
+        """Delete a rule set, keeping a history copy of the removed file.
+
+        Args:
+            name: Rule set name (file stem)
+            expected_revision: Revision the caller based its decision on
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetNotFoundError: If no rule file has this name
+            RevisionConflictError: If the file changed since it was read
+        """
+        self.check_exists(name)
+        current = self.active_path / f"{name}.yaml"
+        if _revision(current.read_bytes()) != expected_revision:
+            raise RevisionConflictError(
+                f"Rule set '{name}' changed since it was loaded."
+            )
+        self._seed_from_template()
+        target = self.user_path / f"{name}.yaml"
+        self._archive(target, name)
+        target.unlink()
+
+    def list_versions(self, name: str) -> list[RuleVersion]:
+        """List earlier versions of a rule set, newest first, then the template.
+
+        Args:
+            name: Rule set name (file stem)
+
+        Returns:
+            History versions followed by the template version when one exists
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetNotFoundError: If no rule file has this name
+        """
+        self.check_exists(name)
+        history_dir = self.user_path / HISTORY_DIR_NAME
+        versions: list[RuleVersion] = []
+        for path in sorted(history_dir.glob(self._history_glob(name)), reverse=True):
+            version_id = path.stem[len(name) + 1 :]
+            saved_at = datetime.strptime(version_id, _STAMP_FORMAT).replace(tzinfo=UTC)
+            versions.append(
+                RuleVersion(id=version_id, kind="history", saved_at=saved_at)
+            )
+        if (self.template_path / f"{name}.yaml").is_file():
+            versions.append(
+                RuleVersion(id=TEMPLATE_VERSION_ID, kind="template", saved_at=None)
+            )
+        return versions
+
+    def read_version(self, name: str, version_id: str) -> DomainRule:
+        """Load an earlier version of a rule set.
+
+        Args:
+            name: Rule set name (file stem)
+            version_id: A history version id, or ``template``
+
+        Returns:
+            The rule content of that version
+
+        Raises:
+            InvalidRuleSetNameError: If the name is not a safe file stem
+            RuleSetNotFoundError: If no rule file has this name
+            RuleVersionNotFoundError: If the version id is malformed or missing
+        """
+        self.check_exists(name)
+        if version_id == TEMPLATE_VERSION_ID:
+            path = self.template_path / f"{name}.yaml"
+        elif _VERSION_ID_PATTERN.fullmatch(version_id):
+            path = self.user_path / HISTORY_DIR_NAME / f"{name}-{version_id}.yaml"
+        else:
+            raise RuleVersionNotFoundError("This version does not exist.")
+        if not path.is_file():
+            raise RuleVersionNotFoundError("This version does not exist.")
+        return load_rule_file(path)
+
+    def _seed_from_template(self) -> None:
+        if self.source != "template":
+            return
+        self.user_path.mkdir(parents=True, exist_ok=True)
+        for template_file in sorted(self.template_path.glob("*.yaml")):
+            _write_atomic(
+                self.user_path / template_file.name, template_file.read_bytes()
+            )
+
+    @staticmethod
+    def _history_glob(name: str) -> str:
+        return f"{name}-????????T????????????Z.yaml"
+
     def _archive(self, target: Path, name: str) -> None:
         history_dir = self.user_path / HISTORY_DIR_NAME
         history_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        stamp = datetime.now(UTC).strftime(_STAMP_FORMAT)
         shutil.copyfile(target, history_dir / f"{name}-{stamp}.yaml")
-        history = sorted(history_dir.glob(f"{name}-????????T????????????Z.yaml"))
+        history = sorted(history_dir.glob(self._history_glob(name)))
         for stale in history[:-HISTORY_KEEP]:
             stale.unlink()

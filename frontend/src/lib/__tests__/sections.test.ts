@@ -22,9 +22,10 @@ describe("splitProblems", () => {
       { path: "classification.component.0.labels.0", message: "c" },
     ];
     const { placed, unplaced } = splitProblems(problems);
-    expect(placed.map((p) => p.message)).toEqual(["a"]);
-    expect(unplaced.map((p) => p.message)).toEqual(["b", "c"]);
-    expect(sectionForPath("project_ids")).toBeNull();
+    expect(placed.map((p) => p.message)).toEqual(["a", "b"]);
+    expect(unplaced.map((p) => p.message)).toEqual(["c"]);
+    expect(sectionForPath("project_ids")).toBe("projects");
+    expect(sectionForPath("team")).toBe("projects");
   });
 });
 
@@ -36,7 +37,7 @@ describe("describeUnplacedProblem", () => {
   });
 
   it("leaves other messages as they are", () => {
-    expect(describeUnplacedProblem({ path: "project_ids", message: "Bad." }, rule)).toBe("Bad.");
+    expect(describeUnplacedProblem({ path: "something", message: "Bad." }, rule)).toBe("Bad.");
   });
 });
 

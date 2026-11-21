@@ -18,9 +18,12 @@ from app.processor.rule_store import (
     InvalidRuleSetNameError,
     RevisionConflictError,
     RuleProblem,
+    RuleSetExistsError,
     RuleSetNotFoundError,
     RuleStore,
+    RuleVersionNotFoundError,
     dump_rule,
+    unique_name,
     validate_rule_set,
 )
 
@@ -268,3 +271,130 @@ def test_rule_loader_records_load_errors(tmp_path: Path) -> None:
 
     assert loader.rules[0].team == "good"
     assert list(loader.load_errors) == ["bad.yaml"]
+
+
+@pytest.mark.parametrize(
+    ("team", "existing", "expected"),
+    [
+        ("Backend Team", [], "backend-team"),
+        ("  R&D / Ops!! ", [], "r-d-ops"),
+        ("Zürich", [], "z-rich"),
+        ("", [], "rule-set"),
+        ("***", [], "rule-set"),
+        ("Backend", ["backend"], "backend-2"),
+        ("Backend", ["backend", "backend-2"], "backend-3"),
+        ("x" * 100, [], "x" * 60),
+        ("x" * 59 + " tail", [], "x" * 59),
+        ("x" * 100, ["x" * 60], "x" * 60 + "-2"),
+    ],
+)
+def test_unique_name(team: str, existing: list[str], expected: str) -> None:
+    name = unique_name(team, existing)
+    assert name == expected
+    assert re.fullmatch(r"^[a-z0-9][a-z0-9_-]*$", name)
+
+
+def test_validate_requires_team_name() -> None:
+    problems = validate_rule_set(DomainRule(team="  ", project_ids=[1]), {})
+    assert [(p.path, p.message) for p in problems] == [
+        ("team", "Give this rule set a team name.")
+    ]
+
+
+def test_create_seeds_template_and_writes_atomically(tmp_path: Path) -> None:
+    store, user, template = _make_store(tmp_path)
+
+    stored = store.create("new-team", DomainRule(team="New", project_ids=[9]))
+
+    assert store.source == "user"
+    assert load_rule_file(user / "new-team.yaml").team == "New"
+    assert user.joinpath("default.yaml").read_bytes() == template.joinpath(
+        "default.yaml"
+    ).read_bytes()
+    assert stored.revision == _revision(store, "new-team")
+    assert list(user.glob("*.tmp")) == []
+    assert not template.joinpath("new-team.yaml").exists()
+
+
+def test_create_rejects_existing_and_invalid_names(tmp_path: Path) -> None:
+    store, _, _ = _make_store(tmp_path)
+    with pytest.raises(RuleSetExistsError):
+        store.create("default", DomainRule())
+    for name in ("../x", "A", ""):
+        with pytest.raises(InvalidRuleSetNameError):
+            store.create(name, DomainRule())
+
+
+def test_delete_archives_removes_and_seeds_template(tmp_path: Path) -> None:
+    store, user, template = _make_store(tmp_path)
+    revision = _revision(store, "other")
+
+    store.delete("other", revision)
+
+    assert not user.joinpath("other.yaml").exists()
+    assert user.joinpath("default.yaml").is_file()
+    assert len(list((user / ".history").glob("other-*.yaml"))) == 1
+    assert template.joinpath("other.yaml").is_file()
+
+
+def test_delete_stale_revision_and_unknown_name(tmp_path: Path) -> None:
+    store, user, _ = _make_store(tmp_path)
+    with pytest.raises(RevisionConflictError):
+        store.delete("other", "stale")
+    assert not user.exists()
+    with pytest.raises(RuleSetNotFoundError):
+        store.delete("missing", "x")
+
+
+def _two_saves(store: RuleStore) -> None:
+    rule = store.list_rule_sets()[0][0].rule
+    revision = _revision(store, "default")
+    revision = store.write("default", rule.model_copy(update={"team": "v1"}), revision).revision
+    store.write("default", rule.model_copy(update={"team": "v2"}), revision)
+
+
+def test_list_versions_newest_first_then_template(tmp_path: Path) -> None:
+    store, _, _ = _make_store(tmp_path)
+    _two_saves(store)
+
+    versions = store.list_versions("default")
+
+    assert [v.kind for v in versions] == ["history", "history", "template"]
+    assert versions[0].id > versions[1].id
+    assert versions[0].saved_at is not None and versions[0].saved_at.tzinfo is not None
+    assert versions[2].id == "template" and versions[2].saved_at is None
+    assert [v.kind for v in store.list_versions("other")] == ["template"]
+
+
+def test_list_versions_without_template_entry_and_no_name_bleed(tmp_path: Path) -> None:
+    store, _, template = _make_store(tmp_path)
+    template.joinpath("a.yaml").write_text("team: a\n", encoding="utf-8")
+    template.joinpath("a-b.yaml").write_text("team: ab\n", encoding="utf-8")
+    sets = {s.name: s for s in store.list_rule_sets()[0]}
+    store.write("a-b", DomainRule(team="ab2"), sets["a-b"].revision)
+    template.joinpath("a.yaml").unlink()
+
+    versions = store.list_versions("a")
+
+    assert versions == []
+    assert [v.kind for v in store.list_versions("a-b")] == ["history", "template"]
+
+
+def test_read_version(tmp_path: Path) -> None:
+    store, _, _ = _make_store(tmp_path)
+    _two_saves(store)
+    versions = store.list_versions("default")
+
+    assert store.read_version("default", versions[0].id).team == "v1"
+    assert store.read_version("default", versions[1].id).team == "default"
+    assert store.read_version("default", "template").team == "default"
+
+
+@pytest.mark.parametrize(
+    "version_id",
+    ["../x", "template/../x", "2026", "20261121T093015Z", "20200101T000000000000Z"],
+)
+def test_read_version_rejects_bad_or_missing_ids(tmp_path: Path, version_id: str) -> None:
+    store, _, _ = _make_store(tmp_path)
+    with pytest.raises(RuleVersionNotFoundError):
+        store.read_version("default", version_id)

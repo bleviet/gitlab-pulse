@@ -3,7 +3,7 @@ import type { AdminJobResponse } from "../../lib/types";
 import { UnlockForm } from "./UnlockForm";
 
 export interface Notice {
-  kind: "success" | "warning" | "error" | "conflict";
+  kind: "success" | "warning" | "error" | "conflict" | "info";
   text: string;
   job?: AdminJobResponse;
 }
@@ -18,6 +18,11 @@ interface SettingsNoticesProps {
   notice: Notice | null;
   onReloadLatest: () => void;
   unplacedProblems: string[];
+}
+
+function noticeClass(kind: Notice["kind"]): string {
+  if (kind === "success" || kind === "error" || kind === "info") return kind;
+  return "warning";
 }
 
 export function SettingsNotices({
@@ -57,8 +62,8 @@ export function SettingsNotices({
 
       {notice && (
         <div
-          className={`settings-notice ${notice.kind === "success" ? "success" : notice.kind === "error" ? "error" : "warning"}`}
-          role={notice.kind === "success" ? "status" : "alert"}
+          className={`settings-notice ${noticeClass(notice.kind)}`}
+          role={notice.kind === "success" || notice.kind === "info" ? "status" : "alert"}
         >
           <div className="settings-notice-row">
             <span>{notice.text}</span>

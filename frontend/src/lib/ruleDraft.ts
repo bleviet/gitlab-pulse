@@ -105,8 +105,49 @@ function checkThreshold(value: number, path: string, problems: RuleProblem[]): v
   }
 }
 
-export function validateRuleSet(rule: RuleSetBody): RuleProblem[] {
+export interface RuleSetContext {
+  otherDefaultExists: boolean;
+  claimedBy: Record<number, string>;
+  savedProjectIds: number[];
+}
+
+function sameIdSet(a: number[], b: number[]): boolean {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((id) => right.has(id));
+}
+
+function claimedMessage(ids: number[], claimedBy: Record<number, string>): string | null {
+  const parts = ids
+    .filter((id) => claimedBy[id] !== undefined)
+    .map((id, i) => (i === 0 ? `Project ${id} already belongs to ${claimedBy[id]}` : `Project ${id} to ${claimedBy[id]}`));
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return `${parts[0]}.`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}.`;
+}
+
+export function teamNameInUse(team: string, otherTeams: string[]): boolean {
+  const wanted = team.trim().toLowerCase();
+  return wanted !== "" && otherTeams.some((t) => t.trim().toLowerCase() === wanted);
+}
+
+export function validateRuleSet(rule: RuleSetBody, context?: RuleSetContext): RuleProblem[] {
   const problems: RuleProblem[] = [];
+
+  if (rule.team.trim() === "") {
+    problems.push({ path: "team", message: "Give this rule set a team name." });
+  }
+  if (context && !sameIdSet(rule.project_ids, context.savedProjectIds)) {
+    if (rule.project_ids.length === 0 && context.otherDefaultExists) {
+      problems.push({
+        path: "project_ids",
+        message:
+          "Choose at least one project. Another rule set already covers all remaining projects.",
+      });
+    }
+    const claimed = claimedMessage(rule.project_ids, context.claimedBy);
+    if (claimed) problems.push({ path: "project_ids", message: claimed });
+  }
 
   for (const category of rule.classification) {
     checkMatcherRules(category.values, `classification.${category.name}`, problems);
@@ -171,4 +212,12 @@ export function problemsWithPrefix(
     if (Number.isInteger(index) && !(index in result)) result[index] = message;
   }
   return result;
+}
+
+export function buildNewRuleSetBody(
+  base: RuleSetBody,
+  team: string,
+  projectIds: number[],
+): RuleSetBody {
+  return { ...base, team: team.trim(), project_ids: projectIds };
 }

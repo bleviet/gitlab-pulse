@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDelta, groupsForSection, mergeProblems } from "../ruleImpact";
+import { changedGroups, formatDelta, groupsForSection, mergeProblems } from "../ruleImpact";
 import type { ImpactSummary } from "../types";
 
 const impact: ImpactSummary = {
@@ -76,5 +76,27 @@ describe("mergeProblems", () => {
       ],
     );
     expect(merged).toEqual([{ path: "a", message: "x" }]);
+  });
+});
+
+describe("changedGroups and overview sections", () => {
+  it("lists only groups with a change, changed rows first", () => {
+    const groups = changedGroups(impact);
+    expect(groups.map((g) => g.title)).toEqual(["Issues by type", "Issues by context", "Issues flagged"]);
+    expect(groups[0].rows.map((r) => r.label)).toEqual(["Bug", "No type"]);
+  });
+
+  it("is empty when nothing changed", () => {
+    const same: ImpactSummary = {
+      ...impact,
+      types: [{ name: "Bug", before: 1, after: 1 }],
+      contexts: [],
+      quality: [],
+    };
+    expect(changedGroups(same)).toEqual([]);
+  });
+
+  it("projects and history show every group", () => {
+    expect(groupsForSection("history", impact).length).toBe(6);
   });
 });

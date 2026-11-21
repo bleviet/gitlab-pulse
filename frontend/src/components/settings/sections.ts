@@ -8,6 +8,7 @@ export interface SectionInfo {
   id: SectionId;
   title: string;
   intro: string;
+  group?: string;
 }
 
 export const SECTIONS: SectionInfo[] = [
@@ -47,6 +48,20 @@ export const SECTIONS: SectionInfo[] = [
     intro:
       "Quality checks flag issues that need attention, such as issues that went quiet, took too long, or are missing labels or fields.",
   },
+  {
+    id: "projects",
+    title: "Team & projects",
+    group: "This rule set",
+    intro:
+      "A rule set holds the rules of one team. One rule set is the default and applies to every project that has no rule set of its own. Every other rule set lists the projects it applies to, and a project belongs to at most one rule set.",
+  },
+  {
+    id: "history",
+    title: "Earlier versions",
+    group: "This rule set",
+    intro:
+      "Going back to an earlier version does not save anything by itself. The version is loaded into the editor as unsaved changes, so you can check its effect and then choose Save & apply, or discard it.",
+  },
 ];
 
 export function sectionForPath(path: string): SectionId | null {
@@ -60,6 +75,7 @@ export function sectionForPath(path: string): SectionId | null {
   }
   if (parts[0] === "workflow") return "stages";
   if (parts[0] === "contexts") return "contexts";
+  if (parts[0] === "team" || parts[0] === "project_ids") return "projects";
   if (parts[0] === "validation") return "quality";
   return null;
 }
@@ -95,6 +111,8 @@ export function rowNamesForSection(rule: RuleSetBody, section: SectionId): strin
     case "contexts":
       return rule.contexts.rules.map((row) => row.name);
     case "quality":
+    case "projects":
+    case "history":
       return [];
   }
 }
@@ -122,6 +140,8 @@ export function addLabelToRow(
     case "contexts":
       return { ...rule, contexts: { ...rule.contexts, rules: withLabel(rule.contexts.rules) } };
     case "quality":
+    case "projects":
+    case "history":
       return rule;
   }
 }
