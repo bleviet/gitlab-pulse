@@ -15,6 +15,10 @@
           var saved = localStorage.getItem("pulse_theme");
           var theme = saved === "light" || saved === "dark" ? saved : "dark";
           document.documentElement.dataset.theme = theme;
+          var colorTheme = localStorage.getItem("pulse_color_theme");
+          if (colorTheme && colorTheme !== "bahonavi") {
+            document.documentElement.dataset.colorTheme = colorTheme;
+          }
         } catch (e) {
           document.documentElement.dataset.theme = "dark";
         }

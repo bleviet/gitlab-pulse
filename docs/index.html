@@ -1343,10 +1343,10 @@
           <div class="marquee-track">
             <ul>
               <li>GitLab.com</li><li>Self-managed GitLab</li><li>REST API</li><li>GraphQL</li><li>YAML rules</li>
-              <li>Parquet</li><li>FastAPI</li><li>React</li><li>TypeScript</li><li>Docker</li><li>uv</li>
+              <li>In-UI rule editor</li><li>7 light/dark themes</li><li>Parquet</li><li>FastAPI</li><li>React</li><li>TypeScript</li><li>Docker</li><li>uv</li>
               <li aria-hidden="true">GitLab.com</li><li aria-hidden="true">Self-managed GitLab</li>
               <li aria-hidden="true">REST API</li><li aria-hidden="true">GraphQL</li><li aria-hidden="true">YAML rules</li>
-              <li aria-hidden="true">Parquet</li><li aria-hidden="true">FastAPI</li><li aria-hidden="true">React</li><li aria-hidden="true">TypeScript</li>
+              <li aria-hidden="true">In-UI rule editor</li><li aria-hidden="true">7 light/dark themes</li><li aria-hidden="true">Parquet</li><li aria-hidden="true">FastAPI</li><li aria-hidden="true">React</li><li aria-hidden="true">TypeScript</li>
               <li aria-hidden="true">Docker</li><li aria-hidden="true">uv</li>
             </ul>
           </div>
@@ -1543,29 +1543,38 @@
       <div class="sheet">
         <div class="sheet-row reveal">
           <span class="addr mono">0x00</span>
-          <h3>Your labels, your stages</h3>
-          <p>YAML rule files map GitLab labels to workflow stages, issue types, and priorities. One file per team, and
-            a file can apply to selected projects only.</p>
+          <h3>Edit rules right on the dashboard</h3>
+          <p>Unlock edit mode in the top bar to configure issue types, priorities, impact levels, workflow stages,
+            contexts, and quality checks directly from anchored panel popovers with live before/after counts—or edit
+            the underlying YAML directly while preserving comments. One rule file per team, with automatic version
+            history.</p>
         </div>
         <div class="sheet-row reveal">
           <span class="addr mono">0x04</span>
+          <h3>Personal light &amp; dark themes</h3>
+          <p>Switch between <b>Bahonavi Pulse</b>, <b>Catppuccin</b> (Mocha/Latte), <b>Dracula</b> (Dark/Alucard),
+            <b>GitHub</b>, <b>Nord</b>, <b>Tokyo Night</b> (Night/Day), and <b>Gruvbox</b> directly from the top bar—no
+            admin access required, stored locally in your browser so every teammate chooses their own look.</p>
+        </div>
+        <div class="sheet-row reveal">
+          <span class="addr mono">0x08</span>
           <h3>Incremental sync</h3>
           <p>The collector remembers what it fetched and pulls only issues that changed. A project that fails is
             logged and skipped; the others continue.</p>
         </div>
         <div class="sheet-row reveal">
-          <span class="addr mono">0x08</span>
+          <span class="addr mono">0x0C</span>
           <h3>Quality hints</h3>
-          <p>Issues without a milestone, without an assignee, or with conflicting type labels are counted, listed,
-            and one click away as a filter.</p>
+          <p>Issues without a milestone, without an assignee, or with conflicting type, impact, or priority labels are
+            counted, listed, and one click away as a filter.</p>
         </div>
         <div class="sheet-row reveal">
-          <span class="addr mono">0x0C</span>
+          <span class="addr mono">0x10</span>
           <h3>Links that keep the view</h3>
           <p>Global scope tokens, date presets, chart facets, search text, and the Charts toggle stay synced in the URL so any shared link restores the same view.</p>
         </div>
         <div class="sheet-row reveal">
-          <span class="addr mono">0x10</span>
+          <span class="addr mono">0x14</span>
           <h3>Synthetic demo data</h3>
           <p>Seed realistic local projects to try the dashboard without access to a GitLab instance.</p>
         </div>

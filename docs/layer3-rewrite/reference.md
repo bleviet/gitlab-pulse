@@ -14,6 +14,7 @@ This document catalogs every backend module, API endpoint, frontend module, URL 
 | `app/dashboard/palettes.py` | Light/dark semantic color maps with YAML rule overrides | `resolve_palettes()` |
 | `app/dashboard/service.py` | Context collapsing, payload construction, `st_mtime_ns` cache | `DashboardService` (`get_dashboard_payload()`, `clear_cache()`) |
 | `app/dashboard/admin.py` | Cookie-authenticated admin router | `create_admin_router()`, `ADMIN_COOKIE_NAME` |
+| `app/dashboard/rules_api.py` | Rule set list, preview, save, create, delete, version history, and raw YAML text read/write endpoints | `create_rules_router()` |
 | `app/dashboard/server.py` | FastAPI app factory, GZip, CORS, SPA fallback serving | `create_app()`, `app` |
 
 ### 1.1 `DashboardService` Cache Key
@@ -38,6 +39,11 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 | `POST` | `/api/admin/run/collector` | Cookie required (`401`) | — | `AdminJobResponse` executing `app/collector/orchestrator.py`; clears cache on `returncode == 0` |
 | `POST` | `/api/admin/run/processor` | Cookie required (`401`) | — | `AdminJobResponse` executing `app/processor/main.py`; clears cache on `returncode == 0` |
 | `POST` | `/api/admin/clear-cache` | Cookie required (`401`) | — | `{"ok": true}` and invalidates `DashboardService` cache |
+| `GET` | `/api/rules`, `/api/rules/{name}/text` | None | — | Rule sets (`RuleSetsResponse`) and stored YAML text (`RuleTextResponse`) |
+| `PUT` | `/api/admin/rules/{name}`, `/api/admin/rules/{name}/text` | Cookie required (`401`) | `RuleSaveRequest` / `RuleTextSaveRequest` | Validates and writes rule JSON or comment-preserving YAML, runs Processor (L2), clears cache |
+| `POST` | `/api/admin/rules`, `/api/admin/rules/{name}/preview` | Cookie required (`401`) | `RuleCreateRequest` / `RulePreviewRequest` | Creates team rule set or returns dry-run `ImpactSummary` |
+| `DELETE` | `/api/admin/rules/{name}?revision=...` | Cookie required (`401`) | — | Archives and deletes non-default team rule set, runs Processor (L2) |
+| `GET` | `/api/admin/rules/{name}/versions[/{id}]` | Cookie required (`401`) | — | Lists or fetches earlier rule versions (`history` / `template`) |
 | `GET` | `/`, `/{full_path:path}` | None | — | Serves `frontend/dist/index.html` (or static file); returns `404` JSON for unknown `/api/*` paths |
 
 ## 3. Frontend Modules (`frontend/`)
@@ -46,12 +52,12 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 - `frontend/package.json`: React 19, TypeScript 5.8, Vite 7, Vitest 3, `@tanstack/react-table` 8, `lucide-react`.
 - `frontend/vite.config.ts`: dev server on `:5173` proxying `/api` to `http://127.0.0.1:8501`, Vitest `jsdom` environment.
 - `frontend/tsconfig.json`: `strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`.
-- `frontend/index.html`: sets initial `document.documentElement.dataset.theme` synchronously from `localStorage` (`pulse_theme`, default `"dark"`).
+- `frontend/index.html`: sets initial `document.documentElement.dataset.theme` (`pulse_theme`, default `"dark"`) and `dataset.colorTheme` (`pulse_color_theme`, default `"bahonavi"`) synchronously from `localStorage`.
 - `frontend/public/static/`: self-hosted fonts (`Manrope-VariableFont.woff2`, `SpaceGrotesk-VariableFont_wght.ttf`, `SpaceMono-Regular.ttf`, `SpaceMono-Bold.ttf`, license files), `logo.svg`, and `favicon.png`.
 
 ### 3.2 Styles (`frontend/src/styles/`)
 - `fonts.css`: `@font-face` declarations for `"Manrope"`, `"Space Grotesk"`, and `"Space Mono"` served from `/static/`.
-- `tokens.css`: `:root` (dark default) and `[data-theme="light"]` CSS custom properties following bahonavi design tokens (`--bg`, `--bg-card`, `--bg-raise`, `--surface`, `--line`, `--line-strong`, `--text`, `--heading`, `--muted`, `--accent`, `--brand`, `--brand-2`, `--grad`, `--chart-1..8`, `--chart-bg`, `--chart-grid`, `--chart-axis`, `--chart-label`, `--chart-tooltip-bg`).
+- `tokens.css`: `:root` (dark default), `[data-theme="light"]`, and per-user `[data-color-theme="<id>"]` (`catppuccin`, `dracula`, `github`, `nord`, `tokyo-night`, `gruvbox`) CSS custom properties (`--bg`, `--bg-card`, `--bg-raise`, `--surface`, `--line`, `--line-strong`, `--text`, `--heading`, `--muted`, `--accent`, `--brand`, `--brand-2`, `--grad`, `--chart-1..8`, `--chart-bg`, `--chart-grid`, `--chart-axis`, `--chart-label`, `--chart-tooltip-bg`).
 - `global.css`: bahonavi corner-glow and 72px blueprint-grid background, sticky topbar/panel/lane-header rules, scope/popover/modal styles, table/board card styling, `:focus-visible` outlines, and `prefers-reduced-motion` guards.
 
 ### 3.3 Pure Domain Modules (`frontend/src/lib/`)
@@ -60,6 +66,7 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 |---|---|---|
 | `types.ts` | TypeScript interfaces matching API DTOs and UI state | `IssueItem`, `DashboardPayload`, `GlobalFilters`, `IssueFacets`, `IssueViewMode`, `ThemeMode`, `ActiveChartId` |
 | `colors.ts` | Priority, issue-type, & contrast color resolution | `getPriorityColor`, `getIssueTypeColor`, `buildPriorityColorMap`, `hexWithAlpha`, `contrastTextForHex` |
+| `uiThemes.ts` | Per-user light/dark appearance themes (`Bahonavi Pulse`, `Catppuccin`, `Dracula`, `GitHub`, `Nord`, `Tokyo Night`, `Gruvbox`) and chart palette overlays | `UI_THEMES`, `parseUiTheme`, `resolveUserPalette`, `UI_THEME_STORAGE_KEY` |
 | `search.ts` | Multi-token exact search + LCS fuzzy fallback (`<=4: 0.90`, `<=8: 0.82`, `>8: 0.72`) | `normalizeSearchText`, `similarityRatio`, `filterIssuesBySearch` |
 | `scopeSearch.ts` | Fuzzy scoring and multi-dimension combined quick-apply matching for `ScopeBar` | `scoreScopeCandidate`, `buildScopeSuggestions` |
 | `facets.ts` | Global/facet filtering, cascading options, chip construction, URL state serialization | `applyPreMilestoneFilters`, `applyGlobalFilters`, `applyFacets`, `buildFacetChips`, `deriveScopedFilterOptions`, `resolvePresetDates`, `withoutFacet`, `parseGlobalFiltersUrl`, `parseUrlState`, `buildUrlSearch` |
@@ -80,7 +87,9 @@ Heavy raw columns (`description`, `notes`) are omitted from `IssueItem` in `Dash
 | `charts/QualitySignalsChart.tsx` | Horizontal bar chart for `MISSING_MILESTONE`, `UNASSIGNED_OWNER`, and `MIXED_CLASSIFICATION` (`Open Hints`) |
 | `charts/DailyVelocityChart.tsx` | 7-day dual-line SVG chart (`New` vs. `Closed`) with historical anchoring and clickable date markers |
 | `charts/WorkflowStateRow.tsx` | Horizontal stacked priority bars with inline counts across open stages and closed terminal stages (`Done`) |
-| `TopBar.tsx` | Sticky frosted navbar: logo, center `ScopeBar`, ambient Sync Status / Refresh button, `Charts` toggle, theme toggle, Admin Ops trigger |
+| `TopBar.tsx` | Sticky frosted navbar: logo, center `ScopeBar`, ambient Sync Status / Refresh button, `Charts` toggle, `#/%` switch, `ThemePicker`, Lock/Unlock `Edit` toggle, Admin Ops trigger |
+| `ThemePicker.tsx` | Per-user Appearance popover in `TopBar` for switching Dark/Light mode and named personal color themes (`localStorage`) |
+| `settings/*` | Lock/Unlock inline rule editor (`useRuleEditor`, `EditModeBar`, `RulePopover`, `RuleEditorPopover`, `ClassificationEditor`, `StagesEditor`, `ContextsEditor`, `QualityEditor`, `ProjectsEditor`, `ColorsEditor`, `HistoryPanel`, `TextView`, `InlineColorDot`, `MatcherInput`, `NewRuleSetDialog`) |
 | `ScopeBar.tsx` | Unified tokenized fuzzy scope picker (`Context`, `Milestone`, and `Team` when `> 1`, supporting multi-term combined quick-apply like `proj v14`) beside inline `30d`/`90d`/`1y`/`All` presets and a custom date popover |
 | `SummaryBar.tsx` | Quick-filter pill groups rendered automatically in `IssuePanel` when `Charts` is toggled OFF |
 | `IssueSearchInput.tsx` | Expanding inline search pill (`Ctrl/Cmd+K` focus, `Escape` blur, clear button) |

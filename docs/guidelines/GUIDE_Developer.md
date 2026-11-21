@@ -78,7 +78,7 @@ Used for **Data Validation**.
 
 Used for **Data Loading** in `DashboardService` (`app/dashboard/service.py`).
 
-* **Implementation:** `DashboardService` acts as an mtime-keyed cache over `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and the active rule files (`data/rules/*.yaml`, or `app/config/rules/*.yaml` until the first save from the Settings screen). It collapses multi-context rows into unique issues and resolves YAML palettes once per file modification timestamp (`st_mtime_ns`), with explicit invalidation via `clear_cache()`.
+* **Implementation:** `DashboardService` acts as an mtime-keyed cache over `issues_valid.parquet`, `labels_*.parquet`, `sync_state.json`, and the active rule files (`data/rules/*.yaml`, or `app/config/rules/*.yaml` until the first save from the dashboard rule editor). It collapses multi-context rows into unique issues and resolves YAML palettes once per file modification timestamp (`st_mtime_ns`), with explicit invalidation via `clear_cache()`.
 
 ## **4\. Extensibility & OCP (Open/Closed Principle)**
 
@@ -155,8 +155,8 @@ For hot-reload frontend development, run `uv run python -m app.dashboard --reloa
 
 UI chrome and data colors follow the `brand-guidelines` and `frontend-design` skills:
 
-* **UI Chrome Tokens:** Declared in `frontend/src/styles/tokens.css` under `:root` (dark default) and `[data-theme="light"]`. Do not hardcode hex values for backgrounds, text, borders, or surfaces inside components.
-* **Semantic Data Palettes:** Defined in `app/dashboard/palettes.py` (`_SEMANTIC_DARK` / `_SEMANTIC_LIGHT`), merged with `colors.light` / `colors.dark` overrides from the team rule YAML, and resolved on the client via `frontend/src/lib/colors.ts`.
+* **UI Chrome Tokens:** Declared in `frontend/src/styles/tokens.css` under `:root` (dark default), `[data-theme="light"]`, and per-user `[data-color-theme="<id>"]` overrides paired with `frontend/src/lib/uiThemes.ts`. Do not hardcode hex values for backgrounds, text, borders, or surfaces inside components.
+* **Semantic Data Palettes:** Defined in `app/dashboard/palettes.py` (`_SEMANTIC_DARK` / `_SEMANTIC_LIGHT`), merged with `colors.light` / `colors.dark` overrides from the team rule YAML, and resolved on the client via `frontend/src/lib/colors.ts` (with per-user overlays when a non-default personal theme is active).
 * **Self-Hosted Fonts:** `Manrope`, `Space Grotesk`, and `Space Mono` are stored in `frontend/public/static/` and loaded via `frontend/src/styles/fonts.css` with zero external requests.
 
 ### **9.3. Timezone-Aware Date Arithmetic**

@@ -7,16 +7,17 @@
 
 ### 1.1 Rule loading
 
-`app/processor/rule_loader.py` loads YAML rules and resolves the correct rule set for each project. The default rule (the file with an empty `project_ids` list) acts as the global fallback. Files are read in sorted order, and files that fail to load are skipped and recorded in `RuleLoader.load_errors`.
+`app/processor/rule_loader.py` loads YAML rules and resolves the correct rule set for each project. The default rule (the file with an empty `project_ids` list) acts as the global fallback. Files are read in sorted order, and files that fail to load are skipped and recorded in `RuleLoader.load_errors`. Legacy `classification.severity` and `label_mappings.severity` entries are transparently migrated into `classification.impact` on load so existing rule files keep working.
 
 `resolve_rules_path()` picks the directory: `data/rules/` when it contains at least one `*.yaml` file, otherwise the shipped template directory `app/config/rules/`. The processor CLI, `DashboardService`, and `tools/local_data_manager.py` use it unless a path is passed explicitly.
 
 ### 1.2 Rule store
 
-`app/processor/rule_store.py` is the write side used by the dashboard Settings screen:
+`app/processor/rule_store.py` is the write side used by the dashboard rule editor:
 
 - `RuleStore.list_rule_sets()` returns every rule file of the active directory with a revision (SHA-256 of the file content).
 - `RuleStore.write()` rejects names that are not a plain file stem, rejects a stale revision, seeds `data/rules/` from the template directory on the first write, copies the replaced file to `data/rules/.history/` (newest 20 kept per file), and writes atomically (`*.tmp` then `os.replace`). Seeding is atomic per file, not as a set: if the process is interrupted between two template files, `data/rules/` becomes active with only part of the template, and the missing files have to be copied by hand.
+- `parse_rule_yaml()` and `RuleStore.write_text()` parse, validate, and atomically save raw user-edited YAML text with the same revision check, template seeding, and `.history/` archiving as `write()`, while preserving user comments and formatting.
 - `RuleStore.create()` writes a new rule file; its name comes from `unique_name()`, a slug of the team name made unique with a numeric suffix, so users never choose file names.
 - `RuleStore.delete()` archives the file to `.history/` and removes it. The history copies of a deleted rule set stay on disk; a rule set created later under the same derived name lists them as its earlier versions, which is the way to get a deleted rule set's content back.
 - The effective default is the rule set with an empty `project_ids` list whose file name sorts first, the one `RuleLoader` registers as the fallback. The store exposes its name so the API, the dry run, and the UI agree on which rule set that is when hand-edited files contain more than one.
@@ -86,6 +87,6 @@ This preserves reporting completeness while still surfacing the data quality pro
 - **Rule store in Layer 2, not in the dashboard:** the processor owns the rule file format (`DomainRule`), so reading, validating, and writing it sit next to the loader; the dashboard only translates between HTTP and the store.
 - **Dry run through the real pipeline:** the preview calls the same `process_issues()` as a processor run instead of re-implementing matching in the browser. Python and JavaScript regular expressions differ, and a second implementation of first-match-wins, stage fallback, and context explosion would drift from the processor.
 - **Restore is a read, not a write:** the store only returns an earlier version. The UI loads it as an unsaved draft and saves it through the normal path, so a restore gets the same validation, preview, history copy, and processor run as any other change, and there is no second write path to keep consistent.
-- **Regenerated files instead of comment-preserving edits:** the Settings screen is the primary editor, so saved files are written from the model with PyYAML. Keeping comments would need a round-trip YAML library for a file users are no longer expected to open.
+- **Dual save paths (`write()` vs. `write_text()`):** structured UI edits serialize cleanly from `DomainRule` via `dump_rule()` without requiring a round-trip YAML library, while direct edits in the in-browser YAML editor save validated raw text via `write_text()` so comments and hand-tuned formatting stay intact.
 - **Split analytics vs. quality output:** analytics stays usable while quality issues remain actionable
 - **Context explosion in Layer 2:** avoids repeated label parsing in the UI layer

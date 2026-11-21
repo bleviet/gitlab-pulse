@@ -42,7 +42,8 @@ The legacy Streamlit UI, Plotly wrapper layer, and experimental Custom View buil
 - `POST /api/admin/rules` -> creates a rule set from `{rule}`; the server derives the file name from the team name. Validated against every existing rule set, so a project that already belongs to another rule set or a second default is rejected with `422`. Runs the processor like a save.
 - `DELETE /api/admin/rules/{name}?revision=...` -> archives and removes a rule set and runs the processor. The effective default rule set cannot be deleted (`422`), because projects without their own rule set would lose their rules, and neither can the last remaining rule set, because an empty `data/rules/` would hand control back to the shipped template without telling anyone.
 - `GET /api/admin/rules/{name}/versions` and `GET /api/admin/rules/{name}/versions/{id}` -> earlier versions of a rule set (history copies and the shipped template) and the content of one. There is no restore endpoint; the UI saves a loaded version through `PUT`.
-- `GET /api/rules/{name}/text` -> `{path, text}`: the stored file of one rule set, for the read-only text view. No authentication, like `GET /api/rules`.
+- `GET /api/rules/{name}/text` -> `{path, text}`: the stored YAML file of one rule set. No authentication, like `GET /api/rules`.
+- `PUT /api/admin/rules/{name}/text` -> parses and validates raw `{revision, text}` YAML (`422` on syntax, schema, or rule problems; `409` on stale revision; `401` without admin session), writes it via `RuleStore.write_text()` preserving comments and formatting, runs `app/processor/main.py`, and invalidates the payload cache.
 
 `GET /api/rules` also returns `palette_defaults` (the built-in light and dark colours from `palettes.py`), so the colours editor shows the effective colour and can reset an override without keeping a second copy of the brand palette in the frontend.
 
@@ -58,11 +59,11 @@ Pipeline runs triggered through the admin endpoints and through a rule save are 
 
 | Area | Modules |
 |---|---|
-| `styles/` | Self-hosted fonts (`fonts.css`), bahonavi dark/light CSS variables (`tokens.css`), layout and component styles (`global.css`) |
-| `lib/` | Pure TypeScript domain logic (`types.ts`, `colors.ts`, `search.ts`, `scopeSearch.ts`, `facets.ts`, `summary.ts`, `timeline.ts`, `board.ts`, `analytics.ts`, `api.ts`), plus the rule editor helpers `rulePatterns.ts` (pattern prefix parsing), `labelInventory.ts` (labels and usage counts from the payload), `ruleDraft.ts` (draft list helpers and client-side validation) |
+| `styles/` | Self-hosted fonts (`fonts.css`), dark/light CSS variables and per-user `[data-color-theme]` palettes (`tokens.css`), layout and component styles (`global.css`) |
+| `lib/` | Pure TypeScript domain logic (`types.ts`, `colors.ts`, `uiThemes.ts`, `search.ts`, `scopeSearch.ts`, `facets.ts`, `summary.ts`, `timeline.ts`, `board.ts`, `analytics.ts`, `api.ts`), plus the rule editor helpers (`rulePatterns.ts`, `labelInventory.ts`, `projectInventory.ts`, `ruleDraft.ts`, `ruleImpact.ts`, `ruleColors.ts`, `ruleSuggestions.ts`) |
 | `components/charts/` | Responsive SVG charts (`ReleaseTimeline`, `PriorityDonut`, `QualitySignalsChart`, `UnscheduledMilestonesChart`, `DailyVelocityChart`, `WorkflowStateRow`) |
-| `components/` | `TopBar`, `ScopeBar`, `OverviewWorkspace`, `SummaryBar`, `IssueSearchInput`, `IssuePanel`, `IssueTable`, `IssueBoard`, `AdminModal` |
-| `components/settings/` | `SettingsWorkspace` (rule editor dialog, load/save flow), `MatcherInput` (label picker and pattern chips), `ClassificationEditor`, `StagesEditor`, `ContextsEditor`, `QualityEditor`, and small shared controls |
+| `components/` | `TopBar`, `ThemePicker`, `ScopeBar`, `OverviewWorkspace`, `SummaryBar`, `IssueSearchInput`, `IssuePanel`, `IssueTable`, `IssueBoard`, `AdminModal` |
+| `components/settings/` | `useRuleEditor` (Lock/Unlock edit mode state), `EditModeBar` (slim edit bar), `RulePopover` & `RuleEditorPopover` (anchored panel popovers), `MatcherInput` (label picker + inline `/regex/`), `InlineColorDot`, `ClassificationEditor`, `StagesEditor`, `ContextsEditor`, `QualityEditor`, `ProjectsEditor`, `ColorsEditor`, `HistoryPanel`, `TextView` (direct YAML editor), `NewRuleSetDialog` |
 
 ### 3.1 Rationale for Client-Side Filtering & SVG Charts
 
@@ -73,8 +74,8 @@ Because GitLab Pulse typically operates on thousands of issues per workspace, sh
 `npm run build:demo` runs Vite with `--mode demo`, `--base /gitlab-pulse/demo/` and `--outDir dist-demo`. `IS_DEMO` (`frontend/src/lib/api.ts`, `import.meta.env.MODE === "demo"`) changes the following:
 
 - `fetchDashboard()` reads `${import.meta.env.BASE_URL}demo-data/dashboard.json` instead of `/api/dashboard`.
-- `App` does not call `fetchAdminStatus` and does not render `AdminModal` or `SettingsWorkspace`.
-- `TopBar` hides the refresh/sync button, the Settings button, and the Ops/admin button and shows a "Demo · synthetic data" chip linking to the README quick start.
+- `App` does not call `fetchAdminStatus` and does not render `AdminModal`, `EditModeBar`, or `RuleEditorPopover`.
+- `TopBar` hides the refresh/sync button, the Edit lock button, and the Ops/admin button, keeps `ThemePicker` available for every demo visitor, and shows a "Demo · synthetic data" chip linking to the README quick start.
 - Public assets use the Vite base: the logo path uses `BASE_URL`, and Vite rewrites the favicon links in `index.html` and the font URLs in `fonts.css`.
 
 The normal build (base `/`) is unaffected. The snapshot is produced by `tools/export_demo_payload.py`.

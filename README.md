@@ -4,9 +4,10 @@ GitLab Pulse is a local-first analytics application for GitLab issue data. It ex
 
 ## Features
 
-- **Analytics Dashboards**: Visualizes workflow state, issue velocity, and priority distribution.
-- **Interactive Data Filtering**: Charts support drill-down filtering to inspect the underlying issue data.
-- **Customizable Workflows**: Uses YAML configuration to map existing GitLab labels to standardized semantic workflow stages.
+- **Analytics Dashboards**: Visualizes workflow state, issue velocity, priority/type mix, unscheduled milestones, and quality hints.
+- **Interactive Data Filtering**: Charts support drill-down filtering to inspect the underlying issue data in a table or Kanban board.
+- **In-Dashboard Rule Editing**: Unlock edit mode directly on the dashboard to map labels to workflow stages, issue types, impact levels, priorities, contexts, and quality checks—or edit YAML directly while preserving comments.
+- **Personal Light & Dark Themes**: Every user can pick from Bahonavi Pulse, Catppuccin (Mocha/Latte), Dracula (Dark/Alucard), GitHub, Nord, Tokyo Night (Night/Day), and Gruvbox in the top bar without admin access.
 
 **Live demo:** <https://bleviet.github.io/gitlab-pulse/demo/> (read-only, synthetic data, rebuilt weekly). To build it locally, seed and process synthetic data first (see Quick Start), then run `cd frontend && npm run build:demo && cd ..`, write the payload from the repository root with `uv run python tools/export_demo_payload.py --output frontend/dist-demo/demo-data/dashboard.json`, and serve `frontend/dist-demo/` under the path `/gitlab-pulse/demo/` (for example, copy it to `site/gitlab-pulse/demo/` and run `python -m http.server` in `site/`).
 
@@ -157,11 +158,11 @@ Rules determine how issues are classified (Bug, Feature, etc.), which labels pla
 
 **Several teams:** **More -> New team rule set** creates rules for one team and the projects you tick; all other projects keep using the default rule set. **Projects** changes the assignment later, and **Earlier versions** loads a previous version (or the version shipped with GitLab Pulse) back into the editor, where you can check its effect before saving.
 
-**Starting from existing labels:** if your projects already use scoped labels such as `type::bug`, `impact::high` (or `severity::high`), `priority::1`, or `workflow::review`, **Suggest** in the type, impact, priority, and stage popovers proposes the matching rows. Inline swatches and **More -> All colours** change the colours used for types, impacts, priorities, and stages in both themes.
+**Starting from existing labels:** if your projects already use scoped labels such as `type::bug`, `impact::high` (or `severity::high`), `priority::1`, or `workflow::review`, **Suggest** in the type, impact, priority, and stage popovers proposes the matching rows. Inline swatches and **More -> Rule colours** change the default colours used for types, impacts, priorities, and stages in both themes.
 
-**Where rules are stored:** `app/config/rules/default.yaml` is a read-only template. The first save from the Settings screen copies the template rules to `data/rules/` and writes there from then on. `data/rules/` is gitignored and sits on the Docker data volume, so saved rules survive image rebuilds. The previous version of a file is kept in `data/rules/.history/` on every save.
+**Where rules are stored:** `app/config/rules/default.yaml` is a read-only template. The first save from the dashboard copies the template rules to `data/rules/` and writes there from then on. `data/rules/` is gitignored and sits on the Docker data volume, so saved rules survive image rebuilds. The previous version of a file is kept in `data/rules/.history/` on every save.
 
-**By hand (optional):** **View as text** in Settings shows the stored file and its location. The files are plain YAML and can still be edited directly, in `data/rules/` once it exists, otherwise in `app/config/rules/`. Create additional files (e.g., `my_project.yaml`) and restrict them to specific projects with `project_ids`. Comments in a file are dropped the next time that file is saved from the Settings screen. Run the processor after a manual edit.
+**Direct YAML editing (in-browser or on disk):** click **YAML** in the edit bar (while unlocked) to view, copy, or edit the stored YAML directly—saving from the YAML editor validates syntax and rule constraints, preserves comments and formatting, and re-runs the processor automatically. You can also edit files directly on disk in `data/rules/` (or `app/config/rules/` before the first save) and run the processor manually. Comments are dropped only when saving through the structured form editors.
 
 ### 3. Run the Pipeline
 Fetch the data, process it into analytics, and launch the dashboard:

@@ -35,7 +35,7 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 - **Manual Refresh:** Click the ambient refresh button (status dot + arrows icon) in the top-right navigation bar to reload `/api/dashboard` immediately without reloading the browser page.
 
 ### **Q: How do I change the rules without editing a file?**
-**A:** Open **Settings** in the top-right navigation bar, unlock editing with the admin password, change the rules, and click **Save & apply**. Before saving, the **Effect on your data** panel shows the issue counts with the saved rules and with your changes. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
+**A:** Click **Edit** (`Lock`) in the top-right navigation bar, enter the admin password to unlock direct edit mode, click **Edit** on any rule-backed panel (**Open Mix**, **Workflow State**, **Issue Quality Signals**, **ScopeBar**) or pick a chip in the edit bar (**Impact**, **Contexts**, **Projects**), and click **Save & apply**. Live before/after issue counts appear right on each row before you save. The dashboard validates the rules, writes them to `data/rules/`, runs the Processor, and reloads the data. Nothing else needs to be run.
 
 ### **Q: How do I give one team its own rules?**
 **A:** Unlock editing via **Edit** in the top bar, open **More -> New team rule set**, enter the team name, and tick the team's projects. The new rule set starts as a copy of the active rule set. Projects that are not ticked in any rule set use the default rule set. A project can belong to only one rule set; move it under **Projects**.
@@ -53,7 +53,7 @@ The system follows a linear pipeline (Medallion Architecture). Steps must be exe
 **A:** While unlocked, click **YAML** in the edit bar (or **More -> Edit YAML**) to view, copy, or edit the stored YAML directly. Saving from the YAML editor validates syntax and rule constraints, archives the previous version, preserves your comments and formatting, and recalculates the dashboard.
 
 ### **Q: Where are the rule files?**
-**A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the Settings screen copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.
+**A:** `app/config/rules/` holds the template shipped with the application. It is used as long as `data/rules/` contains no `*.yaml` file. The first save from the dashboard rule editor copies every template file to `data/rules/`; from then on only `data/rules/` is read. Each save keeps the replaced file in `data/rules/.history/` (the newest 20 per rule file). To go back to the shipped template, stop editing and delete the `*.yaml` files in `data/rules/`.
 
 ### **Q: I edited a rule file by hand. How do I see the changes?**
 **A:** Color overrides under `colors.light` / `colors.dark` are resolved at read time via `DashboardService` mtime detection. Changes to classification rules, workflow stages, or quality rules take effect during **Layer 2 Processing**:

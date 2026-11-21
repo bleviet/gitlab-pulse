@@ -51,7 +51,7 @@ per-layer specs are in `docs/spec/TSD_*.md`):
 
 Shared Pydantic schemas live in `app/shared/schemas.py`. Rules are YAML files:
 `app/config/rules/` holds the shipped template (`default.yaml`), and
-`data/rules/` holds the rules saved from the dashboard Settings screen and takes
+`data/rules/` holds the rules saved from the dashboard rule edit mode and takes
 over as soon as it contains a `*.yaml` file (`resolve_rules_path`). `RuleLoader`
 discovers them, `RuleStore` (`app/processor/rule_store.py`) writes them, and a
 rule file may restrict itself to `project_ids`.
@@ -94,11 +94,13 @@ rule file may restrict itself to `project_ids`.
 
 - UI chrome colors (backgrounds, text, borders, surfaces, fonts) belong in
   `frontend/src/styles/tokens.css` (`:root, [data-theme="dark"]` dark default /
-  `[data-theme="light"]`; either attribute also forces a theme on a subtree).
-- Semantic data colors (issue type, severity, priority, stage, milestone status)
+  `[data-theme="light"]`, plus per-user `[data-color-theme="<id>"]` overrides
+  paired with `frontend/src/lib/uiThemes.ts`).
+- Semantic data colors (issue type, impact, priority, stage, milestone status)
   are resolved by `app/dashboard/palettes.py` (with YAML rule overrides) and
-  consumed in `frontend/src/lib/colors.ts`. Never hardcode off-brand colors in
-  components or SVG charts.
+  consumed in `frontend/src/lib/colors.ts` (with optional per-user theme
+  overlays when a non-default personal theme is selected). Never hardcode
+  off-brand colors in components or SVG charts.
 - Self-hosted fonts (`Manrope`, `Space Grotesk`, `Space Mono`) live in
   `frontend/public/static/` and are declared in `frontend/src/styles/fonts.css`.
 - The palette and fonts follow the bahonavi brand; see the `brand-guidelines`
