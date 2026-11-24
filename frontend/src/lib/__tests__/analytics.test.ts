@@ -4,6 +4,7 @@ import {
   buildIssueTypeDonutData,
   buildStagePriorityBars,
   formatShare,
+  pickAxisLabelIndices,
 } from "../analytics";
 import { getOverviewStages, getWorkflowStages } from "../board";
 import { contrastTextForHex } from "../colors";
@@ -185,5 +186,24 @@ describe("formatShare", () => {
 
   it("returns 100% for the full total", () => {
     expect(formatShare(7, 7)).toBe("100%");
+  });
+});
+
+describe("pickAxisLabelIndices", () => {
+  it("keeps every label when they fit", () => {
+    expect(pickAxisLabelIndices(7, 50, 33)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("thins labels so neighbours never overlap on narrow charts", () => {
+    const picked = pickAxisLabelIndices(7, 20, 33);
+    expect(picked).toEqual([0, 2, 4, 6]);
+    for (let i = 1; i < picked.length; i += 1) {
+      expect((picked[i] - picked[i - 1]) * 20).toBeGreaterThanOrEqual(33);
+    }
+  });
+
+  it("always keeps the most recent day", () => {
+    expect(pickAxisLabelIndices(7, 12, 33)).toEqual([0, 3, 6]);
+    expect(pickAxisLabelIndices(7, 1, 33)).toEqual([6]);
   });
 });
