@@ -216,6 +216,20 @@ export function buildDailyVelocityData(
   return days;
 }
 
+/**
+ * Indices of evenly spaced x-axis points whose labels can be drawn without
+ * overlapping, counted back from the last point so the most recent day keeps
+ * its label.
+ */
+export function pickAxisLabelIndices(count: number, spacing: number, labelWidth: number): number[] {
+  const step = Math.max(1, Math.ceil(labelWidth / Math.max(spacing, 1)));
+  const indices: number[] = [];
+  for (let idx = count - 1; idx >= 0; idx -= step) {
+    indices.unshift(idx);
+  }
+  return indices;
+}
+
 export interface StageBarBucket {
   stage: string;
   total: number;

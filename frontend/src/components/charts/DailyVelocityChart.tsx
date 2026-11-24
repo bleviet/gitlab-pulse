@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildDailyVelocityData } from "../../lib/analytics";
+import { buildDailyVelocityData, pickAxisLabelIndices } from "../../lib/analytics";
 import type { IssueItem } from "../../lib/types";
 import { ChartTooltip, type TooltipState } from "./ChartTooltip";
 
@@ -50,6 +50,13 @@ export function DailyVelocityChart({
   const maxVal = Math.max(...days.flatMap((d) => [d.created, d.closed]), 1);
   const xFor = (idx: number): number => padL + (idx / Math.max(days.length - 1, 1)) * innerW;
   const yFor = (val: number): number => padT + innerH - (val / maxVal) * innerH;
+
+  const axisFontSize = 9;
+  const longestLabel = Math.max(...days.map((d) => d.label.length), 1);
+  const axisLabelWidth = longestLabel * axisFontSize * 0.62 + 6;
+  const axisLabelIndices = new Set(
+    pickAxisLabelIndices(days.length, innerW / Math.max(days.length - 1, 1), axisLabelWidth),
+  );
 
   const createdColor = palette.opened ?? "#4facfe";
   const closedColor = palette.closed ?? "#56d4b0";
@@ -108,16 +115,18 @@ export function DailyVelocityChart({
 
           return (
             <g key={d.isoDate}>
-              <text
-                x={cx}
-                y={height - 4}
-                textAnchor="middle"
-                fill="var(--muted)"
-                fontSize={9}
-                fontFamily="var(--font-mono)"
-              >
-                {d.label}
-              </text>
+              {axisLabelIndices.has(idx) && (
+                <text
+                  x={cx}
+                  y={height - 4}
+                  textAnchor="middle"
+                  fill="var(--muted)"
+                  fontSize={axisFontSize}
+                  fontFamily="var(--font-mono)"
+                >
+                  {d.label}
+                </text>
+              )}
 
               {/* Created point */}
               <g
